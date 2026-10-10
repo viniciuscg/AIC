@@ -1,0 +1,72 @@
+{
+  "object": "list",
+  "type": "page_or_data_source",
+  "page_or_data_source": {},
+  "has_more": false,
+  "next_cursor": null,
+  "request_status": { "type": "complete" },
+  "results": [
+    {
+      "object": "page",
+      "id": "1a2b3c4d-0000-4000-8000-00000000abcd",
+      "created_time": "2026-09-30T13:00:00.000Z",
+      "last_edited_time": "2026-10-08T18:20:00.000Z",
+      "in_trash": false,
+      "is_locked": false,
+      "parent": { "type": "data_source_id", "data_source_id": "11111111-2222-4333-8444-000000000001", "database_id": "11111111-2222-4333-8444-000000000002" },
+      "url": "https://www.notion.so/Story-Simula-o-com-avalista-1a2b3c4d00004000800000000000abcd",
+      "public_url": null,
+      "properties": {
+        "User story": {
+          "id": "title",
+          "type": "title",
+          "title": [
+            { "type": "text", "text": { "content": "Story - ", "link": null }, "annotations": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "code": false, "color": "default" }, "plain_text": "Story - ", "href": null },
+            { "type": "text", "text": { "content": "Simulação com avalista", "link": null }, "annotations": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "code": false, "color": "default" }, "plain_text": "Simulação com avalista", "href": null }
+          ]
+        },
+        "ID": { "id": "%3DuId", "type": "unique_id", "unique_id": { "prefix": null, "number": 1256 } },
+        "Status": { "id": "R3ZsPw", "type": "status", "status": { "id": "abc1", "name": "Em andamento", "color": "blue" } },
+        "Prioridade": { "id": "SHVQZw", "type": "select", "select": { "id": "p1", "name": "Alto", "color": "red" } },
+        "Tipo": { "id": "Y0BEew", "type": "select", "select": { "id": "t1", "name": "❇️Story", "color": "green" } },
+        "Responsável": { "id": "resp", "type": "people", "people": [ { "object": "user", "id": "aaaaaaaa-1111-4111-8111-111111111111" } ] },
+        "Sprint": { "id": "spr", "type": "relation", "relation": [ { "id": "bbbbbbbb-2222-4222-8222-222222222222" } ], "has_more": false },
+        "Associado a Sprint Atual": { "id": "PjtNXw", "type": "formula", "formula": { "type": "boolean", "boolean": true } }
+      }
+    },
+    {
+      "object": "page",
+      "id": "2b3c4d5e-0000-4000-8000-00000000beef",
+      "in_trash": false,
+      "parent": { "type": "data_source_id", "data_source_id": "11111111-2222-4333-8444-000000000001" },
+      "url": "https://www.notion.so/BUG-Erro-no-c-lculo-2b3c4d5e00004000800000000000beef",
+      "properties": {
+        "User story": { "id": "title", "type": "title", "title": [ { "type": "text", "text": { "content": "BUG - Erro no cálculo", "link": null }, "plain_text": "BUG - Erro no cálculo", "href": null } ] },
+        "ID": { "id": "%3DuId", "type": "unique_id", "unique_id": { "prefix": "BUG", "number": 7 } },
+        "Status": { "id": "R3ZsPw", "type": "status", "status": { "id": "abc2", "name": "Waiting Q.A", "color": "gray" } },
+        "Prioridade": { "id": "SHVQZw", "type": "select", "select": { "id": "p0", "name": "Urgente💥", "color": "red" } },
+        "Tipo": { "id": "Y0BEew", "type": "select", "select": { "id": "t2", "name": "🐞BUG", "color": "red" } },
+        "Responsável": { "id": "resp", "type": "people", "people": [] },
+        "Sprint": { "id": "spr", "type": "relation", "relation": [], "has_more": false }
+      }
+    },
+    {
+      "object": "data_source",
+      "id": "cccccccc-3333-4333-8333-333333333333"
+    },
+    {
+      "object": "page",
+      "id": "3c4d5e6f-0000-4000-8000-00000000cafe",
+      "in_trash": false,
+      "parent": { "type": "data_source_id", "data_source_id": "11111111-2222-4333-8444-000000000001" },
+      "url": "https://www.notion.so/3c4d5e6f00004000800000000000cafe",
+      "properties": {
+        "User story": { "id": "title", "type": "title", "title": [] },
+        "ID": { "id": "%3DuId", "type": "unique_id", "unique_id": { "prefix": null, "number": 1300 } },
+        "Status": { "id": "R3ZsPw", "type": "status", "status": { "id": "x", "name": "Finalizado", "color": "green" } },
+        "Prioridade": { "id": "SHVQZw", "type": "select", "select": null },
+        "Tipo": { "id": "Y0BEew", "type": "select", "select": null }
+      }
+    }
+  ]
+}

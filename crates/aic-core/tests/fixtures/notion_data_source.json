@@ -1,0 +1,38 @@
+{
+  "object": "data_source",
+  "id": "11111111-2222-4333-8444-000000000001",
+  "title": [ { "type": "text", "text": { "content": "Backlog - Time", "link": null }, "plain_text": "Backlog - Time", "href": null } ],
+  "parent": { "type": "database_id", "database_id": "11111111-2222-4333-8444-000000000002" },
+  "properties": {
+    "User story": { "id": "title", "name": "User story", "type": "title", "title": {} },
+    "ID": { "id": "uid", "name": "ID", "type": "unique_id", "unique_id": { "prefix": null } },
+    "Status": {
+      "id": "R3ZsPw", "name": "Status", "type": "status",
+      "status": {
+        "options": [
+          { "id": "s1", "name": "Backlog", "color": "default" },
+          { "id": "s2", "name": "Sprint backlog", "color": "gray" },
+          { "id": "s3", "name": "Em andamento", "color": "blue" },
+          { "id": "s4", "name": "Codereview", "color": "yellow" },
+          { "id": "s5", "name": "Q.A", "color": "purple" },
+          { "id": "s6", "name": "Correções", "color": "orange" },
+          { "id": "s7", "name": "Concluído", "color": "green" },
+          { "id": "s8", "name": "Arquivado", "color": "default" }
+        ],
+        "groups": [
+          { "id": "g1", "name": "To-do", "color": "gray", "option_ids": ["s1", "s2"] },
+          { "id": "g2", "name": "In progress", "color": "blue", "option_ids": ["s3", "s4", "s5", "s6"] },
+          { "id": "g3", "name": "Complete", "color": "green", "option_ids": ["s7", "s8"] }
+        ]
+      }
+    },
+    "Status Pull Requests": { "id": "YHhGaQ", "name": "Status Pull Requests", "type": "status", "status": { "options": [], "groups": [] } },
+    "Prioridade": { "id": "SHVQZw", "name": "Prioridade", "type": "select", "select": { "options": [ { "id": "p1", "name": "Alto", "color": "red" } ] } },
+    "Tipo": { "id": "Y0BEew", "name": "Tipo", "type": "select", "select": { "options": [] } },
+    "Categoria": { "id": "QFpkcg", "name": "Categoria", "type": "select", "select": { "options": [] } },
+    "Responsável": { "id": "resp", "name": "Responsável", "type": "people", "people": {} },
+    "Q.A responsável": { "id": "qa", "name": "Q.A responsável", "type": "people", "people": {} },
+    "Sprint": { "id": "spr", "name": "Sprint", "type": "relation", "relation": { "data_source_id": "11111111-2222-4333-8444-000000000003", "type": "dual_property", "dual_property": {} } },
+    "Card Pai": { "id": "pai", "name": "Card Pai", "type": "relation", "relation": { "data_source_id": "11111111-2222-4333-8444-000000000001", "type": "dual_property", "dual_property": {} } }
+  }
+}

@@ -1,0 +1,15 @@
+[package]
+name = "aic-term"
+description = "Widget de terminal egui sobre alacritty_terminal (derivado do egui_term, MIT)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+egui.workspace = true
+alacritty_terminal.workspace = true
+anyhow.workspace = true
+open.workspace = true
+
+[dev-dependencies]
+egui_kittest = { version = "0.36", features = ["wgpu", "snapshot"] }
