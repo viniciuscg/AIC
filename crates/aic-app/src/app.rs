@@ -91,6 +91,8 @@ pub struct App {
     pub usage: ui::usage::UsageState,
     /// Sync com o Notion em background (ver `notion_ui`).
     pub notion: crate::notion_ui::NotionState,
+    /// Buscas de card (Abrir card / Buscar no Notion) em background (ver `connector`).
+    pub connector: crate::connector::ConnectorState,
     /// Histórico de tokens/custo lido dos transcripts numa thread.
     pub usage_history: crate::usage_history::UsageHistory,
 
@@ -169,6 +171,7 @@ impl App {
             settings: Default::default(),
             usage: Default::default(),
             notion: Default::default(),
+            connector: Default::default(),
             usage_history: crate::usage_history::UsageHistory::start(ctx),
             account: StatusSnapshot::latest(),
             md_cache: Default::default(),
@@ -875,6 +878,7 @@ impl App {
         }
 
         self.usage_history.poll();
+        crate::connector::poll(self, ctx);
         self.toasts.retain(|t| t.until > Instant::now());
 
         if self.fonts_dirty {
@@ -1144,7 +1148,7 @@ pub fn repo_name(cwd: &Path, repos_dir: &Path) -> Option<String> {
     Some(first.trim_end_matches(".worktrees").to_string())
 }
 
-fn ensure_git_exclude(cwd: &Path) -> std::io::Result<()> {
+pub(crate) fn ensure_git_exclude(cwd: &Path) -> std::io::Result<()> {
     let Some(top) = git::toplevel(cwd) else { return Ok(()) };
     let out = std::process::Command::new("git").arg("-C").arg(&top).args(["rev-parse", "--git-path", "info/exclude"]).output()?;
     let rel = String::from_utf8_lossy(&out.stdout).trim().to_string();

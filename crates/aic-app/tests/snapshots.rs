@@ -359,3 +359,40 @@ fn mascotes() {
         img.save(out(name)).unwrap();
     }
 }
+
+/// Diálogo "Abrir card" com um card já lido (sem rede): repos sugeridos marcados e opções.
+#[test]
+fn abrir_card() {
+    use aic_app::connector::OpenCardForm;
+    use aic_app::ui::modals::Modal;
+    use aic_core::card::CardInfo;
+
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = sandbox("abrir-card");
+    let repos = dir.join("repos");
+    for r in ["api-pagamentos", "infra", "notificador", "web-app"] {
+        std::fs::create_dir_all(repos.join(r).join(".git")).unwrap();
+    }
+    let mut h = harness("aic", [1280.0, 860.0]);
+    h.step();
+    let app = h.state_mut().as_mut().unwrap();
+    app.cfg.repos_dirs = vec![repos];
+    let card = CardInfo {
+        title: "Corrigir cálculo de juros no checkout".into(),
+        key: Some("DEV-1256".into()),
+        url: Some("https://www.notion.so/minhaempresa/Corrigir-juros-0123456789abcdef0123456789abcdef".into()),
+        status: Some("Em andamento".into()),
+        assignee: Some("Vinicius".into()),
+        summary: "O juros diário erra alguns centavos quando a proposta cruza a virada do mês. Na thread, o time decidiu arredondar só no fim (não por parcela) e expor o valor corrigido também na tela de simulação.".into(),
+        criteria: vec!["juros arredondado só no total".into(), "teste de regressão com a proposta 9912".into(), "simulação mostra o valor corrigido".into()],
+        slack_threads: vec!["https://minhaempresa.slack.com/archives/C1/p1".into()],
+        repos: vec!["api-pagamentos".into(), "web-app".into()],
+    };
+    app.modal = Some(Modal::OpenCard(OpenCardForm::with_card(app, card)));
+    settle(&mut h, 300);
+    shot(&mut h, "abrir-card");
+    let app = h.state_mut().as_mut().unwrap();
+    app.modal = Some(Modal::OpenCard(OpenCardForm { link: "dev-12".into(), error: Some("o Claude não conseguiu ler o card: página não encontrada".into()), ..Default::default() }));
+    settle(&mut h, 200);
+    shot(&mut h, "abrir-card-link");
+}

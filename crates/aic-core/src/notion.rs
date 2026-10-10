@@ -548,6 +548,30 @@ impl Client {
         Ok(v.get("name").and_then(Value::as_str).unwrap_or("integração").to_string())
     }
 
+    /// Uma página (`GET /v1/pages/{id}`).
+    pub fn page(&self, id: &str) -> Result<Value> {
+        self.get(&format!("/pages/{}", norm_id(id)))
+    }
+
+    /// Texto corrido dos primeiros blocos da página (parágrafos, listas, títulos), um por linha.
+    pub fn page_text(&self, id: &str, max_blocks: usize) -> Result<String> {
+        let v = self.get(&format!("/blocks/{}/children?page_size={}", norm_id(id), max_blocks.clamp(1, 100)))?;
+        let lines: Vec<String> = v
+            .get("results")
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter_map(|b| {
+                        let ty = b.get("type")?.as_str()?;
+                        let text = plain_text(b.get(ty)?.get("rich_text"));
+                        (!text.trim().is_empty()).then_some(text)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(lines.join("\n"))
+    }
+
     /// Schema do data source. Aceita id de database (resolve pro primeiro data source).
     pub fn data_source(&self, id: &str) -> Result<Value> {
         let id = norm_id(id);
