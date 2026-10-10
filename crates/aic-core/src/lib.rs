@@ -1,5 +1,6 @@
 //! Núcleo do AIC, sem UI: modelo, store, captura rápida, git, ponte com o Claude Code.
 
+pub mod card;
 pub mod claude;
 pub mod config;
 pub mod events;
