@@ -1,4 +1,4 @@
-//! O pai: Plankton. Laboratório do Siri Cascudo... digo, do Balde de Lixo.
+//! Tema Plankton. Laboratório do Siri Cascudo... digo, do Balde de Lixo.
 
 use std::f32::consts::PI;
 use std::path::PathBuf;
@@ -165,7 +165,7 @@ impl Skin for Plankton {
     }
 }
 
-/// Sprites do usuário: `~/.local/share/aic/forks/plankton/sprites/<estado>.(gif|png)`.
+/// Sprites do usuário: `~/.local/share/aic/temas/plankton/sprites/<estado>.(gif|png)`.
 /// Estados: boot, working, idle, waiting, done, gameover. Qualquer um que faltar cai no desenho.
 fn sprite_for(state: SessionState) -> Option<PathBuf> {
     let name = match state {
@@ -176,7 +176,7 @@ fn sprite_for(state: SessionState) -> Option<PathBuf> {
         SessionState::Done => "done",
         SessionState::GameOver => "gameover",
     };
-    let dir = paths::data_dir().join("forks/plankton/sprites");
+    let dir = paths::data_dir().join("temas/plankton/sprites");
     ["gif", "png"].iter().map(|ext| dir.join(format!("{name}.{ext}"))).find(|p| p.exists())
 }
 

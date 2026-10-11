@@ -14,7 +14,7 @@
       "in_trash": false,
       "is_locked": false,
       "parent": { "type": "data_source_id", "data_source_id": "11111111-2222-4333-8444-000000000001", "database_id": "11111111-2222-4333-8444-000000000002" },
-      "url": "https://www.notion.so/Story-Simula-o-com-avalista-1a2b3c4d00004000800000000000abcd",
+      "url": "https://www.notion.so/Story-Exportar-relat-rio-em-CSV-1a2b3c4d00004000800000000000abcd",
       "public_url": null,
       "properties": {
         "User story": {
@@ -22,10 +22,10 @@
           "type": "title",
           "title": [
             { "type": "text", "text": { "content": "Story - ", "link": null }, "annotations": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "code": false, "color": "default" }, "plain_text": "Story - ", "href": null },
-            { "type": "text", "text": { "content": "Simulação com avalista", "link": null }, "annotations": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "code": false, "color": "default" }, "plain_text": "Simulação com avalista", "href": null }
+            { "type": "text", "text": { "content": "Exportar relatório em CSV", "link": null }, "annotations": { "bold": false, "italic": false, "strikethrough": false, "underline": false, "code": false, "color": "default" }, "plain_text": "Exportar relatório em CSV", "href": null }
           ]
         },
-        "ID": { "id": "%3DuId", "type": "unique_id", "unique_id": { "prefix": null, "number": 1256 } },
+        "ID": { "id": "%3DuId", "type": "unique_id", "unique_id": { "prefix": null, "number": 142 } },
         "Status": { "id": "R3ZsPw", "type": "status", "status": { "id": "abc1", "name": "Em andamento", "color": "blue" } },
         "Prioridade": { "id": "SHVQZw", "type": "select", "select": { "id": "p1", "name": "Alto", "color": "red" } },
         "Tipo": { "id": "Y0BEew", "type": "select", "select": { "id": "t1", "name": "❇️Story", "color": "green" } },

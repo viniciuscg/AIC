@@ -236,7 +236,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
     let color = theme.agent(rt.s.color);
     let border = if is_focused { color } else { theme.border };
 
-    // moldura (sombra dura nos forks retrô)
+    // moldura (sombra dura nos temas retrô)
     if let Some(o) = theme.hard_shadow {
         ui.painter().rect_filled(rect.translate(Vec2::splat(o)), theme.radius(), Color32::from_black_alpha(220));
     }

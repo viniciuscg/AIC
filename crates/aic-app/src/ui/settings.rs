@@ -25,7 +25,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
         section(ui, &theme, "Geral");
         egui::Grid::new("geral").num_columns(2).spacing([16.0, 8.0]).show(ui, |ui| {
-            ui.label("Fork");
+            ui.label("Tema");
             ui.horizontal(|ui| {
                 for f in skins::all() {
                     if ui.selectable_label(app.skin.id() == f.id(), f.display_name()).clicked() {
@@ -237,7 +237,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         });
 
         section(ui, &theme, "Sobre");
-        ui.label(format!("AIC {} · fork {} · variante {}", env!("CARGO_PKG_VERSION"), app.skin.display_name(), app.theme.variant));
+        ui.label(format!("AIC {} · tema {} · variante {}", env!("CARGO_PKG_VERSION"), app.skin.display_name(), app.theme.variant));
         for (label, p) in [
             ("config", aic_core::paths::config_dir()),
             ("dados", aic_core::paths::data_dir()),

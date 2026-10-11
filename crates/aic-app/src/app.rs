@@ -26,11 +26,11 @@ pub enum View {
     Worktrees,
     Usage,
     Settings,
-    ForkHelp,
+    ThemeHelp,
 }
 
 impl View {
-    pub const ALL: [View; 6] = [View::Sessions, View::Board, View::Worktrees, View::Usage, View::Settings, View::ForkHelp];
+    pub const ALL: [View; 6] = [View::Sessions, View::Board, View::Worktrees, View::Usage, View::Settings, View::ThemeHelp];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,7 +109,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ctx: &Context, fork_arg: Option<String>, fresh: bool) -> anyhow::Result<Self> {
+    pub fn new(ctx: &Context, theme_arg: Option<String>, fresh: bool) -> anyhow::Result<Self> {
         paths::ensure_dirs()?;
         egui_extras::install_image_loaders(ctx);
         let mut cfg = Config::load();
@@ -118,7 +118,7 @@ impl App {
         }
         let store = Store::open(&paths::db_path())?;
 
-        if let Some(f) = &fork_arg {
+        if let Some(f) = &theme_arg {
             cfg.theme = f.clone();
         }
         let needs_setup = !cfg.setup_done;
@@ -798,7 +798,7 @@ impl App {
                 md.push_str(&format!("- [{}] {}\n", if s.done { "x" } else { " " }, s.text));
             }
         }
-        md.push_str("\n> Gerado pelo Plankton. Use a skill `aic:contexto` para puxar o card e a thread completos.\n");
+        md.push_str("\n> Gerado pelo AIC. Use a skill `aic:contexto` para puxar o card e a thread completos.\n");
         let result = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("context.md"), md));
         // .aic/ fora do git sem mexer no .gitignore do repo
         let _ = ensure_git_exclude(&rt.s.cwd);
@@ -1047,7 +1047,7 @@ impl App {
             ViewWorktrees => self.set_view(View::Worktrees),
             ViewUsage => self.set_view(View::Usage),
             ViewSettings => self.set_view(View::Settings),
-            ViewForkHelp => self.set_view(View::ForkHelp),
+            ViewThemeHelp => self.set_view(View::ThemeHelp),
             Palette => self.modal = Some(ui::modals::Modal::Palette { query: String::new(), selected: 0 }),
             ZoomIn => self.set_font_size(self.cfg.font_size + 1.0),
             ZoomOut => self.set_font_size(self.cfg.font_size - 1.0),
@@ -1058,7 +1058,7 @@ impl App {
                 let next = vs[(cur + 1) % vs.len()].to_string();
                 self.set_theme(ctx, self.skin.id().to_string(), Some(next));
             }
-            SwitchFork => {
+            SwitchTheme => {
                 let next = skins::all().into_iter().map(|s| s.id()).find(|id| *id != self.skin.id()).unwrap_or("aic");
                 self.set_theme(ctx, next.to_string(), None);
             }

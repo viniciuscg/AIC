@@ -1,4 +1,4 @@
-//! Barra superior: mascote + nome do fork, abas, workspace, contadores e limites da conta.
+//! Barra superior: mascote + nome do tema, abas, workspace, contadores e limites da conta.
 
 use egui::text::LayoutJob;
 use egui::{Rect, RichText, Sense, Ui, Vec2};
@@ -27,8 +27,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         if app.cfg.on(aic_core::Module::Mascot) {
             app.skin.mascot(ui, rect, mood, t, &theme);
         }
-        if resp.on_hover_text("Ajuda do fork (F1)").clicked() {
-            app.set_view(View::ForkHelp);
+        if resp.on_hover_text("Ajuda do tema (F1)").clicked() {
+            app.set_view(View::ThemeHelp);
         }
 
         let pos = ui.cursor().min + Vec2::new(0.0, 4.0);
@@ -46,7 +46,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             (View::Worktrees, widgets::I_WORKTREE, "Worktrees", Action::ViewWorktrees),
             (View::Usage, widgets::I_CHART, "Tokens", Action::ViewUsage),
             (View::Settings, widgets::I_GEAR, "Config", Action::ViewSettings),
-            (View::ForkHelp, widgets::I_HELP, app.skin.name(), Action::ViewForkHelp),
+            (View::ThemeHelp, widgets::I_HELP, app.skin.name(), Action::ViewThemeHelp),
         ];
         for (view, icon, label, action) in tabs {
             let active = app.view == view;

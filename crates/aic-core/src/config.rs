@@ -69,7 +69,6 @@ pub struct ThemeConfig {
 #[serde(default)]
 pub struct Config {
     /// Tema atual (`aic` | `plankton`).
-    #[serde(alias = "fork")]
     pub theme: String,
     /// Primeiro uso concluído (assistente de visualização/tema/módulos).
     pub setup_done: bool,
@@ -131,7 +130,7 @@ pub struct NotionConfig {
     /// Título: vazio = a propriedade do tipo `title`, seja qual for o nome.
     pub title_property: Option<String>,
     pub status_property: Option<String>,
-    /// Propriedade `unique_id` (ID) que gera a chave do card (ex: `DEV-1256`).
+    /// Propriedade `unique_id` (ID) que gera a chave do card (ex: `DEV-142`).
     pub key_property: Option<String>,
     /// Prefixo usado quando o `unique_id` não tem prefixo próprio no Notion.
     pub key_prefix: Option<String>,
@@ -139,7 +138,7 @@ pub struct NotionConfig {
     /// Relação da task com a database de sprints.
     pub sprint_property: Option<String>,
     pub priority_property: Option<String>,
-    /// Select com o tipo do card (Story, Subtask, BUG…); vira tag no Plankton.
+    /// Select com o tipo do card (Story, Subtask, BUG…); vira tag no AIC.
     pub type_property: Option<String>,
     /// Status da sprint na database de sprints e o valor que significa "atual".
     pub sprint_status_property: Option<String>,
@@ -256,7 +255,7 @@ impl Config {
     pub fn load() -> Self {
         std::fs::read_to_string(Self::path())
             .ok()
-            .and_then(|t| match toml::from_str(&t) {
+            .and_then(|t| match toml::from_str::<Self>(&t) {
                 Ok(c) => Some(c),
                 Err(e) => {
                     eprintln!("aic: config.toml inválido ({e}); usando padrões");
@@ -264,6 +263,42 @@ impl Config {
                 }
             })
             .unwrap_or_default()
+            .with_env()
+    }
+
+    /// Overrides do ambiente (e do `~/.config/aic/.env`, já carregado por `paths::load_dotenv`).
+    /// Vazio = ignora. Veja `.env.example`.
+    pub fn with_env(mut self) -> Self {
+        let env = |k: &str| std::env::var(k).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+        if let Some(v) = env("AIC_NOTION_TASKS_DB") {
+            self.notion.tasks_database = Some(v);
+        }
+        if let Some(v) = env("AIC_NOTION_SPRINTS_DB") {
+            self.notion.sprints_database = Some(v);
+        }
+        if let Some(v) = env("AIC_NOTION_ME") {
+            self.notion.me = Some(v);
+        }
+        if let Some(v) = env("AIC_NOTION_KEY_PREFIX") {
+            self.notion.key_prefix = Some(v);
+        }
+        if let Some(v) = env("AIC_REPOS_DIRS") {
+            let home = paths::home_dir();
+            self.repos_dirs = v
+                .split(':')
+                .map(str::trim)
+                .filter(|d| !d.is_empty())
+                .map(|d| match d.strip_prefix("~/") {
+                    Some(rest) => home.join(rest),
+                    None if d == "~" => home.clone(),
+                    None => PathBuf::from(d),
+                })
+                .collect();
+        }
+        if let Some(v) = env("SLACK_WORKSPACE_URL") {
+            self.slack.workspace_url = Some(v);
+        }
+        self
     }
 
     pub fn save(&self) -> anyhow::Result<()> {

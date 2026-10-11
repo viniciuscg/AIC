@@ -7,15 +7,15 @@ description: Abre e fecha um git worktree por card, no padrão <repo>.worktrees/
 
 Padrão (o mesmo do app AIC):
 
-- **Branch**: `<CARD>-<slug>` — `DEV-1256` + "Corrigir cálculo de juros" → `DEV-1256-corrigir-calculo-de-juros`. Slug minúsculo, sem acento, palavras unidas por `-`, até ~40 caracteres. Sem card, só o slug.
-- **Pasta**: ao lado do repo, `<repo>.worktrees/<branch>` (`/` da branch vira `-`). Ex: `~/dev/api-pagamentos.worktrees/DEV-1256-corrigir-calculo-de-juros`.
+- **Branch**: `<CARD>-<slug>` — `DEV-142` + "Corrigir cálculo de juros" → `DEV-142-corrigir-calculo-de-juros`. Slug minúsculo, sem acento, palavras unidas por `-`, até ~40 caracteres. Sem card, só o slug.
+- **Pasta**: ao lado do repo, `<repo>.worktrees/<branch>` (`/` da branch vira `-`). Ex: `~/dev/api-pagamentos.worktrees/DEV-142-corrigir-calculo-de-juros`.
 - **Base**: a branch padrão do origin: `git -C "$REPO" symbolic-ref --short refs/remotes/origin/HEAD` (sem origin: `main`, ou `master` se for a que existe). Se o `CLAUDE.md` do projeto disser outra regra, ela vale.
 
 ## Abrir
 
 ```bash
 REPO=/caminho/do/repo            # raiz do repo (não um worktree)
-BRANCH=DEV-1256-corrigir-calculo-de-juros
+BRANCH=DEV-142-corrigir-calculo-de-juros
 BASE=main                        # ou master (veja a regra acima)
 WT="$REPO.worktrees/${BRANCH//\//-}"
 

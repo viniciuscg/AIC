@@ -42,7 +42,6 @@ const BUILTINS: &[Builtin] = &[
     Builtin { id: "sino", name: "Sino", desc: "Sino curto e limpo (sintetizado)", origin: Origin::Synth, synth: Some(bell), file: "sino.wav" },
     Builtin { id: "pop", name: "Pop", desc: "Estalo discreto (sintetizado)", origin: Origin::Synth, synth: Some(pop), file: "pop.wav" },
     Builtin { id: "plankton-gemido", name: "Plankton gemendo", desc: "\"Aaaahhhhmmmm\" (baixado pelo install.sh)", origin: Origin::Download, synth: None, file: "plankton-gemido.mp3" },
-    Builtin { id: "aic-grito", name: "Grito grunge", desc: "Clipe curto de grito grunge (baixado pelo install.sh)", origin: Origin::Download, synth: None, file: "aic-grito.mp3" },
 ];
 
 /// Som padrão de cada tema.

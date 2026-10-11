@@ -2,6 +2,7 @@ use aic_app::cli::{self, Cli};
 use aic_app::{App, AicApp};
 
 fn main() {
+    aic_core::paths::load_dotenv();
     match cli::parse(std::env::args().collect()) {
         Cli::Run(cmd) => {
             if let Err(e) = cmd() {
@@ -9,7 +10,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Cli::Gui { fork, fresh } => {
+        Cli::Gui { tema, fresh } => {
             let options = eframe::NativeOptions {
                 viewport: egui::ViewportBuilder::default()
                     .with_title("AIC")
@@ -22,7 +23,7 @@ fn main() {
             let result = eframe::run_native(
                 "aic",
                 options,
-                Box::new(move |cc| Ok(Box::new(AicApp(App::new(&cc.egui_ctx, fork, fresh)?)))),
+                Box::new(move |cc| Ok(Box::new(AicApp(App::new(&cc.egui_ctx, tema, fresh)?)))),
             );
             if let Err(e) = result {
                 eprintln!("aic: {e}");

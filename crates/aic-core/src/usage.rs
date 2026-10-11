@@ -9,7 +9,7 @@
 //! - a mesma resposta aparece em várias linhas (uma por bloco de conteúdo), com o mesmo
 //!   `message.id` + `requestId`; durante o streaming o `output_tokens` cresce entre elas.
 //!   Por isso a chave de deduplicação é `message.id:requestId` e fica o maior uso visto.
-//! - forks de sessão copiam o histórico pra um arquivo novo: a deduplicação é global,
+//! - sessões ramificadas copiam o histórico pra um arquivo novo: a deduplicação é global,
 //!   e a resposta continua atribuída à sessão onde apareceu primeiro.
 //! - `usage.cache_creation` separa a escrita de cache de 5 min e de 1 h (preços diferentes).
 //! - `usage.speed == "fast"` é o modo rápido (preço premium).
@@ -811,7 +811,7 @@ mod tests {
         let expected = (10.0 * 4.0 + 50.0 * 20.0 + 1000.0 * 5.0) / 1e6;
         assert!((tot.cost - expected).abs() < 1e-12);
 
-        // completa a linha + subagente (sessionId do pai) + fork copiando msg_a
+        // completa a linha + subagente (sessionId do pai) + sessão ramificada copiando msg_a
         std::fs::write(&file, format!("{text}{partial}")).unwrap();
         std::fs::write(proj.join("s1/subagents/agent-1.jsonl"), line("msg_c", "req_c", "claude-haiku-5-5", &ts, "s1", "/home/x/repo", usage(100, 0, 0, 0, 10))).unwrap();
         std::fs::write(proj.join("s2.jsonl"), line("msg_a", "req_a", "claude-opus-5-5", &ts, "s2", "/home/x/repo", usage(10, 1000, 0, 0, 50))).unwrap();
@@ -821,7 +821,7 @@ mod tests {
         let r = agg.report(today);
         assert_eq!(r.totals(1).messages, 3);
         let sessions = r.by_session(30);
-        assert_eq!(sessions.len(), 1, "fork não duplica: {sessions:?}");
+        assert_eq!(sessions.len(), 1, "ramificação não duplica: {sessions:?}");
         assert_eq!(sessions[0].key, "s1");
         assert_eq!(sessions[0].project, "/home/x/repo");
         let models: Vec<String> = r.by_model(30).into_iter().map(|b| b.key).collect();

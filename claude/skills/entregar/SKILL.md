@@ -32,7 +32,7 @@ Escreva um rascunho curto (o que mudou, como testar, branch/PR). Mostre ao usuá
 ## 4. Concluir no AIC
 
 ```bash
-PK="${AIC_BIN:-plankton}"
+PK="${AIC_BIN:-aic}"
 "$PK" tasks                     # ache o id (a tarefa da sessão está em $AIC_TASK)
 "$PK" done "${AIC_TASK:-<id>}"
 ```

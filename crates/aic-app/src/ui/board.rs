@@ -517,7 +517,7 @@ fn editor(app: &mut App, ui: &mut Ui, mut task: Task) {
 
             ui.label(widgets::subtle("Card", &theme));
             let mut key = task.card_key.clone().unwrap_or_default();
-            if ui.add(TextEdit::singleline(&mut key).hint_text("DEV-1256").desired_width(140.0)).changed() {
+            if ui.add(TextEdit::singleline(&mut key).hint_text("DEV-142").desired_width(140.0)).changed() {
                 task.card_key = (!key.trim().is_empty()).then(|| key.trim().to_uppercase());
             }
             ui.end_row();

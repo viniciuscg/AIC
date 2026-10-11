@@ -1,17 +1,17 @@
-//! Modelo de fork novo. Copie este arquivo, troque os nomes e registre em `skins::all()`.
+//! Modelo de tema novo. Copie este arquivo, troque os nomes e registre em `skins::all()`.
 //!
 //! O que você pode sobrescrever (tudo tem padrão herdado do Plankton):
 //! - `theme(variant)`: cores, raio, sombra e paleta do terminal
 //! - `modules()`: desligar board, worktrees, tokens, Notion, mascote, som, fundo
-//! - `state_label(estado)`: como o fork chama BOOT/WORKING/IDLE/WAITING/DONE/GAME OVER
+//! - `state_label(estado)`: como o tema chama BOOT/WORKING/IDLE/WAITING/DONE/GAME OVER
 //! - `mascot(...)`: desenho/animação do mascote por estado
 //! - `background(...)`: efeito de fundo (bolhas, dragões, granulação...)
 //! - `wordmark(...)`: o letreiro da barra superior
-//! - `icon(...)`: ícone pequeno (seletor de fork, aba de ajuda)
+//! - `icon(...)`: ícone pequeno (seletor de tema, aba de ajuda)
 //!
 //! Pixel art (fonte bitmap 5x7, sprites em grade de caracteres): veja `skins::pixel`.
-//! Referências de mascote: `plankton.rs` (vetor), `clark.rs` (pixel art), `aic.rs` (vetor + fundo).
-//! - `help()`: a aba de ajuda do fork (Markdown em `forks/<id>/HELP.md`)
+//! Referências de mascote: `plankton.rs` (vetor), `aic.rs` (vetor + fundo); pixel art com `skins::pixel`.
+//! - `help()`: a aba de ajuda do tema (Markdown em `skins/<id>/HELP.md`)
 
 use super::{Skin, plankton::Plankton};
 use crate::theme::Theme;
@@ -30,7 +30,7 @@ impl Skin for Template {
         "Você"
     }
     fn tagline(&self) -> &'static str {
-        "um fork novo, herdando tudo do Plankton"
+        "um tema novo, herdando tudo do Plankton"
     }
     fn variants(&self) -> &'static [&'static str] {
         Plankton.variants()
@@ -39,6 +39,6 @@ impl Skin for Template {
         Plankton.theme(variant)
     }
     fn help(&self) -> &'static str {
-        "# Template\n\nFork de exemplo."
+        "# Template\n\nTema de exemplo."
     }
 }

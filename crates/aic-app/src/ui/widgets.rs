@@ -101,7 +101,7 @@ pub fn state_dot(ui: &Ui, center: egui::Pos2, r: f32, state: SessionState, theme
     ui.painter().circle_filled(center, r, color);
 }
 
-/// Frame de card. Com `hard_shadow` (Clark/AIC) desenha a sombra deslocada sólida.
+/// Frame de card. Com `hard_shadow` (tema AIC) desenha a sombra deslocada sólida.
 pub fn card(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, add: impl FnOnce(&mut Ui)) -> Response {
     let stroke = if active { Stroke::new(1.5, accent) } else { Stroke::new(1.0, theme.border) };
     let frame = Frame::new()

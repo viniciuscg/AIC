@@ -1,4 +1,4 @@
-//! Tokens visuais de um fork/variante e a conversão pro `Visuals` do egui.
+//! Tokens visuais de um tema/variante e a conversão pro `Visuals` do egui.
 
 use egui::{Color32, CornerRadius, FontFamily, FontId, Shadow, Stroke, Style, TextStyle, Visuals};
 use aic_core::SessionState;
@@ -24,12 +24,12 @@ pub struct Theme {
     pub ok: Color32,
     pub warn: Color32,
     pub err: Color32,
-    /// "Precisa de você" (roxo no MultiTerm).
+    /// "Precisa de você" (roxo).
     pub attention: Color32,
     /// Cores por sessão (borda/etiqueta).
     pub agents: Vec<Color32>,
     pub radius: u8,
-    /// Sombra dura deslocada (Clark: 3px). `None` = sombra suave padrão.
+    /// Sombra dura deslocada (ex: 3px). `None` = sombra suave padrão.
     pub hard_shadow: Option<f32>,
     pub term: TerminalTheme,
 }

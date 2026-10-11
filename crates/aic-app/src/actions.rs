@@ -48,14 +48,14 @@ pub enum Action {
     ViewWorktrees,
     ViewUsage,
     ViewSettings,
-    ViewForkHelp,
+    ViewThemeHelp,
     Palette,
     // Visual
     ZoomIn,
     ZoomOut,
     ZoomReset,
     CycleThemeVariant,
-    SwitchFork,
+    SwitchTheme,
     ToggleSidebar,
     Quit,
 }
@@ -87,7 +87,7 @@ impl Action {
         v.extend([
             ToggleLayout, CycleView, NewBlock, CloseBlock, RenameBlock, CycleSplit, ToggleBlockSide, FocusNotes, OpenCard, ToggleMaximize, ReleaseTerminal, QuickAdd, LinkTaskToSession, Workspaces, NewWorkspace,
             NextWorkspace, PrevWorkspace, ViewSessions, ViewBoard, ViewWorktrees, ViewUsage, ViewSettings,
-            ViewForkHelp, Palette, ZoomIn, ZoomOut, ZoomReset, CycleThemeVariant, SwitchFork, ToggleSidebar, Quit,
+            ViewThemeHelp, Palette, ZoomIn, ZoomOut, ZoomReset, CycleThemeVariant, SwitchTheme, ToggleSidebar, Quit,
         ]);
         v
     }
@@ -140,13 +140,13 @@ impl Action {
             ViewWorktrees => ("view_worktrees", "Aba Worktrees", "Visões", ks(CS, Key::G)),
             ViewUsage => ("view_usage", "Aba Tokens", "Visões", ks(CS, Key::U)),
             ViewSettings => ("view_settings", "Configurações e binds", "Visões", ks(C, Key::Comma)),
-            ViewForkHelp => ("view_fork_help", "Ajuda do fork", "Visões", ks(N, Key::F1)),
+            ViewThemeHelp => ("view_theme_help", "Ajuda do tema", "Visões", ks(N, Key::F1)),
             Palette => ("palette", "Paleta de comandos", "Visões", ks(CS, Key::P)),
             ZoomIn => ("zoom_in", "Aumentar fonte", "Visual", ks(CS, Key::Equals)),
             ZoomOut => ("zoom_out", "Diminuir fonte", "Visual", ks(CS, Key::Minus)),
             ZoomReset => ("zoom_reset", "Fonte padrão", "Visual", ks(CS, Key::Num0)),
             CycleThemeVariant => ("cycle_theme", "Próxima variante de tema", "Visual", ks(CS, Key::Y)),
-            SwitchFork => ("switch_theme", "Trocar de tema (AIC ⇄ Plankton)", "Visual", None),
+            SwitchTheme => ("switch_theme", "Trocar de tema (AIC ⇄ Plankton)", "Visual", None),
             ToggleSidebar => ("toggle_sidebar", "Mostrar/esconder a lista lateral", "Visual", ks(CS, Key::D)),
             Quit => ("quit", "Sair", "Visual", ks(CS, Key::Q)),
         };
@@ -207,7 +207,7 @@ impl Keymap {
     }
 
     pub fn save(&self) -> anyhow::Result<()> {
-        let mut out = String::from("# Atalhos do Plankton. Formato: acao = \"Ctrl+Shift+N\" (vazio desliga)\n");
+        let mut out = String::from("# Atalhos do AIC. Formato: acao = \"Ctrl+Shift+N\" (vazio desliga)\n");
         for (a, s) in &self.map {
             if *s != a.meta().default {
                 let v = s.map(|s| format_shortcut(&s)).unwrap_or_default();
