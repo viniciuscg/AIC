@@ -131,10 +131,10 @@ fn sidebar(app: &mut App, ui: &mut Ui, ids: &[Id]) {
         ui.horizontal(|ui| {
             ui.label(RichText::new(format!("SESSÕES · {}", ids.len())).font(FontId::monospace(11.0)).color(theme.dim));
             ui.with_layout(ELayout::right_to_left(Align::Center), |ui| {
-                if ui.small_button(widgets::I_PLUS).on_hover_text(app.keymap.label(Action::NewSession)).clicked() {
+                if widgets::icon_button(ui, widgets::I_PLUS, "Nova sessão", &app.keymap.tip(Action::NewSession, "Novo Claude")).clicked() {
                     app.run_action(ui.ctx(), Action::NewSession);
                 }
-                if ui.small_button("▦").on_hover_text(format!("Grade ({})", app.keymap.label(Action::ToggleLayout))).clicked() {
+                if widgets::icon_button(ui, "▦", "Alternar foco/grade", &app.keymap.tip(Action::ToggleLayout, "Alternar foco ⇄ grade")).clicked() {
                     app.run_action(ui.ctx(), Action::ToggleLayout);
                 }
             });
@@ -292,11 +292,11 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
         c.label(RichText::new(app.skin.state_label(SessionState::GameOver)).font(FontId::monospace(18.0)).color(theme.err));
         c.label(widgets::subtle("O processo terminou.", &theme));
         c.horizontal(|ui| {
-            if ui.button(format!("{I_RESTART} Reabrir (Enter)")).clicked() || (is_focused && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
+            if ui.button(format!("{I_RESTART} Reabrir (Enter)")).on_hover_text(app.keymap.tip(Action::RestartSession, "Reabrir o processo")).clicked() || (is_focused && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
                 let ctx = ui.ctx().clone();
                 app.restart_session(&ctx, id);
             }
-            if ui.button(format!("{I_CLOSE} Fechar")).clicked() {
+            if ui.button(format!("{I_CLOSE} Fechar")).on_hover_text(app.keymap.tip(Action::CloseSession, "Fechar o terminal")).clicked() {
                 app.kill_session(id, false);
             }
         });
@@ -334,26 +334,28 @@ fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Co
         }
     }
     ui.with_layout(ELayout::right_to_left(Align::Center), |ui| {
-        if ui.small_button(I_CLOSE).on_hover_text(format!("Fechar ({})", app.keymap.label(Action::CloseSession))).clicked() {
+        if widgets::icon_button(ui, I_CLOSE, "Fechar terminal", &app.keymap.tip(Action::CloseSession, "Fechar terminal")).clicked() {
             app.focus(id);
             app.run_action(ui.ctx(), Action::CloseSession);
         }
-        if ui.small_button(I_RESTART).on_hover_text("Reiniciar (retoma a conversa)").clicked() {
+        if widgets::icon_button(ui, I_RESTART, "Reiniciar terminal", &app.keymap.tip(Action::RestartSession, "Reiniciar (o Claude retoma a conversa)")).clicked() {
             let ctx = ui.ctx().clone();
             app.restart_session(&ctx, id);
         }
-        if matches!(kind, SessionKind::Claude) {
-            if task.is_some() {
-                if ui.small_button("󰈙").on_hover_text("Mandar contexto da tarefa pro Claude (.aic/context.md)").clicked() {
-                    app.write_context(id);
-                }
-            }
-            if ui.small_button(I_LINK).on_hover_text(format!("Vincular tarefa ({})", app.keymap.label(Action::LinkTaskToSession))).clicked() {
-                app.focus(id);
-                app.run_action(ui.ctx(), Action::LinkTaskToSession);
-            }
+        if matches!(kind, SessionKind::Claude)
+            && task.is_some()
+            && app.cfg.on(aic_core::Module::Board)
+            && widgets::icon_button(ui, "󰈙", "Mandar contexto da tarefa", &app.keymap.tip(Action::SendContext, "Mandar contexto da tarefa pro Claude (.aic/context.md)")).clicked()
+        {
+            app.write_context(id);
         }
-        if ui.small_button("󰊓").on_hover_text(format!("Maximizar ({})", app.keymap.label(Action::ToggleMaximize))).clicked() {
+        // vincular vale pra qualquer terminal (a tarefa aparece no cabeçalho e na statusline)
+        if app.cfg.on(aic_core::Module::Board) && widgets::icon_button(ui, I_LINK, "Vincular tarefa", &app.keymap.tip(Action::LinkTaskToSession, "Vincular tarefa")).clicked() {
+            app.focus(id);
+            app.run_action(ui.ctx(), Action::LinkTaskToSession);
+        }
+        let max_label = if app.maximized { "Restaurar terminal" } else { "Maximizar terminal" };
+        if widgets::icon_button(ui, "󰊓", max_label, &app.keymap.tip(Action::ToggleMaximize, max_label)).clicked() {
             app.focus(id);
             app.maximized = !app.maximized;
         }

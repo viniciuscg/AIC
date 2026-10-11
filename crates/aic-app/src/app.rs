@@ -88,6 +88,8 @@ pub struct App {
     pub board: ui::board::BoardState,
     pub worktrees: ui::worktrees::WorktreeState,
     pub settings: ui::settings::SettingsState,
+    /// Menu da tecla líder aberto (caminho dentro da árvore de atalhos).
+    pub leader: Option<ui::leader::LeaderState>,
     pub usage: ui::usage::UsageState,
     /// Sync com o Notion em background (ver `notion_ui`).
     pub notion: crate::notion_ui::NotionState,
@@ -169,6 +171,7 @@ impl App {
             board: Default::default(),
             worktrees: Default::default(),
             settings: Default::default(),
+            leader: None,
             usage: Default::default(),
             notion: Default::default(),
             connector: Default::default(),
@@ -942,6 +945,11 @@ impl App {
 
     pub fn run_action(&mut self, ctx: &Context, a: Action) {
         use Action::*;
+        // módulo desligado: a ação fica inerte (o atalho é consumido e não vaza pro terminal)
+        if let Some(m) = a.module().filter(|m| !self.cfg.on(*m)) {
+            let name = aic_core::modules::info(m).name;
+            return self.toast(&format!("\"{}\" está desligado (Config → Módulos)", name), ToastKind::Warn);
+        }
         match a {
             NewSession => self.modal = Some(ui::modals::Modal::NewSession(ui::modals::NewSessionForm::new(self, SessionKind::Claude))),
             NewShell => {
@@ -999,6 +1007,30 @@ impl App {
                 if let Some(id) = self.focused() {
                     self.modal = Some(ui::modals::Modal::Rename { id, text: self.session_label(id), first: true });
                 }
+            }
+            RestartSession => {
+                if let Some(id) = self.focused() {
+                    self.restart_session(ctx, id);
+                }
+            }
+            SendContext => {
+                if let Some(id) = self.focused() {
+                    self.write_context(id);
+                }
+            }
+            CollapseBlock => {
+                if let Some(b) = self.current_block() {
+                    self.update_block(b, |x| x.collapsed = !x.collapsed);
+                }
+            }
+            MoveBlockUp | MoveBlockDown => {
+                if let Some(b) = self.current_block() {
+                    ui::blocks::move_block(self, b, if a == MoveBlockUp { -1 } else { 1 });
+                }
+            }
+            ToggleHints => {
+                self.cfg.hints_bar = !self.cfg.hints_bar;
+                let _ = self.cfg.save();
             }
             NextSession => self.cycle_session(1),
             PrevSession => self.cycle_session(-1),

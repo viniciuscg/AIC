@@ -11,6 +11,8 @@ use crate::skins;
 pub struct SettingsState {
     /// Ação esperando a próxima combinação de teclas.
     pub capturing: Option<Action>,
+    /// Gravando a tecla líder.
+    pub capturing_leader: bool,
     pub filter: String,
 }
 
@@ -192,6 +194,32 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         let f = app.settings.filter.to_lowercase();
         let mut group = "";
         egui::Grid::new("binds").num_columns(3).striped(true).spacing([20.0, 6.0]).show(ui, |ui| {
+            // tecla líder (fica no config.toml, não no keybinds.toml)
+            if f.is_empty() || "tecla líder menu".contains(&f) {
+                ui.label(RichText::new("TECLA LÍDER").font(FontId::monospace(11.0)).color(theme.accent));
+                ui.end_row();
+                ui.label("Abrir o menu de atalhos (which-key)");
+                if app.settings.capturing_leader {
+                    ui.label(RichText::new("aperte a combinação… (Esc cancela)").color(theme.warn));
+                } else {
+                    widgets::kbd(ui, &super::leader::label(app), &theme);
+                }
+                ui.horizontal(|ui| {
+                    if labeled(ui.small_button("alterar"), "Alterar a tecla líder").clicked() {
+                        app.settings.capturing = None;
+                        app.settings.capturing_leader = true;
+                    }
+                    let default = aic_core::Config::default().leader;
+                    if app.cfg.leader != default && labeled(ui.small_button("padrão"), "Tecla líder padrão").clicked() {
+                        app.cfg.leader = default;
+                        let _ = app.cfg.save();
+                    }
+                    if !app.cfg.on(aic_core::Module::Hints) {
+                        ui.label(widgets::subtle("(módulo Dicas desligado)", &theme).small());
+                    }
+                });
+                ui.end_row();
+            }
             for a in Action::all() {
                 let m = a.meta();
                 if !f.is_empty() && !m.name.to_lowercase().contains(&f) && !m.group.to_lowercase().contains(&f) {
@@ -202,17 +230,19 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     ui.label(RichText::new(group.to_uppercase()).font(FontId::monospace(11.0)).color(theme.accent));
                     ui.end_row();
                 }
-                ui.label(m.name);
+                let off = !a.enabled(&app.cfg);
+                ui.label(if off { RichText::new(format!("{}  (módulo desligado)", m.name)).color(theme.faint) } else { RichText::new(m.name) });
                 if app.settings.capturing == Some(a) {
                     ui.label(RichText::new("aperte a combinação… (Esc cancela, Backspace limpa)").color(theme.warn));
                 } else {
                     widgets::kbd(ui, &app.keymap.label(a), &theme);
                 }
                 ui.horizontal(|ui| {
-                    if ui.small_button("alterar").clicked() {
+                    if labeled(ui.small_button("alterar"), &format!("Alterar atalho: {}", m.name)).clicked() {
+                        app.settings.capturing_leader = false;
                         app.settings.capturing = Some(a);
                     }
-                    if app.keymap.get(a) != m.default && ui.small_button("padrão").clicked() {
+                    if app.keymap.get(a) != m.default && labeled(ui.small_button("padrão"), &format!("Atalho padrão: {}", m.name)).clicked() {
                         app.keymap.set(a, m.default);
                         let _ = app.keymap.save();
                     }
@@ -373,9 +403,17 @@ fn path_field(ui: &mut Ui, value: &mut Option<std::path::PathBuf>, hint: &str) {
     }
 }
 
-/// Captura a próxima combinação de teclas pra ação em edição.
+/// Rótulo acessível pra botões repetidos ("alterar" em toda linha).
+fn labeled(resp: egui::Response, label: &str) -> egui::Response {
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+    resp
+}
+
+/// Captura a próxima combinação de teclas pra ação em edição (ou pra tecla líder).
 fn capture(app: &mut App, ui: &Ui) {
-    let Some(a) = app.settings.capturing else { return };
+    if app.settings.capturing.is_none() && !app.settings.capturing_leader {
+        return;
+    }
     let got = ui.input_mut(|i| {
         let mut out = None;
         i.events.retain(|e| {
@@ -389,19 +427,39 @@ fn capture(app: &mut App, ui: &Ui) {
         });
         out
     });
-    if let Some((key, mods)) = got {
-        match key {
-            Key::Escape if mods.is_none() => {}
-            Key::Backspace if mods.is_none() => {
-                app.keymap.set(a, None);
-                let _ = app.keymap.save();
-            }
-            _ => {
-                app.keymap.set(a, Some(KeyboardShortcut::new(mods, key)));
-                let _ = app.keymap.save();
-                app.toast(&format!("{} → {}", a.meta().name, app.keymap.label(a)), ToastKind::Ok);
+    let Some((key, mods)) = got else { return };
+    if app.settings.capturing_leader {
+        app.settings.capturing_leader = false;
+        if key == Key::Escape && mods.is_none() {
+            return;
+        }
+        let s = KeyboardShortcut::new(mods, key);
+        let clash = Action::all().into_iter().find(|a| app.keymap.get(*a).is_some_and(|k| k.logical_key == key && actions::same_mods(k.modifiers, mods)));
+        match clash {
+            Some(a) => app.toast(&format!("{} já é de \"{}\"", actions::format_shortcut(&s), a.meta().name), ToastKind::Warn),
+            None => {
+                app.cfg.leader = actions::format_shortcut(&s);
+                let _ = app.cfg.save();
+                app.toast(&format!("Tecla líder → {}", app.cfg.leader), ToastKind::Ok);
             }
         }
-        app.settings.capturing = None;
+        return;
+    }
+    let Some(a) = app.settings.capturing else { return };
+    app.settings.capturing = None;
+    match key {
+        Key::Escape if mods.is_none() => {}
+        Key::Backspace if mods.is_none() => {
+            app.keymap.set(a, None);
+            let _ = app.keymap.save();
+        }
+        _ if actions::parse_shortcut(&app.cfg.leader).is_some_and(|l| l.logical_key == key && actions::same_mods(l.modifiers, mods)) => {
+            app.toast("Essa combinação é a tecla líder", ToastKind::Warn);
+        }
+        _ => {
+            app.keymap.set(a, Some(KeyboardShortcut::new(mods, key)));
+            let _ = app.keymap.save();
+            app.toast(&format!("{} → {}", a.meta().name, app.keymap.label(a)), ToastKind::Ok);
+        }
     }
 }

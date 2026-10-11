@@ -27,7 +27,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         if app.cfg.on(aic_core::Module::Mascot) {
             app.skin.mascot(ui, rect, mood, t, &theme);
         }
-        if resp.on_hover_text("Ajuda do fork (F1)").clicked() {
+        if resp.on_hover_text(app.keymap.tip(Action::ViewForkHelp, "Ajuda do tema")).clicked() {
             app.set_view(View::ForkHelp);
         }
 
@@ -49,11 +49,15 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             (View::ForkHelp, widgets::I_HELP, app.skin.name(), Action::ViewForkHelp),
         ];
         for (view, icon, label, action) in tabs {
+            // aba de módulo desligado some
+            if !action.enabled(&app.cfg) {
+                continue;
+            }
             let active = app.view == view;
             let mut text = RichText::new(format!("{icon}  {label}"));
             text = if active { text.color(theme.accent_hi).strong() } else { text.color(theme.dim) };
             let resp = ui.add(egui::Button::new(text).frame(active).fill(theme.bg3));
-            let resp = resp.on_hover_text(app.keymap.label(action));
+            let resp = resp.on_hover_text(app.keymap.tip(action, action.meta().name));
             if resp.clicked() {
                 app.set_view(view);
             }
@@ -67,11 +71,13 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
         ui.add_space(10.0);
         let ws_name = app.current_ws().map(|w| w.name.clone()).unwrap_or_default();
-        let ws_btn = ui
-            .add(egui::Button::new(RichText::new(format!("{}  {ws_name}  ▾", widgets::I_WS)).color(theme.ink)))
-            .on_hover_text(format!("Workspaces ({})", app.keymap.label(Action::Workspaces)));
-        if ws_btn.clicked() {
-            app.run_action(ui.ctx(), Action::Workspaces);
+        if app.cfg.on(aic_core::Module::Workspaces) {
+            let ws_btn = ui
+                .add(egui::Button::new(RichText::new(format!("{}  {ws_name}  ▾", widgets::I_WS)).color(theme.ink)))
+                .on_hover_text(app.keymap.tip(Action::Workspaces, "Trocar de workspace"));
+            if ws_btn.clicked() {
+                app.run_action(ui.ctx(), Action::Workspaces);
+            }
         }
 
         // Direita: contadores + limites da conta

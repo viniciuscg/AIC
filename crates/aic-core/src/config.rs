@@ -80,6 +80,8 @@ pub struct Config {
     pub themes: BTreeMap<String, ThemeConfig>,
     /// Tecla líder: aperte e veja o menu de atalhos (estilo prefixo do tmux).
     pub leader: String,
+    /// Barra de dicas de atalho no rodapé (módulo `hints`).
+    pub hints_bar: bool,
     pub font_family: String,
     pub font_size: f32,
     pub ui_scale: f32,
@@ -221,6 +223,7 @@ impl Default for Config {
             modules: Flags::new(),
             themes: BTreeMap::new(),
             leader: "Ctrl+Space".into(),
+            hints_bar: true,
             font_family: "JetBrainsMono Nerd Font Mono".into(),
             font_size: 14.0,
             ui_scale: 1.0,

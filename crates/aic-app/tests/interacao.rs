@@ -1,0 +1,538 @@
+//! Cliques e teclas de verdade (egui_kittest) em cada botão das telas: o clique chega
+//! no botão certo e muda o estado do app? Pega fundo clicável roubando clique, atalho
+//! engolido, botão sem efeito.
+//!
+//!   cargo test -p aic-app --test interacao
+
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::Duration;
+
+use egui::{Key, Modifiers};
+use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
+use aic_app::app::{App, View};
+use aic_app::ui::modals::Modal;
+use aic_app::ui::widgets::{I_BOARD, I_CHART, I_GEAR, I_PLUS, I_TERM, I_WORKTREE};
+use aic_core::{Id, SessionKind, Subtask, Task, TaskStatus};
+
+/// Os testes mexem em variáveis de ambiente: um de cada vez.
+static LOCK: Mutex<()> = Mutex::new(());
+
+fn sandbox(name: &str, extra_config: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("aic-click-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    for d in ["config", "data", "state", "claude/projects", "repos"] {
+        std::fs::create_dir_all(dir.join(d)).unwrap();
+    }
+    // SAFETY: protegido pelo LOCK (um teste por vez mexe no ambiente)
+    unsafe {
+        std::env::set_var("AIC_CONFIG_DIR", dir.join("config"));
+        std::env::set_var("AIC_DATA_DIR", dir.join("data"));
+        std::env::set_var("AIC_STATE_DIR", dir.join("state"));
+        std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
+    }
+    let cfg = format!(
+        "setup_done = true\nanimations = false\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nsound = false\nnotifications = false\n",
+        dir.join("repos").display()
+    );
+    std::fs::write(dir.join("config/config.toml"), cfg).unwrap();
+    dir
+}
+
+type H = Harness<'static, Option<App>>;
+
+fn harness(size: [f32; 2]) -> H {
+    let mut h = Harness::builder().with_size(egui::vec2(size[0], size[1])).build_ui_state(
+        |ui, app: &mut Option<App>| {
+            let a = app.get_or_insert_with(|| App::new(ui.ctx(), Some("aic".into()), true).expect("app"));
+            aic_app::ui::draw(a, ui);
+        },
+        None,
+    );
+    h.run_steps(2);
+    h
+}
+
+fn app(h: &mut H) -> &mut App {
+    h.state_mut().as_mut().unwrap()
+}
+
+/// Alguns frames (o clique enfileirado vira evento, o efeito aparece no frame seguinte).
+fn frames(h: &mut H, n: usize) {
+    for _ in 0..n {
+        h.step();
+    }
+}
+
+fn click(h: &mut H, label: &str) {
+    h.get_by_label(label).click();
+    frames(h, 3);
+}
+
+/// Primeiro de vários botões com o mesmo rótulo.
+fn click_first(h: &mut H, label: &str) {
+    h.get_all_by_label(label).next().unwrap_or_else(|| panic!("sem botão \"{label}\"")).click();
+    frames(h, 3);
+}
+
+fn exists(h: &H, label: &str) -> bool {
+    h.query_all_by_label(label).next().is_some()
+}
+
+fn key(h: &mut H, m: Modifiers, k: Key) {
+    h.key_press_modifiers(m, k);
+    frames(h, 2);
+}
+
+/// Ctrl como o winit manda no Linux (`command` espelha o `ctrl`).
+fn ctrl() -> Modifiers {
+    Modifiers::CTRL | Modifiers::COMMAND
+}
+
+fn ctrl_shift() -> Modifiers {
+    ctrl() | Modifiers::SHIFT
+}
+
+/// Bloco com um terminal rodando `cmd` (sem Claude: não depende do binário).
+fn terminal(h: &mut H, name: &str, cmd: &str) -> Id {
+    h.step();
+    let ctx = h.ctx.clone();
+    let a = app(h);
+    let block = a.new_block(name, None);
+    let id = a.create_session_in(&ctx, block, name.into(), SessionKind::Command(cmd.into()), std::env::temp_dir(), None, None, vec![], None);
+    frames(h, 3);
+    id
+}
+
+fn wait_until(h: &mut H, what: &str, mut f: impl FnMut(&mut App) -> bool) {
+    for _ in 0..100 {
+        if f(app(h)) {
+            return;
+        }
+        h.step();
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    panic!("esperando: {what}");
+}
+
+fn kill_all(h: &mut H) {
+    let a = app(h);
+    let ids: Vec<_> = a.sessions.keys().copied().collect();
+    for id in ids {
+        a.kill_session(id, false);
+    }
+}
+
+fn is_modal(h: &mut H, f: impl Fn(&Modal) -> bool) -> bool {
+    app(h).modal.as_ref().is_some_and(f)
+}
+
+// ───────────────────────── terminal ─────────────────────────
+
+#[test]
+fn cabecalho_do_terminal() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = sandbox("terminal", "");
+    let mut h = harness([1400.0, 900.0]);
+    let id = terminal(&mut h, "api", "sleep 60");
+
+    click(&mut h, "Maximizar terminal");
+    assert!(app(&mut h).maximized, "maximizar");
+    click(&mut h, "Restaurar terminal");
+    assert!(!app(&mut h).maximized, "restaurar");
+
+    click(&mut h, "Vincular tarefa");
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::LinkTask { .. })), "vincular abre o diálogo");
+    click(&mut h, "Cancelar  (Esc)");
+    assert!(app(&mut h).modal.is_none(), "cancelar fecha");
+
+    click(&mut h, "Fechar terminal");
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseSession { .. })), "✕ pede confirmação");
+    click(&mut h, "Cancelar");
+    assert!(app(&mut h).modal.is_none() && app(&mut h).sessions.contains_key(&id), "cancelar mantém o terminal");
+    click(&mut h, "Fechar terminal");
+    click(&mut h, "Fechar  ⏎");
+    assert!(!app(&mut h).sessions.contains_key(&id), "fechar encerra o terminal");
+
+    // reiniciar: o processo sai na 1ª vez e fica rodando na 2ª
+    let marker = dir.join("marker");
+    let cmd = format!("test -f {m} || {{ touch {m}; exit 0; }}; sleep 60", m = marker.display());
+    let id = terminal(&mut h, "reinicia", &cmd);
+    wait_until(&mut h, "processo sair", |a| a.sessions[&id].term.as_ref().is_some_and(|t| t.is_exited()));
+    frames(&mut h, 2);
+    assert!(exists(&h, &format!("{} Reabrir (Enter)", aic_app::ui::widgets::I_RESTART)), "tela de processo encerrado");
+    click(&mut h, "Reiniciar terminal");
+    wait_until(&mut h, "terminal reiniciado", |a| a.sessions[&id].term.as_ref().is_some_and(|t| !t.is_exited()));
+
+    kill_all(&mut h);
+}
+
+// ───────────────────────── bloco ─────────────────────────
+
+#[test]
+fn cabecalho_do_bloco() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("bloco", "");
+    let mut h = harness([1500.0, 900.0]);
+    let id = terminal(&mut h, "bloco-a", "sleep 60");
+    let block = app(&mut h).block_of(id).unwrap();
+
+    let side = app(&mut h).blocks[&block].side;
+    click(&mut h, "Painel do bloco");
+    assert_ne!(app(&mut h).blocks[&block].side, side, "◧ alterna o painel");
+
+    let split = app(&mut h).blocks[&block].split;
+    click(&mut h, &format!("⊞ {}", split.label()));
+    assert_ne!(app(&mut h).blocks[&block].split, split, "⊞ muda o arranjo");
+
+    click(&mut h, &format!("{I_PLUS} Claude"));
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::NewSession(_))), "+ Claude abre o diálogo");
+    click(&mut h, "Cancelar");
+    assert!(app(&mut h).modal.is_none(), "cancelar fecha a nova sessão");
+
+    let n = app(&mut h).blocks[&block].panes.len();
+    click(&mut h, &format!("{I_TERM} terminal"));
+    assert_eq!(app(&mut h).blocks[&block].panes.len(), n + 1, "terminal abre um split no bloco");
+
+    click(&mut h, "Recolher bloco");
+    assert!(app(&mut h).blocks[&block].collapsed, "recolher");
+    click(&mut h, "Expandir bloco");
+    assert!(!app(&mut h).blocks[&block].collapsed, "expandir");
+
+    click(&mut h, "Fechar bloco");
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseBlock { .. })), "✕ do bloco pede confirmação");
+    click(&mut h, "Cancelar  (Esc)");
+    assert!(app(&mut h).modal.is_none() && app(&mut h).blocks.contains_key(&block));
+    click(&mut h, "Fechar bloco");
+    click(&mut h, "Fechar  ⏎");
+    assert!(!app(&mut h).blocks.contains_key(&block), "fechar bloco remove o bloco");
+
+    // bloco novo pelo + da lista e renomear pelo diálogo
+    let b = app(&mut h).new_block("vazio", None).unwrap();
+    frames(&mut h, 3);
+    let label = format!("{I_PLUS}  Novo bloco  ({})", app(&mut h).keymap.label(aic_app::actions::Action::NewBlock));
+    click(&mut h, &label);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::RenameBlock { .. })), "novo bloco pede o nome");
+    click(&mut h, "Cancelar  (Esc)");
+    assert!(app(&mut h).modal.is_none());
+    assert!(app(&mut h).blocks.contains_key(&b));
+
+    kill_all(&mut h);
+}
+
+// ───────────────────────── board e editor ─────────────────────────
+
+fn task(h: &mut H, title: &str, status: TaskStatus) -> Id {
+    let mut t = Task::new(title);
+    t.status = status;
+    t.subtasks = vec![Subtask { text: "um".into(), done: false }, Subtask { text: "dois".into(), done: false }];
+    let id = t.id;
+    app(h).save_task(t);
+    id
+}
+
+fn task_of(h: &mut H, id: Id) -> Option<Task> {
+    app(h).tasks.iter().find(|t| t.id == id).cloned()
+}
+
+#[test]
+fn board_e_editor() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("board", "");
+    let mut h = harness([1500.0, 900.0]);
+    let a = task(&mut h, "Corrigir juros", TaskStatus::Todo);
+    let _b = task(&mut h, "Revisar PR", TaskStatus::Doing);
+    app(&mut h).set_view(View::Board);
+    frames(&mut h, 3);
+
+    // clique no cartão abre o editor
+    click(&mut h, "Corrigir juros");
+    assert_eq!(app(&mut h).board.selected, Some(a), "clique no cartão seleciona");
+    h.get_all_by_label("Corrigir juros").next().unwrap().click_secondary();
+    frames(&mut h, 3);
+    assert!(exists(&h, "Arquivar  (d)"), "botão direito no cartão abre o menu");
+    click(&mut h, "Corrigir juros");
+    assert!(!exists(&h, "Arquivar  (d)"), "clique fora fecha o menu");
+    assert_eq!(app(&mut h).board.selected, Some(a));
+
+    click_first(&mut h, "Remover subtarefa");
+    assert_eq!(task_of(&mut h, a).unwrap().subtasks.len(), 1, "× remove a subtarefa");
+
+    click(&mut h, "Fechar editor");
+    assert_eq!(app(&mut h).board.selected, None, "✕ fecha o editor");
+
+    // Shift+L move o cartão (antes o `l` engolia o Shift+L)
+    app(&mut h).board.selected = Some(a);
+    frames(&mut h, 2);
+    key(&mut h, Modifiers::SHIFT, Key::L);
+    assert_eq!(task_of(&mut h, a).unwrap().status, TaskStatus::Doing, "Shift+L move de coluna");
+    assert_eq!(app(&mut h).board.selected, Some(a), "e não muda a seleção");
+    key(&mut h, Modifiers::SHIFT, Key::H);
+    assert_eq!(task_of(&mut h, a).unwrap().status, TaskStatus::Todo, "Shift+H volta");
+
+    click(&mut h, "Arquivar");
+    assert_eq!(task_of(&mut h, a).unwrap().status, TaskStatus::Archived, "Arquivar");
+    assert_eq!(app(&mut h).board.selected, None);
+
+    let c = task(&mut h, "Apagar esta", TaskStatus::Todo);
+    app(&mut h).board.selected = Some(c);
+    frames(&mut h, 2);
+    click(&mut h, "Apagar");
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::ConfirmDeleteTask(_))), "Apagar pede confirmação");
+    click(&mut h, "Cancelar");
+    assert!(app(&mut h).modal.is_none() && task_of(&mut h, c).is_some());
+    click(&mut h, "Apagar");
+    click(&mut h, "Apagar  ⏎");
+    assert!(task_of(&mut h, c).is_none(), "apagar remove");
+
+    // + da coluna abre a adição inline
+    click(&mut h, &format!("Nova tarefa em {}", TaskStatus::Review.label()));
+    assert!(matches!(app(&mut h).board.adding, Some((TaskStatus::Review, _))), "+ da coluna");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    assert!(app(&mut h).board.adding.is_none());
+
+    // nova tarefa pelo botão → captura rápida → Criar
+    click(&mut h, &format!("{I_PLUS}  Nova tarefa"));
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::QuickAdd { .. })), "Nova tarefa abre a captura");
+    if let Some(Modal::QuickAdd { text, .. }) = &mut app(&mut h).modal {
+        *text = "tarefa criada no clique".into();
+    }
+    frames(&mut h, 2);
+    click(&mut h, "Criar  ⏎");
+    assert!(app(&mut h).tasks.iter().any(|t| t.title == "tarefa criada no clique"), "Criar cria a tarefa");
+    assert!(app(&mut h).modal.is_none());
+
+    click(&mut h, &format!("{I_PLUS}  Nova tarefa"));
+    click(&mut h, "Cancelar");
+    assert!(app(&mut h).modal.is_none(), "Cancelar fecha a captura");
+}
+
+// ───────────────────────── modais, toasts, topbar ─────────────────────────
+
+#[test]
+fn modais_toasts_e_abas() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("modais", "");
+    let mut h = harness([1500.0, 900.0]);
+    let _id = terminal(&mut h, "x", "sleep 60");
+
+    // abas da topbar
+    for (label, view) in [
+        (format!("{I_BOARD}  Board"), View::Board),
+        (format!("{I_WORKTREE}  Worktrees"), View::Worktrees),
+        (format!("{I_CHART}  Tokens"), View::Usage),
+        (format!("{I_GEAR}  Config"), View::Settings),
+        (format!("{I_TERM}  Sessões"), View::Sessions),
+    ] {
+        click(&mut h, &label);
+        assert_eq!(app(&mut h).view, view, "aba {label}");
+    }
+
+    // toasts: clique fecha
+    app(&mut h).toasts.clear();
+    app(&mut h).toast("primeiro aviso", aic_app::app::ToastKind::Info);
+    app(&mut h).toast("segundo aviso", aic_app::app::ToastKind::Ok);
+    frames(&mut h, 2);
+    click_first(&mut h, "Fechar aviso");
+    assert_eq!(app(&mut h).toasts.len(), 1, "✕ do aviso");
+    click(&mut h, "segundo aviso");
+    assert!(app(&mut h).toasts.is_empty(), "clique no texto do aviso");
+
+    // workspaces: criar pelo diálogo e fechar
+    let n = app(&mut h).workspaces.len();
+    key(&mut h, ctrl_shift(), Key::O);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::Workspaces { .. })), "Ctrl+Shift+O abre workspaces");
+    click(&mut h, "Fechar  (Esc)");
+    assert!(app(&mut h).modal.is_none());
+    key(&mut h, ctrl_shift(), Key::O);
+    click(&mut h, "+ novo workspace");
+    assert_eq!(app(&mut h).workspaces.len(), n + 1, "+ novo workspace");
+
+    // paleta: Fechar
+    key(&mut h, ctrl_shift(), Key::P);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::Palette { .. })));
+    click(&mut h, "Fechar  (Esc)");
+    assert!(app(&mut h).modal.is_none(), "Fechar a paleta");
+
+    // sair: Não
+    app(&mut h).modal = Some(Modal::ConfirmQuit);
+    frames(&mut h, 2);
+    click(&mut h, "Não  (Esc)");
+    assert!(app(&mut h).modal.is_none(), "Não fecha o diálogo de sair");
+
+    // renomear bloco/sessão pelos botões
+    let id = terminal(&mut h, "renomeia", "sleep 60");
+    app(&mut h).modal = Some(Modal::Rename { id, text: "novo nome".into(), first: false });
+    frames(&mut h, 2);
+    click(&mut h, "Salvar  ⏎");
+    assert_eq!(app(&mut h).session_label(id), "novo nome", "Salvar renomeia");
+
+    // módulo desligado: aba some e atalho fica inerte (não vaza)
+    app(&mut h).cfg.modules.insert("board".into(), false);
+    frames(&mut h, 2);
+    assert!(!exists(&h, &format!("{I_BOARD}  Board")), "aba Board some com o módulo desligado");
+    key(&mut h, ctrl_shift(), Key::Space);
+    assert!(app(&mut h).modal.is_none(), "captura rápida inerte com o Board desligado");
+    key(&mut h, ctrl_shift(), Key::B);
+    assert_ne!(app(&mut h).view, View::Board);
+
+    kill_all(&mut h);
+}
+
+// ───────────────────────── worktrees ─────────────────────────
+
+fn git(dir: &Path, args: &[&str]) {
+    let ok = std::process::Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .expect("git")
+        .status
+        .success();
+    assert!(ok, "git {args:?}");
+}
+
+#[test]
+fn worktrees() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = sandbox("worktrees", "");
+    let repo = dir.join("repos/proj");
+    std::fs::create_dir_all(&repo).unwrap();
+    git(&repo, &["init", "-q", "-b", "main"]);
+    std::fs::write(repo.join("a.txt"), "a").unwrap();
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "init"]);
+    let wt = dir.join("repos/proj.worktrees/feat");
+    git(&repo, &["worktree", "add", "-q", "-b", "feat", wt.to_str().unwrap()]);
+
+    let mut h = harness([1400.0, 900.0]);
+    app(&mut h).repos = app(&mut h).cfg.repos();
+    app(&mut h).set_view(View::Worktrees);
+    frames(&mut h, 3);
+
+    click(&mut h, "Atualizar worktrees");
+    click(&mut h, "Remover worktree");
+    assert!(exists(&h, "Forçar (descarta mudanças)"), "🗑 pede confirmação");
+    click(&mut h, "Cancelar");
+    assert!(!exists(&h, "Forçar (descarta mudanças)"), "Cancelar fecha");
+    assert!(wt.exists());
+    click(&mut h, "Remover worktree");
+    click(&mut h, "Remover");
+    assert!(!wt.exists(), "Remover apaga a pasta do worktree");
+}
+
+// ───────────────────────── config ─────────────────────────
+
+#[test]
+fn config_alterar_atalho() {
+    use aic_app::actions::Action;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("config", "");
+    // janela alta: o catálogo de atalhos fica lá embaixo da página
+    let mut h = harness([1400.0, 9000.0]);
+    app(&mut h).set_view(View::Settings);
+    frames(&mut h, 3);
+
+    click(&mut h, "Alterar atalho: Sair do AIC");
+    assert_eq!(app(&mut h).settings.capturing, Some(Action::Quit));
+    // a combinação de outra ação é GRAVADA, não executada (antes abria a Nova sessão)
+    key(&mut h, ctrl_shift(), Key::N);
+    assert!(app(&mut h).modal.is_none(), "gravar Ctrl+Shift+N não pode abrir a nova sessão");
+    assert_eq!(app(&mut h).keymap.label(Action::Quit), "Ctrl+Shift+N");
+    assert_eq!(app(&mut h).settings.capturing, None);
+
+    click(&mut h, "Atalho padrão: Sair do AIC");
+    assert_eq!(app(&mut h).keymap.label(Action::Quit), "Ctrl+Shift+Q", "padrão volta o atalho");
+    click(&mut h, "Restaurar padrões");
+    assert_eq!(app(&mut h).keymap.label(Action::NewSession), "Ctrl+Shift+N", "restaurar padrões");
+
+    // tecla líder
+    click(&mut h, "Alterar a tecla líder");
+    key(&mut h, Modifiers::ALT, Key::Space);
+    assert_eq!(app(&mut h).cfg.leader, "Alt+Space");
+    key(&mut h, Modifiers::ALT, Key::Space);
+    assert!(app(&mut h).leader.is_some(), "a nova líder abre o menu");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    click(&mut h, "Tecla líder padrão");
+    assert_eq!(app(&mut h).cfg.leader, "Ctrl+Space");
+}
+
+// ───────────────────────── tecla líder e dicas ─────────────────────────
+
+#[test]
+fn tecla_lider() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("lider", "");
+    let mut h = harness([1480.0, 900.0]);
+    let _a = terminal(&mut h, "api", "printf 'pronto\\n'; sleep 60");
+    assert!(app(&mut h).term_focus, "terminal focado");
+
+    // abre com o terminal focado
+    key(&mut h, ctrl(), Key::Space);
+    assert!(app(&mut h).leader.is_some(), "Ctrl+Space abre o menu");
+    key(&mut h, Modifiers::NONE, Key::S);
+    assert_eq!(app(&mut h).leader.as_ref().unwrap().path, vec!['s'], "s entra em Sessões");
+    key(&mut h, Modifiers::NONE, Key::Q);
+    assert!(app(&mut h).leader.as_ref().unwrap().error.is_some(), "tecla inválida avisa");
+    key(&mut h, Modifiers::NONE, Key::Backspace);
+    assert!(app(&mut h).leader.as_ref().unwrap().path.is_empty(), "Backspace volta");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    assert!(app(&mut h).leader.is_none(), "Esc fecha");
+
+    // líder → b → n: novo bloco (abre o nome)
+    let blocks = app(&mut h).blocks.len();
+    key(&mut h, ctrl(), Key::Space);
+    key(&mut h, Modifiers::NONE, Key::B);
+    key(&mut h, Modifiers::NONE, Key::N);
+    assert_eq!(app(&mut h).blocks.len(), blocks + 1, "líder b n cria bloco");
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::RenameBlock { .. })));
+    key(&mut h, Modifiers::NONE, Key::Escape);
+
+    // clique nos itens do menu
+    key(&mut h, ctrl(), Key::Space);
+    click(&mut h, "Paleta de comandos");
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::Palette { .. })), "clique no item roda a ação");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    key(&mut h, ctrl(), Key::Space);
+    click(&mut h, "Fechar menu");
+    assert!(app(&mut h).leader.is_none(), "Fechar menu");
+
+    // barra de dicas: o atalho da líder nela abre o menu; ✕ esconde; Ctrl+Shift+H volta
+    click(&mut h, "Ctrl+Space");
+    assert!(app(&mut h).leader.is_some(), "dica da líder é clicável");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    click(&mut h, "Esconder dicas");
+    assert!(!app(&mut h).cfg.hints_bar, "✕ esconde a barra");
+    key(&mut h, ctrl_shift(), Key::H);
+    assert!(app(&mut h).cfg.hints_bar, "Ctrl+Shift+H mostra de novo");
+
+    // módulo desligado: o grupo Tarefas some do menu
+    app(&mut h).cfg.modules.insert("board".into(), false);
+    key(&mut h, ctrl(), Key::Space);
+    assert!(!exists(&h, "Tarefas  ›"), "grupo de módulo desligado não aparece");
+    key(&mut h, Modifiers::NONE, Key::T);
+    assert!(app(&mut h).leader.as_ref().unwrap().error.is_some(), "t vira tecla inválida");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    app(&mut h).cfg.modules.remove("board");
+
+    // Hints desligado: a líder não abre (o Ctrl+Space vai pro terminal)
+    app(&mut h).cfg.modules.insert("hints".into(), false);
+    key(&mut h, ctrl(), Key::Space);
+    assert!(app(&mut h).leader.is_none());
+    app(&mut h).cfg.modules.remove("hints");
+
+    // shot: menu aberto em Sessões + barra de dicas
+    key(&mut h, ctrl(), Key::Space);
+    frames(&mut h, 3);
+    let img = h.render().expect("render");
+    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/snapshots");
+    std::fs::create_dir_all(&out).unwrap();
+    img.save(out.join("lider.png")).unwrap();
+    key(&mut h, Modifiers::NONE, Key::S);
+    frames(&mut h, 3);
+    h.render().expect("render").save(out.join("lider-sessoes.png")).unwrap();
+
+    kill_all(&mut h);
+}

@@ -3,7 +3,7 @@
 //! - **Abas**: um bloco por aba, terminais divididos (o jeito tmux).
 
 use egui::{Align, Color32, CursorIcon, FontId, Layout, Pos2, Rect, RichText, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2};
-use aic_core::{Id, Module, SessionKind, SessionState, Split, TaskStatus};
+use aic_core::{Id, Module, SessionState, Split, TaskStatus};
 
 use super::sessions::pane;
 use super::statusbar::truncate;
@@ -143,7 +143,10 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
     let ui = &mut h;
     if collapsible {
         let arrow = if b.collapsed { "▸" } else { "▾" };
-        if ui.add(egui::Button::new(arrow).frame(false)).on_hover_text("Recolher/expandir").clicked() {
+        let label = if b.collapsed { "Expandir bloco" } else { "Recolher bloco" };
+        let r = ui.add(egui::Button::new(arrow).frame(false));
+        r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+        if r.on_hover_text(app.keymap.tip(Action::CollapseBlock, label)).clicked() {
             app.update_block(id, |b| b.collapsed = !b.collapsed);
         }
     }
@@ -181,22 +184,21 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
     }
 
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-        let tip = |a: Action, txt: &str, app: &App| format!("{txt}  ({})", app.keymap.label(a));
-        if ui.small_button(I_CLOSE).on_hover_text(tip(Action::CloseBlock, "Fechar bloco", app)).clicked() {
+        if widgets::icon_button(ui, I_CLOSE, "Fechar bloco", &app.keymap.tip(Action::CloseBlock, "Fechar bloco")).clicked() {
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::CloseBlock);
         }
-        if ui.small_button("◧").on_hover_text(tip(Action::ToggleBlockSide, "Painel do bloco: card, notas, tarefas", app)).clicked() {
+        if widgets::icon_button(ui, "◧", "Painel do bloco", &app.keymap.tip(Action::ToggleBlockSide, "Painel do bloco: card, notas, tarefas")).clicked() {
             app.update_block(id, |b| b.side = !b.side);
         }
-        if ui.small_button(format!("⊞ {}", b.split.label())).on_hover_text(tip(Action::CycleSplit, "Arranjo dos terminais", app)).clicked() {
+        if ui.small_button(format!("⊞ {}", b.split.label())).on_hover_text(app.keymap.tip(Action::CycleSplit, "Arranjo dos terminais")).clicked() {
             app.update_block(id, |b| b.split = b.split.next());
         }
-        if ui.small_button(format!("{I_TERM} terminal")).on_hover_text(tip(Action::NewShell, "Novo shell neste bloco", app)).clicked() {
+        if ui.small_button(format!("{I_TERM} terminal")).on_hover_text(app.keymap.tip(Action::NewShell, "Novo terminal neste bloco")).clicked() {
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::NewShell);
         }
-        if ui.small_button(format!("{I_PLUS} Claude")).on_hover_text(tip(Action::NewSession, "Novo Claude neste bloco", app)).clicked() {
+        if ui.small_button(format!("{I_PLUS} Claude")).on_hover_text(app.keymap.tip(Action::NewSession, "Novo Claude neste bloco")).clicked() {
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::NewSession);
         }
@@ -205,12 +207,13 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
 
 fn block_menu(app: &mut App, resp: &egui::Response, id: Id) {
     resp.context_menu(|ui| {
-        if ui.button("Renomear").clicked() {
+        if ui.button(format!("Renomear  ({})", app.keymap.label(Action::RenameBlock))).clicked() {
+            app.focus_block(id);
             let name = app.blocks.get(&id).map(|b| b.name.clone()).unwrap_or_default();
             app.modal = Some(super::modals::Modal::RenameBlock { id, text: name, first: true });
             ui.close();
         }
-        if ui.button("Vincular tarefa/card").clicked() {
+        if app.cfg.on(Module::Board) && ui.button(format!("Vincular tarefa/card  ({})", app.keymap.label(Action::LinkTaskToSession))).clicked() {
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::LinkTaskToSession);
             ui.close();
@@ -223,16 +226,16 @@ fn block_menu(app: &mut App, resp: &egui::Response, id: Id) {
                 }
             }
         });
-        if ui.button("Subir").clicked() {
+        if ui.button(format!("Subir  ({})", app.keymap.label(Action::MoveBlockUp))).clicked() {
             move_block(app, id, -1);
             ui.close();
         }
-        if ui.button("Descer").clicked() {
+        if ui.button(format!("Descer  ({})", app.keymap.label(Action::MoveBlockDown))).clicked() {
             move_block(app, id, 1);
             ui.close();
         }
         ui.separator();
-        if ui.button(RichText::new("Fechar bloco").color(app.theme.err)).clicked() {
+        if ui.button(RichText::new(format!("Fechar bloco  ({})", app.keymap.label(Action::CloseBlock))).color(app.theme.err)).clicked() {
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::CloseBlock);
             ui.close();
@@ -240,7 +243,7 @@ fn block_menu(app: &mut App, resp: &egui::Response, id: Id) {
     });
 }
 
-fn move_block(app: &mut App, id: Id, delta: i32) {
+pub fn move_block(app: &mut App, id: Id, delta: i32) {
     if let Some(w) = app.current_ws_mut() {
         if let Some(i) = w.blocks.iter().position(|b| *b == id) {
             let j = (i as i32 + delta).clamp(0, w.blocks.len() as i32 - 1) as usize;
@@ -514,7 +517,7 @@ pub fn tabs(app: &mut App, ui: &mut Ui) {
             }
             block_menu(app, &resp, *b);
         }
-        if ui.button(I_PLUS).on_hover_text(format!("Novo bloco ({})", app.keymap.label(Action::NewBlock))).clicked() {
+        if widgets::icon_button(ui, I_PLUS, "Novo bloco", &app.keymap.tip(Action::NewBlock, "Novo bloco")).clicked() {
             app.run_action(ui.ctx(), Action::NewBlock);
         }
     });

@@ -3,6 +3,8 @@
 pub mod blocks;
 pub mod board;
 pub mod help;
+pub mod hints;
+pub mod leader;
 pub mod modals;
 pub mod sessions;
 pub mod settings;
@@ -35,13 +37,28 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
         return;
     }
 
-    if app.modal.is_none() {
+    // aba de um módulo que foi desligado: volta pras sessões
+    let view_module = match app.view {
+        View::Board => Some(aic_core::Module::Board),
+        View::Worktrees => Some(aic_core::Module::Worktrees),
+        View::Usage => Some(aic_core::Module::Usage),
+        _ => None,
+    };
+    if view_module.is_some_and(|m| !app.cfg.on(m)) {
+        app.set_view(View::Sessions);
+    }
+
+    // Gravando um atalho na Config: o teclado é da captura (senão a combinação disparava a ação).
+    let capturing = app.view == View::Settings && (app.settings.capturing.is_some() || app.settings.capturing_leader);
+    if app.modal.is_some() || capturing {
+        app.leader = None;
+    } else if !leader::handle(app, &ctx) {
         for a in app.keymap.pressed(&ctx) {
             app.run_action(&ctx, a);
         }
         let typing = ctx.egui_wants_keyboard_input();
-        let free = !(app.view == View::Sessions && app.term_focus) && app.view != View::Board && !typing;
-        if free && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::T)) {
+        let free = !(app.view == View::Sessions && app.term_focus) && app.view != View::Board && !typing && app.modal.is_none();
+        if free && app.cfg.on(aic_core::Module::Board) && ctx.input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::NONE, Key::T)) {
             app.open_quick_add(None);
         }
     }
@@ -55,6 +72,12 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     egui::Panel::top("topbar")
         .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(12, 6)).stroke(egui::Stroke::new(1.0, app.theme.border)))
         .show(ui, |ui| topbar::show(app, ui));
+
+    if hints::visible(app) {
+        egui::Panel::bottom("hints")
+            .frame(Frame::new().fill(app.theme.bg).inner_margin(Margin::symmetric(12, 3)))
+            .show(ui, |ui| hints::show(app, ui));
+    }
 
     egui::Panel::bottom("statusbar")
         .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(12, 5)).stroke(egui::Stroke::new(1.0, app.theme.border)))
@@ -72,39 +95,56 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
         });
 
     modals::show(app, &ctx);
+    leader::show(app, &ctx);
     toasts(app, &ctx);
 
     let animating = app.cfg.animations;
     ctx.request_repaint_after(Duration::from_millis(if animating { 40 } else { 250 }));
 }
 
-fn toasts(app: &App, ctx: &egui::Context) {
+fn toasts(app: &mut App, ctx: &egui::Context) {
     if app.toasts.is_empty() {
         return;
     }
+    let mut dismiss = None;
     egui::Area::new(egui::Id::new("toasts"))
         .anchor(Align2::RIGHT_BOTTOM, Vec2::new(-16.0, -64.0))
         .order(egui::Order::Foreground)
-        .interactable(false)
         .show(ctx, |ui| {
-            for t in &app.toasts {
+            for (i, t) in app.toasts.iter().enumerate() {
                 let color = match t.kind {
                     ToastKind::Info => app.theme.accent,
                     ToastKind::Ok => app.theme.ok,
                     ToastKind::Warn => app.theme.warn,
                     ToastKind::Err => app.theme.err,
                 };
-                Frame::new()
-                    .fill(app.theme.bg3)
-                    .stroke(egui::Stroke::new(1.0, color))
-                    .corner_radius(app.theme.radius())
-                    .inner_margin(Margin::symmetric(12, 8))
-                    .shadow(ctx.global_style().visuals.popup_shadow)
-                    .show(ui, |ui| {
-                        ui.set_max_width(420.0);
-                        ui.label(RichText::new(&t.text).color(app.theme.ink));
-                    });
+                // clique em qualquer lugar do aviso fecha (o sentido vem antes do conteúdo)
+                let resp = ui
+                    .scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
+                        Frame::new()
+                            .fill(app.theme.bg3)
+                            .stroke(egui::Stroke::new(1.0, color))
+                            .corner_radius(app.theme.radius())
+                            .inner_margin(Margin::symmetric(12, 8))
+                            .shadow(ctx.global_style().visuals.popup_shadow)
+                            .show(ui, |ui| {
+                                ui.set_max_width(420.0);
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::Label::new(RichText::new(&t.text).color(app.theme.ink)).selectable(false));
+                                    if widgets::icon_button(ui, widgets::I_CLOSE, "Fechar aviso", "Fechar aviso").clicked() {
+                                        dismiss = Some(i);
+                                    }
+                                });
+                            });
+                    })
+                    .response;
+                if resp.on_hover_text("Clique pra fechar").clicked() {
+                    dismiss = Some(i);
+                }
                 ui.add_space(6.0);
             }
         });
+    if let Some(i) = dismiss {
+        app.toasts.remove(i);
+    }
 }
