@@ -1,11 +1,11 @@
 //! Pixel art no painter do egui: fonte bitmap 5x7 e sprites em grade de caracteres.
 //!
 //! Tudo é desenhado com retângulos em escala inteira e posições arredondadas, sem
-//! antialiasing nem blur. A fonte e o formato de sprite vêm do `clark.py` do Biel.
+//! antialiasing nem blur. Fonte e sprites são desenhados à mão, glifo por glifo.
 
 use egui::{Color32, Painter, Pos2, Rect, pos2, vec2};
 
-/// Fonte bitmap 5x7 do Clark. Cada glifo: 7 linhas de 5 bits.
+/// Fonte bitmap 5x7. Cada glifo: 7 linhas de 5 bits.
 const FONT: &[(char, [&str; 7])] = &[
     ('A', ["01110", "10001", "10001", "11111", "10001", "10001", "10001"]),
     ('B', ["11110", "10001", "10001", "11110", "10001", "10001", "11110"]),
@@ -75,7 +75,7 @@ fn glyph(ch: char) -> &'static [&'static str; 7] {
         .expect("fonte tem '?'")
 }
 
-/// Maiúscula sem acento (o `norm` do clark.py).
+/// Maiúscula sem acento.
 fn fold(ch: char) -> char {
     let c = match ch {
         'á' | 'à' | 'â' | 'ã' | 'ä' | 'Á' | 'À' | 'Â' | 'Ã' | 'Ä' => 'A',
@@ -159,7 +159,7 @@ pub fn sprite(p: &Painter, rows: &[String], origin: Pos2, px: f32, flip: bool, p
     }
 }
 
-/// Contorno de 1 pixel em volta das células cheias (o contorno do ícone do Clark).
+/// Contorno de 1 pixel em volta das células cheias.
 pub fn outline(p: &Painter, rows: &[String], origin: Pos2, px: f32, flip: bool, filled: &dyn Fn(char) -> bool, color: Color32) {
     let o = snap(origin);
     let cols = rows.iter().map(|r| r.chars().count()).max().unwrap_or(0) as i32;
@@ -190,7 +190,7 @@ pub fn outline(p: &Painter, rows: &[String], origin: Pos2, px: f32, flip: bool, 
     }
 }
 
-/// Mistura linear de cores (o `mix` do clark.py).
+/// Mistura linear de cores.
 pub fn mix(a: Color32, b: Color32, t: f32) -> Color32 {
     let l = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round().clamp(0.0, 255.0) as u8;
     Color32::from_rgba_unmultiplied(l(a.r(), b.r()), l(a.g(), b.g()), l(a.b(), b.b()), l(a.a(), b.a()))

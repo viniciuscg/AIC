@@ -1,4 +1,4 @@
-//! Aba do fork: como usar, o que esse fork muda, e os atalhos ao vivo.
+//! Aba de ajuda: como usar, o que cada tema muda, e os atalhos ao vivo.
 
 use egui::{FontId, RichText, ScrollArea, Sense, Ui, Vec2};
 use egui_commonmark::CommonMarkViewer;
@@ -14,8 +14,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     let t = app.t();
     let all = skins::all();
 
-    // abas dos forks (cada fork tem a sua página)
-    let current = ui.data(|d| d.get_temp::<String>(egui::Id::new("help-fork"))).unwrap_or_else(|| app.skin.id().to_string());
+    // abas dos temas (cada tema tem a sua página)
+    let current = ui.data(|d| d.get_temp::<String>(egui::Id::new("help-tema"))).unwrap_or_else(|| app.skin.id().to_string());
     ui.horizontal(|ui| {
         for f in &all {
             let th = f.theme(f.variants()[0]);
@@ -30,44 +30,44 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 ui.painter().text(r.min + Vec2::new(42.0, 24.0), egui::Align2::LEFT_TOP, format!("por {}", f.creator()), FontId::proportional(10.5), th.dim);
             }
             if resp.clicked() {
-                ui.data_mut(|d| d.insert_temp(egui::Id::new("help-fork"), f.id().to_string()));
+                ui.data_mut(|d| d.insert_temp(egui::Id::new("help-tema"), f.id().to_string()));
             }
         }
     });
     ui.add_space(10.0);
 
-    let fork = skins::by_id(&current);
-    let th = fork.theme(fork.variants()[0]);
+    let skin = skins::by_id(&current);
+    let th = skin.theme(skin.variants()[0]);
     egui::Panel::right("help-side").resizable(false).exact_size(300.0).show(ui, |ui| {
         let (r, _) = ui.allocate_exact_size(Vec2::new(280.0, 200.0), Sense::hover());
         let state = [SessionState::Idle, SessionState::Working, SessionState::Waiting, SessionState::Done, SessionState::GameOver][((t / 3.0) as usize) % 5];
         ui.painter().rect_filled(r, th.radius(), th.bg2);
-        fork.background(ui, r, t, &th);
-        fork.mascot(ui, r.shrink(20.0), state, t, &th);
-        ui.label(RichText::new(fork.state_label(state)).font(FontId::monospace(14.0)).color(th.state_color(state)));
+        skin.background(ui, r, t, &th);
+        skin.mascot(ui, r.shrink(20.0), state, t, &th);
+        ui.label(RichText::new(skin.state_label(state)).font(FontId::monospace(14.0)).color(th.state_color(state)));
         ui.add_space(8.0);
         ui.label(RichText::new("ESTADOS").font(FontId::monospace(11.0)).color(theme.dim));
         for s in [SessionState::Boot, SessionState::Working, SessionState::Idle, SessionState::Waiting, SessionState::Done, SessionState::GameOver] {
             ui.horizontal(|ui| {
-                widgets::state_badge(ui, fork.state_label(s), s, &th, t);
+                widgets::state_badge(ui, skin.state_label(s), s, &th, t);
                 ui.label(widgets::subtle(state_desc(s), &theme).small());
             });
         }
         ui.add_space(8.0);
         ui.label(RichText::new("VARIANTES").font(FontId::monospace(11.0)).color(theme.dim));
         ui.horizontal_wrapped(|ui| {
-            for v in fork.variants() {
-                let vt = fork.theme(v);
+            for v in skin.variants() {
+                let vt = skin.theme(v);
                 if widgets::chip(ui, *v, vt.accent_hi, &theme).clicked() {
                     let ctx = ui.ctx().clone();
-                    app.set_theme(&ctx, fork.id().to_string(), Some(v.to_string()));
+                    app.set_theme(&ctx, skin.id().to_string(), Some(v.to_string()));
                 }
             }
         });
         ui.add_space(8.0);
-        if app.skin.id() != fork.id() && ui.button(format!("Usar o {} agora", fork.display_name())).clicked() {
+        if app.skin.id() != skin.id() && ui.button(format!("Usar o {} agora", skin.display_name())).clicked() {
             let ctx = ui.ctx().clone();
-            app.set_theme(&ctx, fork.id().to_string(), None);
+            app.set_theme(&ctx, skin.id().to_string(), None);
         }
         ui.add_space(8.0);
         ui.label(RichText::new("ATALHOS PRINCIPAIS").font(FontId::monospace(11.0)).color(theme.dim));
@@ -81,7 +81,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
     ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.set_max_width(780.0);
-        CommonMarkViewer::new().show(ui, &mut app.md_cache, fork.help());
+        CommonMarkViewer::new().show(ui, &mut app.md_cache, skin.help());
     });
 }
 

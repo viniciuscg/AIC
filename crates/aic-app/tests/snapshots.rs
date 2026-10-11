@@ -43,19 +43,19 @@ fn out(name: &str) -> PathBuf {
 fn tasks(app: &mut App) {
     let mut a = Task::new("Corrigir cálculo de juros no checkout");
     a.repo = Some("api-pagamentos".into());
-    a.card_key = Some("DEV-1256".into());
+    a.card_key = Some("DEV-142".into());
     a.priority = Priority::High;
     a.status = TaskStatus::Doing;
     a.due = Some(chrono::Local::now().date_naive());
     a.subtasks = vec![
-        Subtask { text: "reproduzir com proposta 9912".into(), done: true },
+        Subtask { text: "reproduzir com pedido 9912".into(), done: true },
         Subtask { text: "ajustar arredondamento".into(), done: false },
         Subtask { text: "teste de regressão".into(), done: false },
     ];
-    a.notes = "Diferença de centavos no juros diário quando a proposta cruza o mês.".into();
-    let mut b = Task::new("Tela de simulação: novo campo de carência");
+    a.notes = "Diferença de centavos no juros diário quando o pedido cruza o mês.".into();
+    let mut b = Task::new("Tela de pedidos: filtro por data");
     b.repo = Some("web-app".into());
-    b.card_key = Some("DEV-1301".into());
+    b.card_key = Some("DEV-150".into());
     b.tags = vec!["front".into()];
     let mut c = Task::new("Revisar PR do notificador (retry de webhooks)");
     c.repo = Some("notificador".into());
@@ -63,7 +63,7 @@ fn tasks(app: &mut App) {
     c.priority = Priority::Urgent;
     let mut d = Task::new("Atualizar docker-compose do infra");
     d.status = TaskStatus::Done;
-    let mut e = Task::new("Ler a thread sobre o VaaS stub");
+    let mut e = Task::new("Ler a thread sobre o rate limit da API");
     e.slack_thread = Some("https://minhaempresa.slack.com/archives/C1/p1".into());
     e.priority = Priority::Low;
     for t in [a, b, c, d, e] {
@@ -80,11 +80,11 @@ fn hook(session: aic_core::Id, name: &str, extra: &[(&str, &str)]) {
     events::append(&e).unwrap();
 }
 
-fn harness(fork: &str, size: [f32; 2]) -> Harness<'static, Option<App>> {
-    let fork = fork.to_string();
+fn harness(tema: &str, size: [f32; 2]) -> Harness<'static, Option<App>> {
+    let tema = tema.to_string();
     Harness::builder().with_size(egui::vec2(size[0], size[1])).build_ui_state(
         move |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), Some(fork.clone()), true).expect("app"));
+            let a = app.get_or_insert_with(|| App::new(ui.ctx(), Some(tema.clone()), true).expect("app"));
             aic_app::ui::draw(a, ui);
         },
         None,
@@ -165,11 +165,11 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     let ctx = h.ctx.clone();
     let app = h.state_mut().as_mut().unwrap();
     tasks(app);
-    let script = r#"printf '\e[38;2;215;119;87m✻\e[0m Welcome to \e[1mClaude Code\e[0m!\n\n> corrige o cálculo do juros quando cruza o mês\n\n\e[38;2;215;119;87m⏺\e[0m Vou olhar o serviço de juros primeiro.\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mRead\e[0m(src/Service/IofService.php)\n  ⎿  Read 214 lines\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mUpdate\e[0m(src/Service/IofService.php)\n  ⎿  Updated with \e[32m6 additions\e[0m and \e[31m2 removals\e[0m\n\n╭──────────────────────────────────────────────╮\n│ > \e[2mTry \"write a test for IofService\"\e[0m          │\n╰──────────────────────────────────────────────╯\n  \e[2m⏵⏵ accept edits on (shift+tab to cycle)\e[0m\n'; sleep 60"#;
+    let script = r#"printf '\e[38;2;215;119;87m✻\e[0m Welcome to \e[1mClaude Code\e[0m!\n\n> corrige o cálculo do juros quando cruza o mês\n\n\e[38;2;215;119;87m⏺\e[0m Vou olhar o serviço de juros primeiro.\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mRead\e[0m(src/checkout/interest.ts)\n  ⎿  Read 214 lines\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mUpdate\e[0m(src/checkout/interest.ts)\n  ⎿  Updated with \e[32m6 additions\e[0m and \e[31m2 removals\e[0m\n\n╭──────────────────────────────────────────────╮\n│ > \e[2mTry \"write a test for interest.ts\"\e[0m          │\n╰──────────────────────────────────────────────╯\n  \e[2m⏵⏵ accept edits on (shift+tab to cycle)\e[0m\n'; sleep 60"#;
     // 3 blocos: um card com 2 terminais, uma revisão, infra
     let plan = [
-        ("api juros", "api-pagamentos", "DEV-1256 · juros no checkout", true),
-        ("web carência", "web-app", "", false),
+        ("api juros", "api-pagamentos", "DEV-142 · juros no checkout", true),
+        ("web filtros", "web-app", "", false),
         ("review", "notificador", "Revisão do notificador", true),
         ("infra", "infra", "infra", true),
     ];
@@ -184,8 +184,8 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
         ids.push(id);
     }
     let b0 = app.block_of(ids[0]).unwrap();
-    app.update_block(b0, |b| b.notes = "## Plano\n- reproduzir com a proposta 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
-    let t0 = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-1256")).map(|t| t.id).unwrap();
+    app.update_block(b0, |b| b.notes = "## Plano\n- reproduzir com a pedido 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
+    let t0 = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id).unwrap();
     app.link(t0, ids[0]);
     app.update_block(b0, |b| b.task = Some(t0));
     // estados via hooks
@@ -201,7 +201,7 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     hook(ids[2], "Stop", &[]);
     app.focus(ids[0]);
     // histórico de uso: duas sessões abertas no AIC + duas de fora (só projeto)
-    let mut usage_sessions: Vec<(String, String)> = ids[..2].iter().zip(["api-pagamentos", "web-app"]).map(|(id, repo)| (app.sessions[id].s.claude_session.to_string(), format!("/home/dev/emcash/repos/{repo}"))).collect();
+    let mut usage_sessions: Vec<(String, String)> = ids[..2].iter().zip(["api-pagamentos", "web-app"]).map(|(id, repo)| (app.sessions[id].s.claude_session.to_string(), format!("/home/dev/projetos/{repo}"))).collect();
     usage_sessions.push(("7c1e9a52-0000-4000-8000-000000000001".into(), "/home/dev/projetos/notificador".into()));
     usage_sessions.push(("9d2f0b63-0000-4000-8000-000000000002".into(), "/home/dev/dotfiles".into()));
     usage_fixtures(&usage_sessions);
@@ -223,12 +223,12 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
 fn telas() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _dir = sandbox("telas");
-    for fork in ["aic", "plankton"] {
-        let mut h = harness(fork, [1480.0, 900.0]);
+    for tema in ["aic", "plankton"] {
+        let mut h = harness(tema, [1480.0, 900.0]);
         demo_sessions(&mut h);
         settle(&mut h, 2500);
-        shot(&mut h, &format!("{fork}-blocos"));
-        if fork == "aic" {
+        shot(&mut h, &format!("{tema}-blocos"));
+        if tema == "aic" {
             for (v, name) in [(aic_core::SessionView::Tabs, "abas"), (aic_core::SessionView::Focus, "foco"), (aic_core::SessionView::Grid, "grade")] {
                 h.state_mut().as_mut().unwrap().cfg.view = v;
                 settle(&mut h, 300);
@@ -236,12 +236,12 @@ fn telas() {
             }
             h.state_mut().as_mut().unwrap().cfg.view = aic_core::SessionView::Blocks;
         }
-        if fork == "plankton" {
-            for (view, name) in [(View::Board, "board"), (View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::ForkHelp, "ajuda")] {
+        if tema == "plankton" {
+            for (view, name) in [(View::Board, "board"), (View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::ThemeHelp, "ajuda")] {
                 let app = h.state_mut().as_mut().unwrap();
                 app.set_view(view);
                 if view == View::Board {
-                    app.board.selected = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-1256")).map(|t| t.id);
+                    app.board.selected = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id);
                 }
                 settle(&mut h, 300);
                 shot(&mut h, &format!("plankton-{name}"));
@@ -250,7 +250,7 @@ fn telas() {
             app.set_view(View::Sessions);
             app.open_quick_add(None);
             if let Some(aic_app::ui::modals::Modal::QuickAdd { text, .. }) = &mut app.modal {
-                *text = "corrigir cálculo de juros #api !alta @sexta ^dev-1256".into();
+                *text = "corrigir cálculo de juros #api !alta @sexta ^dev-142".into();
             }
             settle(&mut h, 200);
             shot(&mut h, "plankton-captura-rapida");
@@ -259,7 +259,7 @@ fn telas() {
             settle(&mut h, 200);
             shot(&mut h, "plankton-fechar");
         }
-        // mata os processos antes do próximo fork
+        // mata os processos antes do próximo tema
         let app = h.state_mut().as_mut().unwrap();
         let ids: Vec<_> = app.sessions.keys().copied().collect();
         for id in ids {
@@ -309,7 +309,7 @@ fn splash() {
     shot(&mut h, "assistente");
 }
 
-/// Folha de mascotes: cada fork em cada estado e nos tamanhos reais da UI
+/// Folha de mascotes: cada tema em cada estado e nos tamanhos reais da UI
 /// (22 cabeçalho, 34 card, 40 topbar, 64, 150 splash), mais o fundo e o wordmark.
 /// Gera `mascotes.png` (instante t=1.3) e `mascotes-b.png` (t=2.05, outro quadro).
 #[test]

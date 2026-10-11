@@ -1,7 +1,7 @@
 //! Captura rápida: uma linha de texto vira tarefa.
 //!
 //! ```text
-//! corrigir cálculo de juros #api !alta @hoje ^DEV-1256 +sprint
+//! corrigir cálculo de juros #api !alta @hoje ^DEV-142 +sprint
 //! ```
 //!
 //! | marcador        | vira                                   |
@@ -10,7 +10,7 @@
 //! | `@hoje` `@sexta` `@12/10` | prazo                        |
 //! | `!alta` `!!` `!!!` `!baixa` | prioridade                 |
 //! | `+workspace`    | workspace (por prefixo do nome)        |
-//! | `^DEV-1256`     | card do Notion                         |
+//! | `^DEV-142`     | card do Notion                         |
 //! | `~tag`          | etiqueta livre                         |
 //!
 //! Marcadores podem estar em qualquer posição; o resto é o título.
@@ -253,12 +253,12 @@ mod tests {
 
     #[test]
     fn exemplo_completo() {
-        let p = parse("corrigir cálculo de juros #api !alta @hoje ^dev-1256", today(), &repos(), &[]);
+        let p = parse("corrigir cálculo de juros #api !alta @hoje ^dev-142", today(), &repos(), &[]);
         assert_eq!(p.title, "corrigir cálculo de juros");
         assert_eq!(p.repo.as_deref(), Some("api-pagamentos"));
         assert_eq!(p.priority, Some(Priority::High));
         assert_eq!(p.due, Some(today()));
-        assert_eq!(p.card_key.as_deref(), Some("DEV-1256"));
+        assert_eq!(p.card_key.as_deref(), Some("DEV-142"));
         assert_eq!(p.chips.len(), 4);
     }
 

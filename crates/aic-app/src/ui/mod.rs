@@ -91,7 +91,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             View::Worktrees => worktrees::show(app, ui),
             View::Usage => usage::show(app, ui),
             View::Settings => settings::show(app, ui),
-            View::ForkHelp => help::show(app, ui),
+            View::ThemeHelp => help::show(app, ui),
         });
 
     modals::show(app, &ctx);

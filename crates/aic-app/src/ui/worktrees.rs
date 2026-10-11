@@ -101,7 +101,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
     // criar
     ui.horizontal(|ui| {
-        let r = ui.add(TextEdit::singleline(&mut app.worktrees.new_branch).hint_text("nova branch (ex: DEV-1256-ajuste-juros)").desired_width(320.0));
+        let r = ui.add(TextEdit::singleline(&mut app.worktrees.new_branch).hint_text("nova branch (ex: DEV-142-ajuste-juros)").desired_width(320.0));
         if app.worktrees.creating {
             r.request_focus();
             app.worktrees.creating = false;

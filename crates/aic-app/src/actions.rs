@@ -53,14 +53,14 @@ pub enum Action {
     ViewWorktrees,
     ViewUsage,
     ViewSettings,
-    ViewForkHelp,
+    ViewThemeHelp,
     Palette,
     // Visual
     ZoomIn,
     ZoomOut,
     ZoomReset,
     CycleThemeVariant,
-    SwitchFork,
+    SwitchTheme,
     ToggleSidebar,
     ToggleHints,
     Quit,
@@ -94,8 +94,8 @@ impl Action {
         v.extend([
             ToggleLayout, CycleView, ToggleMaximize, ReleaseTerminal, NewBlock, CloseBlock, RenameBlock, CycleSplit, ToggleBlockSide,
             CollapseBlock, MoveBlockUp, MoveBlockDown, FocusNotes, OpenCard, QuickAdd, LinkTaskToSession, Workspaces, NewWorkspace,
-            NextWorkspace, PrevWorkspace, ViewSessions, ViewBoard, ViewWorktrees, ViewUsage, ViewSettings, ViewForkHelp, Palette, ZoomIn,
-            ZoomOut, ZoomReset, CycleThemeVariant, SwitchFork, ToggleSidebar, ToggleHints, Quit,
+            NextWorkspace, PrevWorkspace, ViewSessions, ViewBoard, ViewWorktrees, ViewUsage, ViewSettings, ViewThemeHelp, Palette, ZoomIn,
+            ZoomOut, ZoomReset, CycleThemeVariant, SwitchTheme, ToggleSidebar, ToggleHints, Quit,
         ]);
         v
     }
@@ -180,13 +180,13 @@ impl Action {
             ViewWorktrees => ("view_worktrees", "Ir pra aba Worktrees", "Visões", ks(CS, Key::G)),
             ViewUsage => ("view_usage", "Ir pra aba Tokens (limites e custo)", "Visões", ks(CS, Key::U)),
             ViewSettings => ("view_settings", "Abrir configurações e atalhos", "Visões", ks(C, Key::Comma)),
-            ViewForkHelp => ("view_fork_help", "Abrir a ajuda do tema", "Visões", ks(N, Key::F1)),
+            ViewThemeHelp => ("view_theme_help", "Abrir a ajuda do tema", "Visões", ks(N, Key::F1)),
             Palette => ("palette", "Paleta de comandos (busca ações, terminais e tarefas)", "Visões", ks(CS, Key::P)),
             ZoomIn => ("zoom_in", "Aumentar a fonte do terminal", "Visual", ks(CS, Key::Equals)),
             ZoomOut => ("zoom_out", "Diminuir a fonte do terminal", "Visual", ks(CS, Key::Minus)),
             ZoomReset => ("zoom_reset", "Voltar a fonte do terminal ao padrão", "Visual", ks(CS, Key::Num0)),
             CycleThemeVariant => ("cycle_theme", "Próxima variante de cor do tema", "Visual", ks(CS, Key::Y)),
-            SwitchFork => ("switch_theme", "Trocar de tema (AIC ⇄ Plankton)", "Visual", ks(CA, Key::Y)),
+            SwitchTheme => ("switch_theme", "Trocar de tema (AIC ⇄ Plankton)", "Visual", ks(CA, Key::Y)),
             ToggleSidebar => ("toggle_sidebar", "Mostrar/esconder a lista lateral (visualização Foco)", "Visual", ks(CS, Key::D)),
             ToggleHints => ("toggle_hints", "Mostrar/esconder a barra de dicas do rodapé", "Visual", ks(CS, Key::H)),
             Quit => ("quit", "Sair do AIC", "Visual", ks(CS, Key::Q)),

@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn diretorio_de_projeto() {
-        let p = project_dir(Path::new("/home/vini/dev/api-pagamentos"));
-        assert!(p.ends_with("-home-vini-dev-api-pagamentos"));
+        let p = project_dir(Path::new("/home/dev/dev/api-pagamentos"));
+        assert!(p.ends_with("-home-dev-dev-api-pagamentos"));
     }
 }

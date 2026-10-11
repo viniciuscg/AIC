@@ -16,15 +16,15 @@ pub mod template;
 pub trait Skin: Send + Sync {
     /// Id estável (config, `--tema`).
     fn id(&self) -> &'static str;
-    /// Nome do fork ("Clark").
+    /// Nome do tema ("AIC").
     fn name(&self) -> &'static str;
-    /// Criador ("Biel"). Vazio no Plankton.
+    /// Criador ("Vinicius"). Vazio no Plankton.
     fn creator(&self) -> &'static str;
     fn tagline(&self) -> &'static str;
     /// Variantes de tema; a primeira é a padrão.
     fn variants(&self) -> &'static [&'static str];
     fn theme(&self, variant: &str) -> Theme;
-    /// Markdown da aba de ajuda do fork.
+    /// Markdown da aba de ajuda do tema.
     fn help(&self) -> &'static str;
 
     /// "AIC" / "Plankton".
@@ -36,7 +36,7 @@ pub trait Skin: Send + Sync {
         }
     }
 
-    /// Nome do estado na linguagem do fork.
+    /// Nome do estado na linguagem do tema.
     fn state_label(&self, s: SessionState) -> &'static str {
         s.label()
     }
@@ -46,7 +46,7 @@ pub trait Skin: Send + Sync {
         plankton::draw_plankton(ui, rect, state, t, theme);
     }
 
-    /// Ícone pequeno (seletor de fork, aba de ajuda). Por padrão, o mascote parado.
+    /// Ícone pequeno (seletor de tema, aba de ajuda). Por padrão, o mascote parado.
     fn icon(&self, ui: &Ui, rect: Rect, t: f64, theme: &Theme) {
         self.mascot(ui, rect, SessionState::Idle, t, theme);
     }

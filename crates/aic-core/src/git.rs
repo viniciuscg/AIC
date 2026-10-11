@@ -1,6 +1,6 @@
 //! Git via CLI: branch, sujeira e worktrees.
 //!
-//! Worktrees seguem o padrão do MultiTerm: `<repo>.worktrees/<branch>` ao lado do
+//! Worktrees seguem o padrão `<repo>.worktrees/<branch>` ao lado do
 //! repo. Remover um worktree nunca apaga a branch.
 
 use std::path::{Path, PathBuf};
@@ -166,7 +166,7 @@ pub fn prune(repo: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Nome de branch a partir de um card/tarefa: `DEV-1256` + "corrigir juros" → `DEV-1256-corrigir-juros`.
+/// Nome de branch a partir de um card/tarefa: `DEV-142` + "corrigir juros" → `DEV-142-corrigir-juros`.
 pub fn branch_slug(card: Option<&str>, title: &str) -> String {
     let mut slug: String = title
         .to_lowercase()
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn slug() {
-        assert_eq!(branch_slug(Some("DEV-1256"), "Corrigir cálculo de juros!"), "DEV-1256-corrigir-calculo-de-juros");
+        assert_eq!(branch_slug(Some("DEV-142"), "Corrigir cálculo de juros!"), "DEV-142-corrigir-calculo-de-juros");
         assert_eq!(branch_slug(None, "  ajuste / canvas  "), "ajuste-canvas");
     }
 

@@ -1,4 +1,4 @@
-//! Paleta ANSI do terminal. Cada fork do AIC entrega a sua.
+//! Paleta ANSI do terminal. Cada tema do AIC entrega a sua.
 
 use alacritty_terminal::term::color::Colors;
 use alacritty_terminal::vte::ansi::{Color, NamedColor, Rgb};

@@ -52,10 +52,10 @@ impl Workspace {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum Layout {
-    /// Uma sessão grande + lista lateral (estilo Clark).
+    /// Uma sessão grande + lista lateral.
     #[default]
     Focus,
-    /// Todas lado a lado (estilo MultiTerm).
+    /// Todas lado a lado.
     Grid,
 }
 
@@ -356,7 +356,7 @@ pub struct Task {
     pub session: Option<Id>,
     #[serde(default)]
     pub source: TaskSource,
-    /// Chave do card (ex: `DEV-1256`).
+    /// Chave do card (ex: `DEV-142`).
     #[serde(default)]
     pub card_key: Option<String>,
     /// Page id do Notion, quando vinculado.

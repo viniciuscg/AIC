@@ -125,7 +125,7 @@ fn opt(s: &Option<String>) -> Option<&str> {
 
 // ───────────────────────────── mapeamento ─────────────────────────────
 
-/// Um card do Notion já traduzido pro vocabulário do Plankton.
+/// Um card do Notion já traduzido pro vocabulário do AIC.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotionCard {
     /// Page id normalizado (32 hex).
@@ -156,7 +156,7 @@ fn option_name(prop: &Value) -> Option<String> {
     prop.get(ty)?.get("name")?.as_str().map(str::to_string)
 }
 
-/// Status do Notion → coluna do Plankton. Primeiro o mapa configurado, depois heurística.
+/// Status do Notion → coluna do AIC. Primeiro o mapa configurado, depois heurística.
 pub fn map_status(name: &str, map: &NotionStatusMap) -> TaskStatus {
     let eq = |list: &Vec<String>| list.iter().any(|s| s.trim().eq_ignore_ascii_case(name.trim()));
     for (list, st) in [
@@ -510,7 +510,7 @@ impl Client {
     pub fn new(token: impl Into<String>) -> Result<Self> {
         let http = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(30))
-            .user_agent(concat!("plankton/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("aic/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self { http, token: token.into(), base: API_BASE.into() })
     }
@@ -814,8 +814,8 @@ mod tests {
         assert_eq!(c.len(), 3, "o data_source na lista é ignorado");
         let a = &c[0];
         assert_eq!(a.page_id, norm_id(PAGE_ID));
-        assert_eq!(a.title, "Story - Simulação com avalista");
-        assert_eq!(a.key.as_deref(), Some("DEV-1256"), "prefixo do config quando o unique_id não tem");
+        assert_eq!(a.title, "Story - Exportar relatório em CSV");
+        assert_eq!(a.key.as_deref(), Some("DEV-142"), "prefixo do config quando o unique_id não tem");
         assert_eq!(a.status, TaskStatus::Doing);
         assert_eq!(a.status_name.as_deref(), Some("Em andamento"));
         assert_eq!(a.priority, Some(Priority::High));
@@ -942,7 +942,7 @@ mod tests {
 
     #[test]
     fn token_em_arquivo_600() {
-        let dir = std::env::temp_dir().join(format!("plankton-notion-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("aic-notion-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // Só este teste mexe em AIC_CONFIG_DIR dentro do crate.

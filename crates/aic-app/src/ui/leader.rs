@@ -86,7 +86,7 @@ fn tree() -> Vec<Item> {
             Run('-', "Diminuir fonte", ZoomOut),
             Run('0', "Fonte padrão", ZoomReset),
             Run('c', "Variante de cor", CycleThemeVariant),
-            Run('t', "Trocar tema", SwitchFork),
+            Run('t', "Trocar tema", SwitchTheme),
         ]),
         Group('w', "Workspaces", vec![
             Run('w', "Trocar de workspace", Workspaces),
@@ -100,7 +100,7 @@ fn tree() -> Vec<Item> {
         Run('k', "Tokens e custo", ViewUsage),
         Run('p', "Paleta de comandos", Palette),
         Run(',', "Configurações", ViewSettings),
-        Run('?', "Ajuda", ViewForkHelp),
+        Run('?', "Ajuda", ViewThemeHelp),
         Run('q', "Sair", Quit),
     ]
 }

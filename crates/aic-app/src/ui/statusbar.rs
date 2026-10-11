@@ -1,7 +1,7 @@
 //! Barra de status: a statusline do Claude da sessão em foco, desenhada pelo app.
 //!
 //! ```text
-//!  Opus 5.5 · medium   api-pagamentos   DEV-1256   main ±8   󰧑 █░░░░░░░░░ 17% de 1M
+//!  Opus 5.5 · medium   api-pagamentos   DEV-142   main ±8   󰧑 █░░░░░░░░░ 17% de 1M
 //! 󱑂 5h █░░░ 15% reseta em 3h13m   󰃭 semana ░░░ 2% reseta em 6d11h   󰄦 $3.83 · 1065min   ⏵⏵ bypass   ← 4 agents
 //! ```
 

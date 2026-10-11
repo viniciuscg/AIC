@@ -65,7 +65,7 @@ pub fn context(app: &App) -> Vec<(String, &'static str)> {
             v.push(("alterar".into(), "gravar atalho"));
             act(&mut v, Action::ViewSessions, "voltar às sessões");
         }
-        View::Usage | View::ForkHelp => {
+        View::Usage | View::ThemeHelp => {
             act(&mut v, Action::ViewSessions, "voltar às sessões");
             act(&mut v, Action::Palette, "paleta");
         }
