@@ -155,6 +155,19 @@ pub fn show(app: &mut App, ctx: &Context) {
     }
 }
 
+/// Botões de confirmar/cancelar pros diálogos que só tinham teclado.
+fn ok_cancel(ui: &mut Ui, ok: &str, done: &mut bool, cancel: &mut bool) {
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        if ui.button(ok).clicked() {
+            *done = true;
+        }
+        if ui.button("Cancelar  (Esc)").clicked() {
+            *cancel = true;
+        }
+    });
+}
+
 fn list_nav(ui: &Ui, selected: &mut usize, len: usize) -> bool {
     let (down, up, enter) = ui.input_mut(|i| {
         (
@@ -462,6 +475,7 @@ fn close_session(app: &mut App, ctx: &Context, id: Id, mut remove_wt: bool, has_
 
 fn rename(app: &mut App, ctx: &Context, id: Id, mut text: String, first: bool) -> Option<Modal> {
     let mut done = false;
+    let mut cancel = false;
     let closed = frame(ctx, "rename", 380.0, |ui| {
         ui.label("Renomear sessão");
         let r = ui.add(TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
@@ -476,16 +490,18 @@ fn rename(app: &mut App, ctx: &Context, id: Id, mut text: String, first: bool) -
         if ui.input(|i| i.key_pressed(Key::Enter)) {
             done = true;
         }
+        ok_cancel(ui, "Salvar  ⏎", &mut done, &mut cancel);
     });
     if done {
         app.rename_session(id, &text);
         return None;
     }
-    (!closed).then_some(Modal::Rename { id, text, first: false })
+    (!closed && !cancel).then_some(Modal::Rename { id, text, first: false })
 }
 
 fn rename_block(app: &mut App, ctx: &Context, id: Id, mut text: String, first: bool) -> Option<Modal> {
     let mut done = false;
+    let mut cancel = false;
     let closed = frame(ctx, "rename-block", 420.0, |ui| {
         ui.label("Nome do bloco (ex: o card ou o assunto)");
         let r = ui.add(TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
@@ -501,6 +517,7 @@ fn rename_block(app: &mut App, ctx: &Context, id: Id, mut text: String, first: b
             done = true;
         }
         ui.label(super::widgets::subtle("Enter salva · Esc cancela", &app.theme).small());
+        ok_cancel(ui, "Salvar  ⏎", &mut done, &mut cancel);
     });
     if done {
         let name = text.trim().to_string();
@@ -509,7 +526,7 @@ fn rename_block(app: &mut App, ctx: &Context, id: Id, mut text: String, first: b
         }
         return None;
     }
-    (!closed).then_some(Modal::RenameBlock { id, text, first: false })
+    (!closed && !cancel).then_some(Modal::RenameBlock { id, text, first: false })
 }
 
 fn close_block(app: &mut App, ctx: &Context, id: Id, mut remove_wt: bool, has_wt: bool) -> Option<Modal> {
@@ -558,6 +575,7 @@ fn link_task(app: &mut App, ctx: &Context, session: Id, mut query: String, mut s
     list.sort_by(|a, b| a.status.cmp(&b.status).then(b.priority.cmp(&a.priority)));
     let mut chosen = None;
     let mut create = false;
+    let mut cancel = false;
     let closed = frame(ctx, "link-task", 560.0, |ui| {
         ui.label(RichText::new(format!("Vincular tarefa a \"{}\"", app.session_label(session))).size(15.0));
         let r = ui.add(TextEdit::singleline(&mut query).hint_text("buscar… (Enter numa busca sem resultado cria a tarefa)").desired_width(f32::INFINITY));
@@ -587,7 +605,13 @@ fn link_task(app: &mut App, ctx: &Context, session: Id, mut query: String, mut s
                 None => create = true,
             }
         }
+        if ui.button("Cancelar  (Esc)").clicked() {
+            cancel = true;
+        }
     });
+    if cancel {
+        return None;
+    }
     if create && !query.trim().is_empty() {
         app.quick_add(&query, TaskStatus::Doing, Some(session));
         return None;
@@ -618,6 +642,7 @@ fn workspaces(app: &mut App, ctx: &Context, mut query: String, mut selected: usi
     let mut pick = None;
     let mut create = false;
     let mut delete = None;
+    let mut close = false;
     let closed = frame(ctx, "workspaces", 480.0, |ui| {
         ui.label(RichText::new(format!("{}  Workspaces", widgets::I_WS)).font(FontId::monospace(16.0)).color(theme.accent_hi));
         ui.label(widgets::subtle("Um workspace agrupa sessões, tarefas e layout. Trocar não mata processos.", &theme).small());
@@ -632,7 +657,7 @@ fn workspaces(app: &mut App, ctx: &Context, mut query: String, mut selected: usi
                     pick = Some(*i);
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if app.workspaces.len() > 1 && ui.small_button("🗑").on_hover_text("Apagar (fecha as sessões dele)").clicked() {
+                    if app.workspaces.len() > 1 && widgets::icon_button(ui, "🗑", &format!("Apagar workspace {name}"), "Apagar (fecha as sessões dele)").clicked() {
                         delete = Some(*i);
                     }
                 });
@@ -641,6 +666,9 @@ fn workspaces(app: &mut App, ctx: &Context, mut query: String, mut selected: usi
         let new_label = if query.trim().is_empty() { "+ novo workspace".to_string() } else { format!("+ criar \"{}\"", query.trim()) };
         if ui.selectable_label(selected == list.len(), new_label).clicked() {
             create = true;
+        }
+        if ui.button("Fechar  (Esc)").clicked() {
+            close = true;
         }
         if enter {
             match list.get(selected) {
@@ -661,7 +689,7 @@ fn workspaces(app: &mut App, ctx: &Context, mut query: String, mut selected: usi
         app.new_workspace(&query);
         return None;
     }
-    (!closed).then_some(Modal::Workspaces { query, selected })
+    (!closed && !close).then_some(Modal::Workspaces { query, selected })
 }
 
 // ───────────────────────── paleta ─────────────────────────
@@ -677,7 +705,7 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
     let q = query.to_lowercase();
     let matches = |s: &str| q.split_whitespace().all(|w| s.to_lowercase().contains(w));
     let mut items: Vec<(String, String, PaletteItem)> = Vec::new();
-    for a in Action::all() {
+    for a in Action::all().into_iter().filter(|a| a.enabled(&app.cfg)) {
         let m = a.meta();
         if matches(m.name) || matches(m.group) {
             items.push((format!("{} › {}", m.group, m.name), app.keymap.label(a), PaletteItem::Action(a)));
@@ -700,6 +728,7 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
         }
     }
     let mut run = None;
+    let mut close = false;
     let closed = frame(ctx, "palette", 600.0, |ui| {
         let r = ui.add(
             TextEdit::singleline(&mut query)
@@ -731,6 +760,9 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
         if enter {
             run = Some(selected);
         }
+        if ui.button("Fechar  (Esc)").clicked() {
+            close = true;
+        }
     });
     if let Some(i) = run {
         if let Some((_, _, item)) = items.into_iter().nth(i) {
@@ -745,7 +777,7 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
         }
         return app.modal.take();
     }
-    (!closed).then_some(Modal::Palette { query, selected })
+    (!closed && !close).then_some(Modal::Palette { query, selected })
 }
 
 // ───────────────────────── cache ─────────────────────────

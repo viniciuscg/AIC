@@ -91,7 +91,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         widgets::heading(ui, &format!("{}  Board", widgets::I_BOARD), &theme);
         ui.add_space(12.0);
         for (f, label, key) in [(Filter::All, "Tudo", "1"), (Filter::Notion, "Notion", "2"), (Filter::Mine, "Minhas", "3")] {
-            if ui.selectable_label(app.board.filter == f, label).on_hover_text(key).clicked() {
+            if ui.selectable_label(app.board.filter == f, label).on_hover_text(format!("Filtro ({key})")).clicked() {
                 app.board.filter = f;
             }
         }
@@ -107,7 +107,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             search.surrender_focus();
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if ui.button(format!("{}  Nova tarefa", widgets::I_PLUS)).on_hover_text(app.keymap.label(crate::actions::Action::QuickAdd)).clicked() {
+            if ui.button(format!("{}  Nova tarefa", widgets::I_PLUS)).on_hover_text(app.keymap.tip(crate::actions::Action::QuickAdd, "Nova tarefa (captura rápida)")).clicked() {
                 app.open_quick_add(None);
             }
             crate::notion_ui::toolbar(app, ui);
@@ -159,7 +159,7 @@ fn column(app: &mut App, ui: &mut Ui, status: TaskStatus, tasks: &[Task], width:
             ui.label(RichText::new(status.label().to_uppercase()).font(FontId::monospace(12.0)).color(color).strong());
             ui.label(RichText::new(tasks.len().to_string()).small().color(theme.faint));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.small_button(widgets::I_PLUS).on_hover_text("Adicionar aqui (t)").clicked() {
+                if widgets::icon_button(ui, widgets::I_PLUS, &format!("Nova tarefa em {}", status.label()), "Nova tarefa nesta coluna (t)").clicked() {
                     app.board.adding = Some((status, String::new()));
                 }
             });
@@ -169,7 +169,23 @@ fn column(app: &mut App, ui: &mut Ui, status: TaskStatus, tasks: &[Task], width:
             for task in tasks {
                 let selected = app.board.selected == Some(task.id);
                 let marked = app.board.marked.contains(&task.id);
-                let r = ui.dnd_drag_source(egui::Id::new(("task", task.id)), task.id, |ui| card(app, ui, task, selected, marked, t)).response;
+                // O cartão sente clique E arrasto num widget só. Com o `dnd_drag_source` do egui
+                // o arrasto ficava por cima do cartão e o egui descartava o clique de baixo:
+                // clicar, dar duplo clique ou abrir o menu num cartão não fazia nada.
+                let r = card(app, ui, task, selected, marked, t);
+                if r.drag_started() {
+                    egui::DragAndDrop::set_payload(ui.ctx(), task.id);
+                }
+                if r.dragged() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                    if let Some(p) = ui.ctx().pointer_interact_pos() {
+                        let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("task-ghost")));
+                        let galley = painter.layout_no_wrap(truncate(&task.title, 40), FontId::proportional(13.0), theme.ink);
+                        let rect = egui::Rect::from_min_size(p + Vec2::new(14.0, -galley.size().y / 2.0), galley.size());
+                        painter.rect(rect.expand(6.0), theme.radius(), theme.bg3, egui::Stroke::new(1.0, theme.accent), egui::StrokeKind::Outside);
+                        painter.galley(rect.min, galley, theme.ink);
+                    }
+                }
                 if selected {
                     r.scroll_to_me(None);
                 }
@@ -212,11 +228,11 @@ fn column(app: &mut App, ui: &mut Ui, status: TaskStatus, tasks: &[Task], width:
     }
 }
 
-fn card(app: &App, ui: &mut Ui, task: &Task, selected: bool, marked: bool, t: f64) {
+fn card(app: &App, ui: &mut Ui, task: &Task, selected: bool, marked: bool, t: f64) -> egui::Response {
     let theme = &app.theme;
     let today = Local::now().date_naive();
     let accent = priority_color(task.priority, theme);
-    widgets::card(ui, theme, selected || marked, accent, |ui| {
+    widgets::card_sense(ui, theme, selected || marked, accent, Sense::click_and_drag(), |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             if marked {
@@ -265,7 +281,7 @@ fn card(app: &App, ui: &mut Ui, task: &Task, selected: bool, marked: bool, t: f6
                 ui.label(RichText::new(format!("{I_TERM} {}", truncate(&app.session_label(sid), 16))).small().color(theme.dim));
             }
         });
-    });
+    })
 }
 
 fn task_menu(app: &mut App, resp: &egui::Response, task: &Task) {
@@ -330,7 +346,8 @@ fn keyboard(app: &mut App, ui: &Ui, cols: &[(TaskStatus, Vec<Task>)]) {
         cols.iter().enumerate().find_map(|(c, (_, ts))| ts.iter().position(|t| t.id == id).map(|r| (c, r)))
     });
     let (mut c, mut r) = pos.unwrap_or((0, 0));
-    let pressed = |k: Key, m: Modifiers| ui.input_mut(|i| i.consume_key(m, k));
+    // combinação exata: `consume_key` deixaria `l` engolir `Shift+L` (mover cartão)
+    let pressed = |k: Key, m: Modifiers| ui.input_mut(|i| crate::actions::consume_exact(i, m, k));
     let none = Modifiers::NONE;
     let shift = Modifiers::SHIFT;
 
@@ -456,7 +473,7 @@ fn editor(app: &mut App, ui: &mut Ui, mut task: Task) {
                 ui.label(RichText::new(format!("{I_NOTION} Notion")).small().color(theme.dim));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.small_button(widgets::I_CLOSE).on_hover_text("Fechar (Esc)").clicked() {
+                if widgets::icon_button(ui, widgets::I_CLOSE, "Fechar editor", "Fechar o editor (Esc)").clicked() {
                     app.board.selected = None;
                 }
             });
@@ -565,7 +582,7 @@ fn editor(app: &mut App, ui: &mut Ui, mut task: Task) {
             ui.horizontal(|ui| {
                 ui.checkbox(&mut s.done, "");
                 ui.add(TextEdit::singleline(&mut s.text).frame(egui::Frame::NONE).desired_width(ui.available_width() - 30.0));
-                if ui.small_button("×").clicked() {
+                if widgets::icon_button(ui, "×", "Remover subtarefa", "Remover subtarefa").clicked() {
                     remove = Some(i);
                 }
             });
@@ -641,11 +658,11 @@ fn editor(app: &mut App, ui: &mut Ui, mut task: Task) {
         ui.add_space(14.0);
         ui.horizontal(|ui| {
             crate::notion_ui::editor_buttons(app, ui, &task);
-            if ui.button("Arquivar").clicked() {
+            if ui.button("Arquivar").on_hover_text("Tira do board sem apagar (d)").clicked() {
                 task.status = TaskStatus::Archived;
                 app.board.selected = None;
             }
-            if ui.button(RichText::new("Apagar").color(theme.err)).clicked() {
+            if ui.button(RichText::new("Apagar").color(theme.err)).on_hover_text("Apaga a tarefa (Delete)").clicked() {
                 app.modal = Some(super::modals::Modal::ConfirmDeleteTask(task.id));
             }
         });

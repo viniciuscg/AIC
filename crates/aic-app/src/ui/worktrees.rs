@@ -9,6 +9,7 @@ use aic_core::git::{self, GitStatus, Worktree};
 use aic_core::{Id, SessionKind};
 
 use super::widgets::{self, I_BRANCH, I_TERM, I_WORKTREE};
+use crate::actions::consume_exact;
 use crate::app::{App, ToastKind};
 
 #[derive(Default)]
@@ -89,7 +90,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 }
                 app.worktrees.invalidate(&repo);
             }
-            if ui.button("↻").on_hover_text("Atualizar").clicked() {
+            let r = ui.button("↻");
+            r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Atualizar worktrees"));
+            if r.on_hover_text("Atualizar (r)").clicked() {
                 app.worktrees.invalidate(&repo);
             }
         });
@@ -122,20 +125,22 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     // teclado: j/k, Enter abre, Delete remove, n nova
     if app.modal.is_none() && !ui.ctx().egui_wants_keyboard_input() {
         let n = list.len().max(1);
-        ui.input_mut(|i| {
-            if i.consume_key(Modifiers::NONE, Key::J) || i.consume_key(Modifiers::NONE, Key::ArrowDown) {
-                app.worktrees.selected = (app.worktrees.selected + 1) % n;
-            }
-            if i.consume_key(Modifiers::NONE, Key::K) || i.consume_key(Modifiers::NONE, Key::ArrowUp) {
-                app.worktrees.selected = (app.worktrees.selected + n - 1) % n;
-            }
-            if i.consume_key(Modifiers::NONE, Key::N) {
-                app.worktrees.creating = true;
-            }
-        });
+        let key = |k: Key| ui.input_mut(|i| consume_exact(i, Modifiers::NONE, k));
+        if key(Key::J) || key(Key::ArrowDown) {
+            app.worktrees.selected = (app.worktrees.selected + 1) % n;
+        }
+        if key(Key::K) || key(Key::ArrowUp) {
+            app.worktrees.selected = (app.worktrees.selected + n - 1) % n;
+        }
+        if key(Key::N) {
+            app.worktrees.creating = true;
+        }
+        if key(Key::R) {
+            app.worktrees.invalidate(&repo);
+        }
     }
-    let enter = app.modal.is_none() && !ui.ctx().egui_wants_keyboard_input() && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
-    let del = app.modal.is_none() && !ui.ctx().egui_wants_keyboard_input() && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Delete));
+    let enter = app.modal.is_none() && !ui.ctx().egui_wants_keyboard_input() && ui.input_mut(|i| consume_exact(i, Modifiers::NONE, Key::Enter));
+    let del = app.modal.is_none() && !ui.ctx().egui_wants_keyboard_input() && ui.input_mut(|i| consume_exact(i, Modifiers::NONE, Key::Delete));
 
     ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         for (i, (wt, st)) in list.iter().enumerate() {
@@ -165,7 +170,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                         }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if !wt.is_main && ui.small_button("🗑").on_hover_text("Remover worktree (Delete)").clicked() {
+                        if !wt.is_main && widgets::icon_button(ui, "🗑", "Remover worktree", "Remover worktree (Delete)").clicked() {
                             app.worktrees.confirm_remove = Some(wt.path.clone());
                         }
                         if ui.small_button(format!("{I_TERM} sessão")).on_hover_text("Abrir sessão Claude aqui (Enter)").clicked() {

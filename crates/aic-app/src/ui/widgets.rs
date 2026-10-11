@@ -103,6 +103,11 @@ pub fn state_dot(ui: &Ui, center: egui::Pos2, r: f32, state: SessionState, theme
 
 /// Frame de card. Com `hard_shadow` (Clark/AIC) desenha a sombra deslocada sólida.
 pub fn card(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, add: impl FnOnce(&mut Ui)) -> Response {
+    card_sense(ui, theme, active, accent, Sense::click(), add)
+}
+
+/// `card` com outro sentido (o board usa clique + arrasto pra mover cartões).
+pub fn card_sense(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, sense: Sense, add: impl FnOnce(&mut Ui)) -> Response {
     let stroke = if active { Stroke::new(1.5, accent) } else { Stroke::new(1.0, theme.border) };
     let frame = Frame::new()
         .fill(if active { theme.bg3 } else { theme.bg2 })
@@ -112,7 +117,7 @@ pub fn card(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, add: impl
     let shadow_at = ui.painter().add(egui::Shape::Noop);
     // `UiBuilder::sense` registra o clique do card ANTES do conteúdo: botões dentro dele
     // continuam clicáveis (antes o `interact` depois do conteúdo roubava os cliques).
-    let inner = ui.scope_builder(egui::UiBuilder::new().sense(Sense::click()), |ui| {
+    let inner = ui.scope_builder(egui::UiBuilder::new().sense(sense), |ui| {
         frame.show(ui, add);
     });
     let rect = inner.response.rect;
@@ -164,4 +169,13 @@ pub fn empty_state(ui: &mut Ui, title: &str, hint: &str, theme: &Theme) {
 
 pub fn paint_text(ui: &Ui, pos: egui::Pos2, align: Align2, text: &str, size: f32, color: Color32) -> Rect {
     ui.painter().text(pos, align, text, mono(size), color)
+}
+
+/// Botão pequeno só de ícone. O ícone não diz nada pro accesskit (nem pros testes), então
+/// o botão ganha um rótulo de verdade (`label`) e a dica (`tip`, com o atalho).
+pub fn icon_button(ui: &mut Ui, icon: &str, label: &str, tip: &str) -> Response {
+    let resp = ui.small_button(icon);
+    let enabled = ui.is_enabled();
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label));
+    resp.on_hover_text(tip)
 }

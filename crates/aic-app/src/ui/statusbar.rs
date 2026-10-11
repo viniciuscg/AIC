@@ -17,7 +17,16 @@ const SZ: f32 = 12.5;
 pub fn show(app: &mut App, ui: &mut Ui) {
     let theme = app.theme.clone();
     let Some(id) = app.focused() else {
-        ui.label(widgets::subtle("Sem sessão em foco · Ctrl+Shift+N abre um Claude · Ctrl+Shift+Space cria uma tarefa · F1 ajuda", &theme));
+        let k = |a: crate::actions::Action| app.keymap.label(a);
+        ui.label(widgets::subtle(
+            format!(
+                "Sem sessão em foco · {} abre um Claude · {} cria uma tarefa · {} menu de atalhos",
+                k(crate::actions::Action::NewSession),
+                k(crate::actions::Action::QuickAdd),
+                super::leader::label(app)
+            ),
+            &theme,
+        ));
         return;
     };
     let task = app.task_of(id).cloned();

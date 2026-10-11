@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use egui_kittest::Harness;
-use aic_app::app::{App, Phase, View};
+use aic_app::app::{App, View};
 use aic_core::events::{self, HookEvent};
 use aic_core::{Priority, SessionKind, Subtask, Task, TaskStatus};
 
