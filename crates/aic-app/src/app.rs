@@ -12,13 +12,13 @@ use aic_core::{Block, Config, Id, Layout, Module, Session, SessionKind, SessionS
 use aic_term::{BindingsLayout, TerminalFont};
 
 use crate::actions::{Action, Keymap};
-use crate::skins::{self, Skin};
 use crate::injection;
 use crate::notify;
 use crate::session::Runtime;
 use crate::theme::Theme;
 use crate::ui;
 
+/// Abas da barra superior, na ordem em que aparecem (e em que `Ctrl+B n/p` anda).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Sessions,
@@ -26,11 +26,45 @@ pub enum View {
     Worktrees,
     Usage,
     Settings,
-    ThemeHelp,
+    Help,
 }
 
 impl View {
-    pub const ALL: [View; 6] = [View::Sessions, View::Board, View::Worktrees, View::Usage, View::Settings, View::ThemeHelp];
+    pub const ALL: [View; 6] = [View::Sessions, View::Board, View::Worktrees, View::Usage, View::Settings, View::Help];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            View::Sessions => "Sessões",
+            View::Board => "Board",
+            View::Worktrees => "Worktrees",
+            View::Usage => "Tokens",
+            View::Settings => "Config",
+            View::Help => "Ajuda",
+        }
+    }
+
+    pub fn icon(self) -> &'static str {
+        match self {
+            View::Sessions => ui::widgets::I_TERM,
+            View::Board => ui::widgets::I_BOARD,
+            View::Worktrees => ui::widgets::I_WORKTREE,
+            View::Usage => ui::widgets::I_CHART,
+            View::Settings => ui::widgets::I_GEAR,
+            View::Help => ui::widgets::I_HELP,
+        }
+    }
+
+    /// Ação que abre a aba (a tecla de prefixo dela aparece na barra).
+    pub fn action(self) -> Action {
+        match self {
+            View::Sessions => Action::ViewSessions,
+            View::Board => Action::ViewBoard,
+            View::Worktrees => Action::ViewWorktrees,
+            View::Usage => Action::ViewUsage,
+            View::Settings => Action::ViewSettings,
+            View::Help => Action::ViewHelp,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,7 +82,7 @@ pub struct Toast {
 }
 
 pub enum Phase {
-    /// Assistente de primeiro uso (tema, visualização, módulos, pastas).
+    /// Assistente de primeiro uso (visualização, módulos, pastas, atalhos).
     Setup(ui::setup::SetupState),
     Main,
 }
@@ -56,7 +90,6 @@ pub enum Phase {
 pub struct App {
     pub cfg: Config,
     pub store: Store,
-    pub skin: Box<dyn Skin>,
     pub theme: Theme,
     pub font: TerminalFont,
     pub term_bindings: BindingsLayout,
@@ -65,6 +98,8 @@ pub struct App {
 
     pub workspaces: Vec<Workspace>,
     pub ws: usize,
+    /// Workspace de antes da última troca (`Ctrl+B Tab` volta pra ele).
+    pub last_ws: Option<Id>,
     pub sessions: HashMap<Id, Runtime>,
     pub blocks: HashMap<Id, Block>,
     /// Bloco vazio selecionado (sem terminal pra focar).
@@ -90,6 +125,8 @@ pub struct App {
     pub settings: ui::settings::SettingsState,
     /// Menu da tecla líder aberto (caminho dentro da árvore de atalhos).
     pub leader: Option<ui::leader::LeaderState>,
+    /// Prefixo (`Ctrl+B`) apertado, esperando a tecla da ação.
+    pub prefix_pending: bool,
     pub usage: ui::usage::UsageState,
     /// Sync com o Notion em background (ver `notion_ui`).
     pub notion: crate::notion_ui::NotionState,
@@ -113,7 +150,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ctx: &Context, theme_arg: Option<String>, fresh: bool) -> anyhow::Result<Self> {
+    pub fn new(ctx: &Context, fresh: bool) -> anyhow::Result<Self> {
         paths::ensure_dirs()?;
         egui_extras::install_image_loaders(ctx);
         let mut cfg = Config::load();
@@ -122,13 +159,8 @@ impl App {
         }
         let store = Store::open(&paths::db_path())?;
 
-        if let Some(f) = &theme_arg {
-            cfg.theme = f.clone();
-        }
         let needs_setup = !cfg.setup_done;
-        let skin = skins::by_id(&cfg.theme);
-        let variant = cfg.themes.get(&cfg.theme).and_then(|t| t.variant.clone()).unwrap_or_else(|| skin.variants()[0].to_string());
-        let theme = skin.theme(&variant);
+        let theme = crate::brand::theme();
         theme.apply(ctx, cfg.ui_scale);
         let font = aic_term::fonts::install(ctx, &cfg.font_family, None, cfg.font_size);
 
@@ -144,7 +176,6 @@ impl App {
             repos: cfg.repos(),
             cfg,
             store,
-            skin,
             theme,
             font,
             term_bindings: BindingsLayout::new(),
@@ -155,6 +186,7 @@ impl App {
             },
             workspaces: vec![],
             ws: 0,
+            last_ws: None,
             sessions: HashMap::new(),
             blocks: HashMap::new(),
             empty_block_focus: None,
@@ -172,6 +204,7 @@ impl App {
             worktrees: Default::default(),
             settings: Default::default(),
             leader: None,
+            prefix_pending: false,
             usage: Default::default(),
             notion: Default::default(),
             connector: Default::default(),
@@ -217,7 +250,8 @@ impl App {
         self.workspaces = vec![ws];
         self.ws = 0;
         let _ = self.store.mark_cache(true);
-        self.toast("Sessão nova. Ctrl+Shift+N abre um Claude, Ctrl+Shift+Space cria tarefa.", ToastKind::Info);
+        let prefix = self.cfg.prefix.clone();
+        self.toast(&format!("Sessão nova. {prefix} c abre um Claude, {prefix} ? mostra os atalhos."), ToastKind::Info);
     }
 
     /// Reabre workspaces e sessões do cache (`claude --resume`).
@@ -401,7 +435,10 @@ impl App {
         // a sessão pode estar em outro workspace
         if let Some(rt) = self.sessions.get(&id) {
             if let Some(i) = self.workspaces.iter().position(|w| w.id == rt.s.workspace) {
-                self.ws = i;
+                if i != self.ws {
+                    self.last_ws = self.current_ws().map(|w| w.id);
+                    self.ws = i;
+                }
             }
         }
         if let Some(w) = self.current_ws_mut() {
@@ -425,6 +462,7 @@ impl App {
     pub fn new_workspace(&mut self, name: &str) {
         let ws = Workspace::new(if name.trim().is_empty() { "Novo workspace" } else { name.trim() });
         let _ = self.store.save_workspace(&ws);
+        self.last_ws = self.current_ws().map(|w| w.id);
         self.workspaces.push(ws);
         self.ws = self.workspaces.len() - 1;
         self.toast(&format!("Workspace \"{}\" criado", self.workspaces[self.ws].name), ToastKind::Ok);
@@ -432,9 +470,39 @@ impl App {
 
     pub fn switch_ws(&mut self, i: usize) {
         if i < self.workspaces.len() {
+            if i != self.ws {
+                self.last_ws = self.current_ws().map(|w| w.id);
+            }
             self.ws = i;
+            self.empty_block_focus = None;
             self.term_focus = self.view == View::Sessions;
         }
+    }
+
+    /// Volta pro workspace de antes (vai e volta, como o `back_and_forth` do i3).
+    pub fn last_workspace(&mut self) {
+        match self.last_ws.and_then(|id| self.workspaces.iter().position(|w| w.id == id)) {
+            Some(i) => self.switch_ws(i),
+            None => self.toast("Nenhum workspace anterior ainda", ToastKind::Info),
+        }
+    }
+
+    pub fn rename_workspace(&mut self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() {
+            return;
+        }
+        if let Some(w) = self.current_ws_mut() {
+            w.name = name.to_string();
+        }
+        self.persist_ws();
+    }
+
+    /// Workspaces com alguém precisando de você (pra destacar na barra, como o "urgent" do i3).
+    pub fn ws_needs_you(&self, i: usize) -> usize {
+        self.workspaces.get(i).map_or(0, |w| {
+            w.sessions.iter().filter(|id| self.sessions.get(id).is_some_and(|r| r.state() == SessionState::Waiting || (r.unseen && r.state() == SessionState::Done))).count()
+        })
     }
 
     pub fn delete_workspace(&mut self, i: usize) {
@@ -918,7 +986,7 @@ impl App {
         match effect {
             Effect::Finished => {
                 if self.cfg.sound.enabled && self.cfg.on(aic_core::Module::Sound) {
-                    if let Some(p) = crate::sounds::resolve(self.cfg.sound.done.as_deref().unwrap_or(crate::sounds::default_for(&self.cfg.theme))) {
+                    if let Some(p) = crate::sounds::resolve(self.cfg.sound.done.as_deref().unwrap_or(crate::sounds::DEFAULT_DONE)) {
                         notify::play(&p, self.cfg.sound.volume);
                     }
                 }
@@ -927,7 +995,7 @@ impl App {
                         Some(t) => format!("{name} terminou: {t}"),
                         None => format!("{name} terminou e está te esperando."),
                     };
-                    notify::desktop(&format!("{} — {}", self.skin.name(), self.skin.state_label(SessionState::Done)), &body, icon_path());
+                    notify::desktop(&format!("{} — {}", crate::brand::NAME, crate::brand::state_label(SessionState::Done)), &body, icon_path());
                 }
             }
             Effect::NeedsYou(msg) => {
@@ -951,6 +1019,7 @@ impl App {
             return self.toast(&format!("\"{}\" está desligado (Config → Módulos)", name), ToastKind::Warn);
         }
         match a {
+            CloseFocused => self.close_focused(),
             NewSession => self.modal = Some(ui::modals::Modal::NewSession(ui::modals::NewSessionForm::new(self, SessionKind::Claude))),
             NewShell => {
                 // split rápido: shell na pasta do terminal em foco, no mesmo bloco
@@ -1075,6 +1144,19 @@ impl App {
             NewWorkspace => self.modal = Some(ui::modals::Modal::Workspaces { query: String::new(), selected: usize::MAX }),
             NextWorkspace => self.switch_ws((self.ws + 1) % self.workspaces.len().max(1)),
             PrevWorkspace => self.switch_ws((self.ws + self.workspaces.len().max(1) - 1) % self.workspaces.len().max(1)),
+            GotoWorkspace(n) => {
+                let i = n as usize - 1;
+                if i < self.workspaces.len() {
+                    self.switch_ws(i);
+                } else {
+                    self.toast(&format!("Não existe workspace {n} ({} abertos)", self.workspaces.len()), ToastKind::Info);
+                }
+            }
+            LastWorkspace => self.last_workspace(),
+            RenameWorkspace => {
+                let name = self.current_ws().map(|w| w.name.clone()).unwrap_or_default();
+                self.modal = Some(ui::modals::Modal::RenameWorkspace { text: name, first: true });
+            }
             ViewSessions => {
                 self.view = View::Sessions;
                 self.term_focus = true;
@@ -1083,21 +1165,18 @@ impl App {
             ViewWorktrees => self.set_view(View::Worktrees),
             ViewUsage => self.set_view(View::Usage),
             ViewSettings => self.set_view(View::Settings),
-            ViewThemeHelp => self.set_view(View::ThemeHelp),
+            ViewHelp => self.set_view(View::Help),
+            NextView => self.cycle_view(1),
+            PrevView => self.cycle_view(-1),
+            SearchSettings => {
+                self.set_view(View::Settings);
+                self.settings.focus_search = true;
+            }
+            Catalog => self.leader = Some(Default::default()),
             Palette => self.modal = Some(ui::modals::Modal::Palette { query: String::new(), selected: 0 }),
             ZoomIn => self.set_font_size(self.cfg.font_size + 1.0),
             ZoomOut => self.set_font_size(self.cfg.font_size - 1.0),
             ZoomReset => self.set_font_size(14.0),
-            CycleThemeVariant => {
-                let vs = self.skin.variants();
-                let cur = vs.iter().position(|v| *v == self.theme.variant).unwrap_or(0);
-                let next = vs[(cur + 1) % vs.len()].to_string();
-                self.set_theme(ctx, self.skin.id().to_string(), Some(next));
-            }
-            SwitchTheme => {
-                let next = skins::all().into_iter().map(|s| s.id()).find(|id| *id != self.skin.id()).unwrap_or("aic");
-                self.set_theme(ctx, next.to_string(), None);
-            }
             ToggleSidebar => self.sidebar = !self.sidebar,
             Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
         }
@@ -1106,6 +1185,42 @@ impl App {
     pub fn set_view(&mut self, v: View) {
         self.view = v;
         self.term_focus = v == View::Sessions;
+    }
+
+    /// Abas visíveis na barra (as de módulos desligados somem).
+    pub fn tabs(&self) -> Vec<View> {
+        View::ALL.into_iter().filter(|v| v.action().enabled(&self.cfg)).collect()
+    }
+
+    /// Próxima/anterior aba da barra, dando a volta.
+    pub fn cycle_view(&mut self, delta: i32) {
+        let tabs = self.tabs();
+        let i = tabs.iter().position(|v| *v == self.view).unwrap_or(0) as i32;
+        let next = tabs[(i + delta).rem_euclid(tabs.len() as i32) as usize];
+        self.set_view(next);
+    }
+
+    /// Fecha o que está em foco, do mais específico pro mais geral:
+    /// cartão aberto no board → aba que não é Sessões → terminal em foco → bloco vazio.
+    pub fn close_focused(&mut self) {
+        match self.view {
+            View::Board if self.board.selected.is_some() => {
+                self.board.selected = None;
+            }
+            View::Sessions => {
+                if let Some(b) = self.empty_block_focus.filter(|b| self.blocks.get(b).is_some_and(|x| x.panes.is_empty())) {
+                    self.modal = Some(ui::modals::Modal::CloseBlock { id: b, remove_worktrees: false, has_worktrees: false });
+                } else if let Some(id) = self.focused() {
+                    let has_wt = self.sessions.get(&id).is_some_and(|r| r.s.worktree.is_some());
+                    self.modal = Some(ui::modals::Modal::CloseSession { id, remove_worktree: false, has_worktree: has_wt });
+                } else if let Some(b) = self.current_block() {
+                    self.modal = Some(ui::modals::Modal::CloseBlock { id: b, remove_worktrees: false, has_worktrees: false });
+                } else {
+                    self.toast("Nada em foco pra fechar", ToastKind::Info);
+                }
+            }
+            _ => self.set_view(View::Sessions),
+        }
     }
 
     pub fn open_quick_add(&mut self, status: Option<TaskStatus>) {
@@ -1119,23 +1234,6 @@ impl App {
         if let Some(b) = &mut self.font.bold {
             b.size = self.cfg.font_size;
         }
-        let _ = self.cfg.save();
-    }
-
-    pub fn set_theme(&mut self, ctx: &Context, id: String, variant: Option<String>) {
-        self.skin = skins::by_id(&id);
-        let variant = variant
-            .filter(|v| self.skin.variants().contains(&v.as_str()))
-            .unwrap_or_else(|| self.skin.variants()[0].to_string());
-        self.theme = self.skin.theme(&variant);
-        self.theme.apply(ctx, self.cfg.ui_scale);
-        for rt in self.sessions.values() {
-            if let Some(t) = &rt.term {
-                t.set_theme(self.theme.term.clone());
-            }
-        }
-        self.cfg.theme = id;
-        self.cfg.theme_cfg().variant = Some(variant);
         let _ = self.cfg.save();
     }
 
@@ -1198,8 +1296,9 @@ pub(crate) fn ensure_git_exclude(cwd: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Ícone instalado pelo `install.sh` (pra notificação do sistema).
 pub fn icon_path() -> Option<PathBuf> {
-    let p = paths::data_dir().join("icons/plankton.png");
+    let p = paths::data_dir().parent()?.join("icons/hicolor/128x128/apps/aic.png");
     p.exists().then_some(p)
 }
 

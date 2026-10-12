@@ -80,11 +80,10 @@ fn hook(session: aic_core::Id, name: &str, extra: &[(&str, &str)]) {
     events::append(&e).unwrap();
 }
 
-fn harness(tema: &str, size: [f32; 2]) -> Harness<'static, Option<App>> {
-    let tema = tema.to_string();
+fn harness(size: [f32; 2]) -> Harness<'static, Option<App>> {
     Harness::builder().with_size(egui::vec2(size[0], size[1])).build_ui_state(
         move |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), Some(tema.clone()), true).expect("app"));
+            let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
             aic_app::ui::draw(a, ui);
         },
         None,
@@ -223,48 +222,61 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
 fn telas() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _dir = sandbox("telas");
-    for tema in ["aic", "plankton"] {
-        let mut h = harness(tema, [1480.0, 900.0]);
-        demo_sessions(&mut h);
-        settle(&mut h, 2500);
-        shot(&mut h, &format!("{tema}-blocos"));
-        if tema == "aic" {
-            for (v, name) in [(aic_core::SessionView::Tabs, "abas"), (aic_core::SessionView::Focus, "foco"), (aic_core::SessionView::Grid, "grade")] {
-                h.state_mut().as_mut().unwrap().cfg.view = v;
-                settle(&mut h, 300);
-                shot(&mut h, &format!("aic-{name}"));
-            }
-            h.state_mut().as_mut().unwrap().cfg.view = aic_core::SessionView::Blocks;
-        }
-        if tema == "plankton" {
-            for (view, name) in [(View::Board, "board"), (View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::ThemeHelp, "ajuda")] {
-                let app = h.state_mut().as_mut().unwrap();
-                app.set_view(view);
-                if view == View::Board {
-                    app.board.selected = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id);
-                }
-                settle(&mut h, 300);
-                shot(&mut h, &format!("plankton-{name}"));
-            }
-            let app = h.state_mut().as_mut().unwrap();
-            app.set_view(View::Sessions);
-            app.open_quick_add(None);
-            if let Some(aic_app::ui::modals::Modal::QuickAdd { text, .. }) = &mut app.modal {
-                *text = "corrigir cálculo de juros #api !alta @sexta ^dev-142".into();
-            }
-            settle(&mut h, 200);
-            shot(&mut h, "plankton-captura-rapida");
-            let app = h.state_mut().as_mut().unwrap();
-            app.modal = Some(aic_app::ui::modals::Modal::ConfirmQuit);
-            settle(&mut h, 200);
-            shot(&mut h, "plankton-fechar");
-        }
-        // mata os processos antes do próximo tema
+    let mut h = harness([1480.0, 900.0]);
+    demo_sessions(&mut h);
+    settle(&mut h, 2500);
+    shot(&mut h, "blocos");
+    for (v, name) in [(aic_core::SessionView::Tabs, "abas"), (aic_core::SessionView::Focus, "foco"), (aic_core::SessionView::Grid, "grade")] {
+        h.state_mut().as_mut().unwrap().cfg.view = v;
+        settle(&mut h, 300);
+        shot(&mut h, name);
+    }
+    h.state_mut().as_mut().unwrap().cfg.view = aic_core::SessionView::Blocks;
+    // prefixo armado: indicador na barra e dicas do prefixo no rodapé
+    h.state_mut().as_mut().unwrap().prefix_pending = true;
+    settle(&mut h, 200);
+    shot(&mut h, "prefixo");
+    h.state_mut().as_mut().unwrap().prefix_pending = false;
+    // dois workspaces, um com alguém esperando (fica roxo na barra)
+    {
         let app = h.state_mut().as_mut().unwrap();
-        let ids: Vec<_> = app.sessions.keys().copied().collect();
-        for id in ids {
-            app.kill_session(id, false);
+        let ws0 = app.ws;
+        app.new_workspace("front");
+        app.switch_ws(ws0);
+    }
+    settle(&mut h, 200);
+    shot(&mut h, "workspaces");
+    for (view, name) in [(View::Board, "board"), (View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::Help, "ajuda")] {
+        let app = h.state_mut().as_mut().unwrap();
+        app.set_view(view);
+        if view == View::Board {
+            app.board.selected = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id);
         }
+        settle(&mut h, 300);
+        shot(&mut h, name);
+    }
+    let app = h.state_mut().as_mut().unwrap();
+    app.set_view(View::Settings);
+    app.settings.search = "prefixo".into();
+    settle(&mut h, 200);
+    shot(&mut h, "config-busca");
+    let app = h.state_mut().as_mut().unwrap();
+    app.settings.search.clear();
+    app.set_view(View::Sessions);
+    app.open_quick_add(None);
+    if let Some(aic_app::ui::modals::Modal::QuickAdd { text, .. }) = &mut app.modal {
+        *text = "corrigir cálculo de juros #api !alta @sexta ^dev-142".into();
+    }
+    settle(&mut h, 200);
+    shot(&mut h, "captura-rapida");
+    let app = h.state_mut().as_mut().unwrap();
+    app.modal = Some(aic_app::ui::modals::Modal::ConfirmQuit);
+    settle(&mut h, 200);
+    shot(&mut h, "fechar");
+    let app = h.state_mut().as_mut().unwrap();
+    let ids: Vec<_> = app.sessions.keys().copied().collect();
+    for id in ids {
+        app.kill_session(id, false);
     }
 }
 
@@ -273,12 +285,12 @@ fn telas() {
 fn historico_de_uso() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _dir = sandbox("historico");
-    let mut h = harness("plankton", [1480.0, 1500.0]);
+    let mut h = harness([1480.0, 1500.0]);
     demo_sessions(&mut h);
     settle(&mut h, 600);
     h.state_mut().as_mut().unwrap().set_view(View::Usage);
     settle(&mut h, 600);
-    shot(&mut h, "plankton-historico");
+    shot(&mut h, "historico");
     let app = h.state_mut().as_mut().unwrap();
     let report = app.usage_history.report.clone().expect("relatório do histórico");
     assert_eq!(report.by_session(30).len(), 4);
@@ -296,7 +308,7 @@ fn splash() {
     std::fs::write(std::env::var("AIC_CONFIG_DIR").unwrap() + "/config.toml", "setup_done = false\n").unwrap();
     let mut h: Harness<'static, Option<App>> = Harness::builder().with_size(egui::vec2(1400.0, 860.0)).build_ui_state(
         |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), None, true).expect("app"));
+            let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
             aic_app::ui::draw(a, ui);
         },
         None,
@@ -309,49 +321,43 @@ fn splash() {
     shot(&mut h, "assistente");
 }
 
-/// Folha de mascotes: cada tema em cada estado e nos tamanhos reais da UI
-/// (22 cabeçalho, 34 card, 40 topbar, 64, 150 splash), mais o fundo e o wordmark.
+/// Folha do mascote em cada estado e nos tamanhos reais da UI
+/// (22 cabeçalho, 24 topbar, 34 card, 64, 150 splash), mais o fundo e o wordmark.
 /// Gera `mascotes.png` (instante t=1.3) e `mascotes-b.png` (t=2.05, outro quadro).
 #[test]
 fn mascotes() {
     use egui::{Align2, FontId, Pos2, Rect, Vec2};
-    use aic_app::skins;
+    use aic_app::brand;
     use aic_core::SessionState;
 
     const STATES: [SessionState; 6] =
         [SessionState::Boot, SessionState::Working, SessionState::Idle, SessionState::Waiting, SessionState::Done, SessionState::GameOver];
-    const SIZES: [f32; 5] = [22.0, 34.0, 40.0, 64.0, 150.0];
+    const SIZES: [f32; 5] = [22.0, 24.0, 34.0, 64.0, 150.0];
     let col_w = 170.0;
     let label_w = 120.0;
-    let block_h: f32 = 70.0 + SIZES.iter().map(|s| s + 16.0).sum::<f32>();
-    let all = skins::all();
+    let height: f32 = 70.0 + SIZES.iter().map(|s| s + 16.0).sum::<f32>();
     let width = label_w + col_w * STATES.len() as f32;
-    let height = block_h * all.len() as f32;
     for (name, t) in [("mascotes", 1.3f64), ("mascotes-b", 2.05)] {
         let mut h = Harness::builder().with_size(egui::vec2(width, height)).build_ui(move |ui| {
-            let all = skins::all();
-            for (fi, f) in all.iter().enumerate() {
-                let th = f.theme(f.variants()[0]);
-                let top = fi as f32 * block_h;
-                let block = Rect::from_min_size(Pos2::new(0.0, top), Vec2::new(width, block_h));
-                ui.painter().rect_filled(block, 0.0, th.bg);
-                f.background(ui, block, t, &th);
-                let wm = f.wordmark(ui, Pos2::new(12.0, top + 12.0), 18.0, &th);
-                ui.painter().text(Pos2::new(wm.right() + 16.0, top + 16.0), Align2::LEFT_TOP, f.display_name(), FontId::proportional(13.0), th.dim);
-                let mut y = top + 60.0;
-                for s in SIZES {
-                    ui.painter().text(Pos2::new(12.0, y + s / 2.0), Align2::LEFT_CENTER, format!("{s}px"), FontId::monospace(11.0), th.dim);
-                    for (si, st) in STATES.iter().enumerate() {
-                        let x = label_w + si as f32 * col_w;
-                        if s == SIZES[0] {
-                            ui.painter().text(Pos2::new(x + col_w / 2.0, top + 44.0), Align2::CENTER_CENTER, f.state_label(*st), FontId::monospace(11.0), th.state_color(*st));
-                        }
-                        let r = Rect::from_min_size(Pos2::new(x + (col_w - s) / 2.0, y), Vec2::splat(s));
-                        ui.painter().rect_filled(r, 0.0, th.bg2);
-                        f.mascot(ui, r, *st, t, &th);
+            let th = brand::theme();
+            let block = Rect::from_min_size(Pos2::ZERO, Vec2::new(width, height));
+            ui.painter().rect_filled(block, 0.0, th.bg);
+            brand::background(ui, block, t, &th);
+            let wm = brand::wordmark(ui, Pos2::new(12.0, 12.0), 18.0, &th);
+            ui.painter().text(Pos2::new(wm.right() + 16.0, 16.0), Align2::LEFT_TOP, brand::TAGLINE, FontId::proportional(13.0), th.dim);
+            let mut y = 60.0;
+            for s in SIZES {
+                ui.painter().text(Pos2::new(12.0, y + s / 2.0), Align2::LEFT_CENTER, format!("{s}px"), FontId::monospace(11.0), th.dim);
+                for (si, st) in STATES.iter().enumerate() {
+                    let x = label_w + si as f32 * col_w;
+                    if s == SIZES[0] {
+                        ui.painter().text(Pos2::new(x + col_w / 2.0, 44.0), Align2::CENTER_CENTER, brand::state_label(*st), FontId::monospace(11.0), th.state_color(*st));
                     }
-                    y += s + 16.0;
+                    let r = Rect::from_min_size(Pos2::new(x + (col_w - s) / 2.0, y), Vec2::splat(s));
+                    ui.painter().rect_filled(r, 0.0, th.bg2);
+                    brand::mascot(ui, r, *st, t, &th);
                 }
+                y += s + 16.0;
             }
         });
         h.run_steps(2);
@@ -373,7 +379,7 @@ fn abrir_card() {
     for r in ["api-pagamentos", "infra", "notificador", "web-app"] {
         std::fs::create_dir_all(repos.join(r).join(".git")).unwrap();
     }
-    let mut h = harness("aic", [1280.0, 860.0]);
+    let mut h = harness([1280.0, 860.0]);
     h.step();
     let app = h.state_mut().as_mut().unwrap();
     app.cfg.repos_dirs = vec![repos];

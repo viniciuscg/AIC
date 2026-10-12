@@ -1,6 +1,5 @@
-//! Catálogo de sons. Três origens:
+//! Catálogo de sons. Duas origens:
 //! - **sintetizados**: gerados pelo AIC na primeira vez (WAV em `~/.local/share/aic/sounds`), sem direito autoral;
-//! - **baixados**: o `install.sh` baixa de sites de efeitos (não vão pro repo);
 //! - **seus**: qualquer `.mp3/.ogg/.wav/.oga` que você colocar na pasta de sons.
 
 use std::f32::consts::PI;
@@ -12,7 +11,6 @@ use aic_core::paths;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
     Synth,
-    Download,
     User,
 }
 
@@ -41,18 +39,12 @@ const BUILTINS: &[Builtin] = &[
     Builtin { id: "aic-feedback", name: "Microfonia", desc: "Nota longa com microfonia subindo, estilo fim de música (sintetizado)", origin: Origin::Synth, synth: Some(feedback), file: "aic-feedback.wav" },
     Builtin { id: "sino", name: "Sino", desc: "Sino curto e limpo (sintetizado)", origin: Origin::Synth, synth: Some(bell), file: "sino.wav" },
     Builtin { id: "pop", name: "Pop", desc: "Estalo discreto (sintetizado)", origin: Origin::Synth, synth: Some(pop), file: "pop.wav" },
-    Builtin { id: "plankton-gemido", name: "Plankton gemendo", desc: "\"Aaaahhhhmmmm\" (baixado pelo install.sh)", origin: Origin::Download, synth: None, file: "plankton-gemido.mp3" },
 ];
 
-/// Som padrão de cada tema.
-pub fn default_for(theme: &str) -> &'static str {
-    match theme {
-        "plankton" => "plankton-gemido",
-        _ => "aic-acorde",
-    }
-}
+/// Som padrão de "terminou".
+pub const DEFAULT_DONE: &str = "aic-acorde";
 
-/// Todos os sons disponíveis agora (baixados só aparecem se o arquivo existir).
+/// Todos os sons disponíveis agora.
 pub fn catalog() -> Vec<Sound> {
     let dir = paths::sounds_dir();
     let mut v: Vec<Sound> = BUILTINS

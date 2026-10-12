@@ -1,4 +1,4 @@
-//! Paleta ANSI do terminal. Cada tema do AIC entrega a sua.
+//! Paleta ANSI do terminal (as cores do AIC vêm de `aic_app::brand`).
 
 use alacritty_terminal::term::color::Colors;
 use alacritty_terminal::vte::ansi::{Color, NamedColor, Rgb};
