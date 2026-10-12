@@ -174,7 +174,7 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
         let st = app.state_of(*p);
         let (r, resp) = ui.allocate_exact_size(Vec2::splat(12.0), Sense::click());
         widgets::state_dot(ui, r.center(), 4.0, st, &theme, t);
-        if resp.on_hover_text(format!("{} · {}", app.session_label(*p), app.skin.state_label(st))).clicked() {
+        if resp.on_hover_text(format!("{} · {}", app.session_label(*p), crate::brand::state_label(st))).clicked() {
             app.focus(*p);
         }
     }

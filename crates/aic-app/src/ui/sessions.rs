@@ -56,10 +56,10 @@ pub fn empty(app: &mut App, ui: &mut Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space(ui.available_height() * 0.12);
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(180.0), Sense::hover());
-        app.skin.mascot(ui, rect, SessionState::Idle, t, &theme);
+        crate::brand::mascot(ui, rect, SessionState::Idle, t, &theme);
         ui.add_space(8.0);
-        ui.label(RichText::new(app.skin.display_name()).font(FontId::monospace(26.0)).color(theme.accent_hi));
-        ui.label(widgets::subtle(app.skin.tagline(), &theme));
+        ui.label(RichText::new(crate::brand::NAME).font(FontId::monospace(26.0)).color(theme.accent_hi));
+        ui.label(widgets::subtle(crate::brand::TAGLINE, &theme));
         ui.add_space(18.0);
         ui.horizontal(|ui| {
             let w = 3.0 * 210.0;
@@ -77,10 +77,11 @@ pub fn empty(app: &mut App, ui: &mut Ui) {
         ui.add_space(8.0);
         ui.label(widgets::subtle(
             format!(
-                "{} nova sessão · {} nova tarefa · {} paleta · F1 ajuda",
-                app.keymap.label(Action::NewSession),
-                app.keymap.label(Action::QuickAdd),
-                app.keymap.label(Action::Palette)
+                "{} nova sessão · {} nova tarefa · {} atalhos · {} catálogo · F1 manual",
+                super::prefix::chord(app, Action::NewSession),
+                super::prefix::chord(app, Action::QuickAdd),
+                super::prefix::chord(app, Action::Catalog),
+                super::leader::label(app),
             ),
             &theme,
         ));
@@ -159,7 +160,7 @@ fn sidebar(app: &mut App, ui: &mut Ui, ids: &[Id]) {
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(Vec2::splat(34.0), Sense::hover());
                     if app.cfg.on(aic_core::Module::Mascot) {
-                        app.skin.mascot(ui, r, state, t + i as f64 * 0.7, &theme);
+                        crate::brand::mascot(ui, r, state, t + i as f64 * 0.7, &theme);
                     } else {
                         widgets::state_dot(ui, r.center(), 6.0, state, &theme, t);
                     }
@@ -172,7 +173,7 @@ fn sidebar(app: &mut App, ui: &mut Ui, ids: &[Id]) {
                             }
                         });
                         ui.horizontal(|ui| {
-                            widgets::state_badge(ui, app.skin.state_label(state), state, &theme, t);
+                            widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, t);
                             if agents > 0 {
                                 ui.label(RichText::new(format!("{I_AGENTS} {agents}")).small().color(theme.attention));
                             }
@@ -236,7 +237,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
     let color = theme.agent(rt.s.color);
     let border = if is_focused { color } else { theme.border };
 
-    // moldura (sombra dura nos temas retrô)
+    // moldura (sombra dura do visual do AIC)
     if let Some(o) = theme.hard_shadow {
         ui.painter().rect_filled(rect.translate(Vec2::splat(o)), theme.radius(), Color32::from_black_alpha(220));
     }
@@ -287,9 +288,9 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
         ui.painter().rect_filled(over, theme.radius(), theme.bg2.gamma_multiply(0.95));
         ui.painter().rect_stroke(over, theme.radius(), Stroke::new(1.0, theme.err), egui::StrokeKind::Inside);
         let mascot = Rect::from_min_size(over.min + Vec2::new(10.0, 10.0), Vec2::splat(64.0));
-        app.skin.mascot(ui, mascot, SessionState::GameOver, t, &theme);
+        crate::brand::mascot(ui, mascot, SessionState::GameOver, t, &theme);
         let mut c = ui.new_child(UiBuilder::new().max_rect(Rect::from_min_max(over.min + Vec2::new(84.0, 16.0), over.max - Vec2::new(10.0, 10.0))));
-        c.label(RichText::new(app.skin.state_label(SessionState::GameOver)).font(FontId::monospace(18.0)).color(theme.err));
+        c.label(RichText::new(crate::brand::state_label(SessionState::GameOver)).font(FontId::monospace(18.0)).color(theme.err));
         c.label(widgets::subtle("O processo terminou.", &theme));
         c.horizontal(|ui| {
             if ui.button(format!("{I_RESTART} Reabrir (Enter)")).on_hover_text(app.keymap.tip(Action::RestartSession, "Reabrir o processo")).clicked() || (is_focused && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
@@ -314,12 +315,12 @@ fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Co
 
     let (r, _) = ui.allocate_exact_size(Vec2::splat(22.0), Sense::hover());
     if app.cfg.on(aic_core::Module::Mascot) {
-        app.skin.mascot(ui, r, state, t, &theme);
+        crate::brand::mascot(ui, r, state, t, &theme);
     } else {
         widgets::state_dot(ui, r.center(), 5.0, state, &theme, t);
     }
     ui.label(RichText::new(&name).strong().color(color));
-    widgets::state_badge(ui, app.skin.state_label(state), state, &theme, t);
+    widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, t);
     if agents > 0 {
         ui.label(RichText::new(format!("{I_AGENTS} {agents}")).color(theme.attention));
     }

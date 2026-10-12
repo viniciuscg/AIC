@@ -33,7 +33,6 @@ pub struct BoardState {
     pub edit_title: bool,
     pub new_subtask: String,
     pub focus_subtask: bool,
-    pub only_ws: bool,
 }
 
 fn priority_color(p: Priority, theme: &Theme) -> Color32 {
@@ -61,7 +60,8 @@ fn columns(app: &App) -> Vec<(TaskStatus, Vec<Task>)> {
                     Filter::Notion => t.source == TaskSource::Notion,
                     Filter::Mine => t.source == TaskSource::Local,
                 })
-                .filter(|t| !app.board.only_ws || t.workspace.is_none() || t.workspace == ws)
+                // o board é do workspace atual (tarefas sem workspace, como os cards do Notion, aparecem em todos)
+                .filter(|t| t.workspace.is_none() || t.workspace == ws)
                 .filter(|t| {
                     q.is_empty()
                         || t.title.to_lowercase().contains(&q)
@@ -95,7 +95,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 app.board.filter = f;
             }
         }
-        ui.checkbox(&mut app.board.only_ws, "só deste workspace");
         ui.add_space(8.0);
         let search = ui.add(TextEdit::singleline(&mut app.board.search).hint_text("/ buscar").desired_width(200.0));
         if app.board.searching {
@@ -615,7 +614,7 @@ fn editor(app: &mut App, ui: &mut Ui, mut task: Task) {
             Some(sid) => {
                 ui.horizontal(|ui| {
                     let state = app.state_of(sid);
-                    widgets::state_badge(ui, app.skin.state_label(state), state, &theme, app.t());
+                    widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, app.t());
                     if ui.link(app.session_label(sid)).clicked() {
                         app.focus(sid);
                     }

@@ -1,5 +1,6 @@
-//! Tecla líder (estilo which-key): aperta `cfg.leader` e aparece um menu com os atalhos
-//! agrupados por letra. Cada item mostra a tecla, o que faz e o atalho direto equivalente.
+//! Tecla líder (estilo which-key): aperta `cfg.leader` e aparece o catálogo com os atalhos
+//! agrupados por letra. Cada item mostra a tecla, o que faz, o atalho direto e o acorde de
+//! prefixo equivalentes (pra ir decorando o caminho rápido).
 //!
 //! Enquanto o menu está aberto ele engole TODO o teclado (nada vaza pro terminal).
 
@@ -35,6 +36,7 @@ fn tree() -> Vec<Item> {
     use Action::*;
     use Item::{Group, Run};
     vec![
+        Run('x', "Fechar o que está em foco", CloseFocused),
         Group('s', "Sessões (terminais)", vec![
             Run('n', "Novo Claude", NewSession),
             Run('t', "Novo terminal ao lado", NewShell),
@@ -85,14 +87,34 @@ fn tree() -> Vec<Item> {
             Run('+', "Aumentar fonte", ZoomIn),
             Run('-', "Diminuir fonte", ZoomOut),
             Run('0', "Fonte padrão", ZoomReset),
-            Run('c', "Variante de cor", CycleThemeVariant),
-            Run('t', "Trocar tema", SwitchTheme),
         ]),
         Group('w', "Workspaces", vec![
             Run('w', "Trocar de workspace", Workspaces),
             Run('n', "Criar workspace", NewWorkspace),
+            Run('r', "Renomear workspace", RenameWorkspace),
             Run(']', "Próximo workspace", NextWorkspace),
             Run('[', "Workspace anterior", PrevWorkspace),
+            Run('l', "Voltar pro anterior (vai e volta)", LastWorkspace),
+            Run('1', "Workspace 1", GotoWorkspace(1)),
+            Run('2', "Workspace 2", GotoWorkspace(2)),
+            Run('3', "Workspace 3", GotoWorkspace(3)),
+            Run('4', "Workspace 4", GotoWorkspace(4)),
+            Run('5', "Workspace 5", GotoWorkspace(5)),
+            Run('6', "Workspace 6", GotoWorkspace(6)),
+            Run('7', "Workspace 7", GotoWorkspace(7)),
+            Run('8', "Workspace 8", GotoWorkspace(8)),
+            Run('9', "Workspace 9", GotoWorkspace(9)),
+        ]),
+        Group('a', "Abas", vec![
+            Run('s', "Sessões", ViewSessions),
+            Run('b', "Board", ViewBoard),
+            Run('g', "Worktrees", ViewWorktrees),
+            Run('k', "Tokens", ViewUsage),
+            Run(',', "Config", ViewSettings),
+            Run('/', "Pesquisar na Config", SearchSettings),
+            Run('?', "Manual", ViewHelp),
+            Run('n', "Próxima aba", NextView),
+            Run('p', "Aba anterior", PrevView),
         ]),
         Run('g', "Worktrees", ViewWorktrees),
         Run('c', "Abrir card", OpenCard),
@@ -100,7 +122,8 @@ fn tree() -> Vec<Item> {
         Run('k', "Tokens e custo", ViewUsage),
         Run('p', "Paleta de comandos", Palette),
         Run(',', "Configurações", ViewSettings),
-        Run('?', "Ajuda", ViewThemeHelp),
+        Run('?', "Manual", ViewHelp),
+        Run('/', "Pesquisar na Config", SearchSettings),
         Run('q', "Sair", Quit),
     ]
 }
@@ -263,7 +286,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 .inner_margin(Margin::symmetric(16, 12))
                 .shadow(ctx.global_style().visuals.popup_shadow)
                 .show(ui, |ui| {
-                    ui.set_min_width(460.0);
+                    ui.set_min_width(560.0);
                     ui.horizontal(|ui| {
                         widgets::kbd(ui, &label(app), &theme);
                         let crumb = std::iter::once("Atalhos").chain(names.iter().copied()).collect::<Vec<_>>().join("  ›  ");
@@ -274,7 +297,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                     let half = if lvl.len() > 9 { lvl.len().div_ceil(2) } else { lvl.len() };
                     ui.horizontal_top(|ui| {
                         for chunk in lvl.chunks(half.max(1)) {
-                            egui::Grid::new(("leader-col", chunk.first().map(|i| i.key()).unwrap_or(' '))).num_columns(3).spacing([10.0, 4.0]).show(ui, |ui| {
+                            egui::Grid::new(("leader-col", chunk.first().map(|i| i.key()).unwrap_or(' '))).num_columns(4).spacing([10.0, 4.0]).show(ui, |ui| {
                                 for item in chunk {
                                     widgets::kbd(ui, &item.key().to_string(), &theme);
                                     match item {
@@ -284,12 +307,14 @@ pub fn show(app: &mut App, ctx: &Context) {
                                                 open_group = Some(*k);
                                             }
                                             ui.label("");
+                                            ui.label("");
                                         }
                                         Item::Run(_, l, a) => {
                                             if ui.add(egui::Button::new(RichText::new(*l).color(theme.ink)).frame(false)).on_hover_text(a.meta().name).clicked() {
                                                 run = Some(*a);
                                             }
                                             ui.label(RichText::new(app.keymap.label(*a)).font(FontId::monospace(11.0)).color(theme.faint));
+                                            ui.label(RichText::new(super::prefix::chord(app, *a)).font(FontId::monospace(11.0)).color(theme.accent));
                                         }
                                     }
                                     ui.end_row();

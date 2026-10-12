@@ -10,7 +10,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Cli::Gui { tema, fresh } => {
+        Cli::Gui { fresh } => {
             let options = eframe::NativeOptions {
                 viewport: egui::ViewportBuilder::default()
                     .with_title("AIC")
@@ -23,7 +23,7 @@ fn main() {
             let result = eframe::run_native(
                 "aic",
                 options,
-                Box::new(move |cc| Ok(Box::new(AicApp(App::new(&cc.egui_ctx, tema, fresh)?)))),
+                Box::new(move |cc| Ok(Box::new(AicApp(App::new(&cc.egui_ctx, fresh)?)))),
             );
             if let Err(e) = result {
                 eprintln!("aic: {e}");

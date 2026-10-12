@@ -6,6 +6,7 @@ pub mod help;
 pub mod hints;
 pub mod leader;
 pub mod modals;
+pub mod prefix;
 pub mod sessions;
 pub mod settings;
 pub mod setup;
@@ -49,10 +50,11 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     }
 
     // Gravando um atalho na Config: o teclado é da captura (senão a combinação disparava a ação).
-    let capturing = app.view == View::Settings && (app.settings.capturing.is_some() || app.settings.capturing_leader);
+    let capturing = app.view == View::Settings && app.settings.is_capturing();
     if app.modal.is_some() || capturing {
         app.leader = None;
-    } else if !leader::handle(app, &ctx) {
+        app.prefix_pending = false;
+    } else if !prefix::handle(app, &ctx) && !leader::handle(app, &ctx) {
         for a in app.keymap.pressed(&ctx) {
             app.run_action(&ctx, a);
         }
@@ -66,11 +68,11 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     ui.painter().rect_filled(rect, 0.0, app.theme.bg);
     if app.cfg.animations && app.cfg.on(aic_core::Module::Background) {
-        app.skin.background(ui, rect, app.t(), &app.theme);
+        crate::brand::background(ui, rect, app.t(), &app.theme);
     }
 
     egui::Panel::top("topbar")
-        .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(12, 6)).stroke(egui::Stroke::new(1.0, app.theme.border)))
+        .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(6, 4)).stroke(egui::Stroke::new(1.0, app.theme.border)))
         .show(ui, |ui| topbar::show(app, ui));
 
     if hints::visible(app) {
@@ -91,7 +93,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             View::Worktrees => worktrees::show(app, ui),
             View::Usage => usage::show(app, ui),
             View::Settings => settings::show(app, ui),
-            View::ThemeHelp => help::show(app, ui),
+            View::Help => help::show(app, ui),
         });
 
     modals::show(app, &ctx);

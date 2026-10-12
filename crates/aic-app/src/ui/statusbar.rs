@@ -137,7 +137,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         push(&mut l2, &format!("← {agents} agent{}", if agents == 1 { "" } else { "s" }), theme.attention, SZ);
     }
     if l2.is_empty() {
-        push(&mut l2, &format!("{} · {}", app.skin.state_label(rt.state()), aic_core::paths::pretty(&rt.s.cwd)), theme.faint, SZ);
+        push(&mut l2, &format!("{} · {}", crate::brand::state_label(rt.state()), aic_core::paths::pretty(&rt.s.cwd)), theme.faint, SZ);
     }
 
     ui.add(egui::Label::new(l1).sense(Sense::hover()).wrap_mode(egui::TextWrapMode::Truncate));

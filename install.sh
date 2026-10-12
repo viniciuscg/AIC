@@ -6,7 +6,7 @@
 #   ./install.sh --uninstall  remove o que o install criou (dados e config ficam)
 #
 # O que faz: rustup (se faltar cargo), build release, link em ~/.local/bin/aic,
-# ícones + atalho no menu, link do plugin do Claude, sons baixados e a fonte
+# ícones + atalho no menu, link do plugin do Claude e a fonte
 # JetBrainsMono Nerd Font Mono (se faltar).
 
 set -euo pipefail
@@ -20,11 +20,8 @@ DESKTOP_FILE="$DATA_DIR/applications/aic.desktop"
 FONT_DIR="$DATA_DIR/fonts/JetBrainsMonoNerdFontMono"
 ICON_SIZES=(16 32 48 64 128 256 512)
 
-# Sons baixados (não vão pro repo). Formato: arquivo|url
-# Gemido do Plankton: myinstants.com ("Plankton aaaahhhhmmmm").
-SOUNDS=(
-  "plankton-gemido.mp3|https://www.myinstants.com/media/sounds/plankton-aaaahhhhmmmm.mp3"
-)
+# Sons baixados por versões antigas (o uninstall ainda limpa).
+OLD_SOUNDS=(plankton-gemido.mp3)
 FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
@@ -102,11 +99,6 @@ fetch() {
   fi
 }
 
-# MP3 de verdade (tag ID3 ou frame sync 0xFF), não uma página de erro/Cloudflare.
-is_mp3() {
-  [ "$(head -c 3 "$1")" = ID3 ] || [ "$(head -c 1 "$1" | od -An -tx1 | tr -d ' \n')" = ff ]
-}
-
 cargo_bin() {
   if have cargo; then
     command -v cargo
@@ -159,7 +151,7 @@ build() {
   fi
   local bin="$REPO_DIR/target/release/aic"
   # Sem mudança no código desde o último build: o cargo resolve rápido, mas evita o barulho.
-  if [ -x "$bin" ] && [ -z "$(find "$REPO_DIR/crates" "$REPO_DIR/skins" "$REPO_DIR/Cargo.toml" "$REPO_DIR/Cargo.lock" -newer "$bin" -print -quit 2>/dev/null)" ]; then
+  if [ -x "$bin" ] && [ -z "$(find "$REPO_DIR/crates" "$REPO_DIR/docs/MANUAL.md" "$REPO_DIR/Cargo.toml" "$REPO_DIR/Cargo.lock" -newer "$bin" -print -quit 2>/dev/null)" ]; then
     ok "binário em dia"
     return
   fi
@@ -251,38 +243,6 @@ install_plugin() {
   link "$REPO_DIR/claude" "$AIC_DATA/plugin"
 }
 
-install_sounds() {
-  step "Sons baixados"
-  local entry file url got=0 failed=()
-  for entry in "${SOUNDS[@]}"; do
-    file=${entry%%|*}
-    url=${entry#*|}
-    [ -s "$AIC_DATA/sounds/$file" ] && continue
-    if [ "$DRY" = 1 ]; then
-      run fetch "$url" "$AIC_DATA/sounds/$file"
-      got=$((got + 1))
-      continue
-    fi
-    mkdir -p "$AIC_DATA/sounds"
-    if fetch "$url" "$AIC_DATA/sounds/$file.part" && is_mp3 "$AIC_DATA/sounds/$file.part"; then
-      mv "$AIC_DATA/sounds/$file.part" "$AIC_DATA/sounds/$file"
-      got=$((got + 1))
-    else
-      rm -f "$AIC_DATA/sounds/$file.part"
-      failed+=("$file")
-    fi
-  done
-  if [ "$DRY" = 1 ]; then
-    [ "$got" = 0 ] && ok || would
-  elif [ ${#failed[@]} -gt 0 ]; then
-    skip "não baixou: ${failed[*]} (os sons sintetizados continuam funcionando)"
-  elif [ "$got" = 0 ]; then
-    ok
-  else
-    done_ "$got arquivo(s)"
-  fi
-}
-
 install_font() {
   step "Fonte JetBrainsMono Nerd Font Mono"
   if [ -n "$(find "$FONT_DIR" -name 'JetBrainsMonoNerdFontMono-*.ttf' -print -quit 2>/dev/null)" ] ||
@@ -357,10 +317,10 @@ uninstall() {
   if [ "$found" = 1 ]; then [ "$DRY" = 1 ] && would || done_; else skip "não existem"; fi
   step "Link do plugin"
   if [ -L "$AIC_DATA/plugin" ]; then remove_path "$AIC_DATA/plugin"; else skip "não é link"; fi
-  step "Sons baixados"
-  local entry found=0
-  for entry in "${SOUNDS[@]}"; do
-    [ -f "$AIC_DATA/sounds/${entry%%|*}" ] && found=1 && run rm -f "$AIC_DATA/sounds/${entry%%|*}"
+  step "Sons baixados (versões antigas)"
+  local f found=0
+  for f in "${OLD_SOUNDS[@]}"; do
+    [ -f "$AIC_DATA/sounds/$f" ] && found=1 && run rm -f "$AIC_DATA/sounds/$f"
   done
   if [ "$found" = 1 ]; then [ "$DRY" = 1 ] && would || done_; else skip "não existem"; fi
   step "Fonte instalada pelo AIC"
@@ -383,7 +343,7 @@ if [ "$MODE" = uninstall ]; then
   exit 0
 fi
 
-TOTAL=10
+TOTAL=9
 install_rust
 check_build_deps
 build
@@ -391,7 +351,6 @@ install_bin
 install_icons
 install_desktop
 install_plugin
-install_sounds
 install_font
 check_runtime
 
