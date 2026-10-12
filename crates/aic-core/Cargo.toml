@@ -1,6 +1,6 @@
 [package]
 name = "aic-core"
-description = "Domínio do Plankton: workspaces, sessões, tarefas, store SQLite, ponte com o Claude Code"
+description = "Domínio do AIC: workspaces, sessões, tarefas, store SQLite, ponte com o Claude Code"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

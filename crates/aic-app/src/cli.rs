@@ -20,7 +20,7 @@ use aic_core::quickadd;
 use aic_core::{Config, Id, Store, TaskStatus, paths};
 
 pub enum Cli {
-    Gui { tema: Option<String>, fresh: bool },
+    Gui { fresh: bool },
     Run(Box<dyn FnOnce() -> Result<()>>),
 }
 
@@ -55,24 +55,15 @@ pub fn parse(args: Vec<String>) -> Cli {
             Ok(())
         })),
         _ => {
-            let mut tema = None;
             let mut fresh = false;
             let mut all: Vec<String> = first.into_iter().collect();
             all.extend(it);
-            let mut i = 0;
-            while i < all.len() {
-                match all[i].as_str() {
-                    "--tema" | "-t" => {
-                        tema = all.get(i + 1).cloned();
-                        i += 1;
-                    }
-                    s if s.starts_with("--tema=") => tema = Some(s["--tema=".len()..].to_string()),
-                    "--fresh" => fresh = true,
-                    _ => {}
+            for a in &all {
+                if a == "--fresh" {
+                    fresh = true;
                 }
-                i += 1;
             }
-            Cli::Gui { tema, fresh }
+            Cli::Gui { fresh }
         }
     }
 }
@@ -80,7 +71,7 @@ pub fn parse(args: Vec<String>) -> Cli {
 const HELP: &str = "AIC — central de vibecode pessoal
 
 Uso:
-  aic [--tema aic|plankton] [--fresh]   abre o app
+  aic [--fresh]                                          abre o app
   aic add \"texto #repo @hoje !alta +workspace ^DEV-1 ~tag\"   cria tarefa
   aic tasks [--all] [--json]                             lista tarefas
   aic done <id>                                          conclui tarefa

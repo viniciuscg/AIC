@@ -1,6 +1,5 @@
 //! `~/.config/aic/config.toml`. Tudo tem default; o arquivo só guarda o que mudou.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -56,29 +55,19 @@ pub enum Connector {
     Token,
 }
 
-/// Preferências por tema.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(default)]
-pub struct ThemeConfig {
-    pub variant: Option<String>,
-    /// Módulos ligados/desligados só neste tema.
-    pub modules: Flags,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Config {
-    /// Tema atual (`aic` | `plankton`).
-    pub theme: String,
-    /// Primeiro uso concluído (assistente de visualização/tema/módulos).
+    /// Primeiro uso concluído (assistente de visualização/módulos).
     pub setup_done: bool,
     /// Visualização das sessões.
     pub view: SessionView,
-    /// Módulos ligados/desligados para todos os temas.
+    /// Módulos ligados/desligados.
     pub modules: Flags,
-    pub themes: BTreeMap<String, ThemeConfig>,
-    /// Tecla líder: aperte e veja o menu de atalhos (estilo prefixo do tmux).
+    /// Tecla líder: aperte e veja o catálogo de atalhos (which-key).
     pub leader: String,
+    /// Prefixo estilo tmux: aperte, solte e aperte a tecla da ação (`Ctrl+B x` fecha o que está em foco).
+    pub prefix: String,
     /// Barra de dicas de atalho no rodapé (módulo `hints`).
     pub hints_bar: bool,
     pub font_family: String,
@@ -101,8 +90,8 @@ pub struct Config {
 #[serde(default)]
 pub struct SoundConfig {
     pub enabled: bool,
-    /// Id do som de "terminou" no catálogo (ex: `aic-acorde`, `plankton-gemido`) ou caminho de arquivo.
-    /// `None` = o som padrão do tema.
+    /// Id do som de "terminou" no catálogo (ex: `aic-acorde`) ou caminho de arquivo.
+    /// `None` = o som padrão.
     pub done: Option<String>,
     /// Id/caminho do som de "precisa de você". `None` = sem som.
     pub attention: Option<String>,
@@ -216,12 +205,11 @@ pub struct SlackConfig {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            theme: "aic".into(),
             setup_done: false,
             view: SessionView::Blocks,
             modules: Flags::new(),
-            themes: BTreeMap::new(),
             leader: "Ctrl+Space".into(),
+            prefix: "Ctrl+B".into(),
             hints_bar: true,
             font_family: "JetBrainsMono Nerd Font Mono".into(),
             font_size: 14.0,
@@ -315,13 +303,9 @@ impl Config {
         Ok(())
     }
 
-    /// Módulo ligado no tema atual?
+    /// Módulo ligado?
     pub fn on(&self, m: Module) -> bool {
-        modules::enabled(m, &self.modules, self.themes.get(&self.theme).map(|t| &t.modules))
-    }
-
-    pub fn theme_cfg(&mut self) -> &mut ThemeConfig {
-        self.themes.entry(self.theme.clone()).or_default()
+        modules::enabled(m, &self.modules)
     }
 
     /// Repos (nome, caminho) nas pastas de `repos_dirs`. Worktrees (`x.worktrees`) ficam de fora.
@@ -359,5 +343,21 @@ impl Config {
             let name = first.trim_end_matches(".worktrees").to_string();
             (!name.is_empty()).then_some(name)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Config de antes (com temas) continua abrindo: os campos velhos são ignorados.
+    #[test]
+    fn config_antiga_com_temas_carrega() {
+        let old = "theme = \"plankton\"\nsetup_done = true\nleader = \"Ctrl+Space\"\n\n[modules]\nboard = false\n\n[themes.aic]\nvariant = \"jar\"\n\n[themes.aic.modules]\nnotion = false\n";
+        let c: Config = toml::from_str(old).expect("config antiga");
+        assert!(c.setup_done);
+        assert_eq!(c.prefix, "Ctrl+B", "prefixo padrão entra");
+        assert!(!c.on(Module::Board));
+        assert!(c.on(Module::Notion), "módulo por tema não vale mais");
     }
 }

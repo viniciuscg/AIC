@@ -1,4 +1,4 @@
-//! Tokens visuais de um tema/variante e a conversão pro `Visuals` do egui.
+//! Tokens visuais do AIC e a conversão pro `Visuals` do egui. As cores ficam em `brand`.
 
 use egui::{Color32, CornerRadius, FontFamily, FontId, Shadow, Stroke, Style, TextStyle, Visuals};
 use aic_core::SessionState;
@@ -6,7 +6,6 @@ use aic_term::{TerminalTheme, hex};
 
 #[derive(Debug, Clone)]
 pub struct Theme {
-    pub variant: &'static str,
     pub dark: bool,
     /// Fundo da janela → painéis → cabeçalhos → elevado.
     pub bg: Color32,
@@ -132,7 +131,7 @@ impl Theme {
     }
 }
 
-/// Paleta ANSI escura genérica a partir dos tokens do tema.
+/// Paleta ANSI do terminal.
 pub fn term_from(bg: &str, fg: &str, cursor: &str, sel: &str, ansi: [&str; 16]) -> TerminalTheme {
     TerminalTheme::from_hex(bg, fg, cursor, sel, ansi)
 }

@@ -1,13 +1,12 @@
-//! Assistente de primeiro uso: tema → visualização → módulos → pastas e tecla líder.
+//! Assistente de primeiro uso: visualização → módulos → pastas e atalhos.
 //! Só aparece enquanto `setup_done = false` (ou se você mandar rodar de novo em Config).
 //! Tudo no teclado: ←/→ escolhe, Enter avança, Esc volta.
 
 use egui::{Align2, Color32, FontId, Key, Pos2, Rect, RichText, Sense, Stroke, Ui, UiBuilder, Vec2};
 use aic_core::modules::{self, ALL as MODULES};
-use aic_core::{SessionState, SessionView};
+use aic_core::SessionView;
 
 use crate::app::{App, Phase};
-use crate::skins;
 use crate::theme::Theme;
 
 #[derive(Debug, Clone, Default)]
@@ -16,7 +15,7 @@ pub struct SetupState {
     pub repos_text: Option<String>,
 }
 
-const STEPS: [&str; 4] = ["Tema", "Visualização", "Módulos", "Pastas e atalhos"];
+const STEPS: [&str; 3] = ["Visualização", "Módulos", "Pastas e atalhos"];
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let Phase::Setup(mut st) = std::mem::replace(&mut app.phase, Phase::Main) else { return };
@@ -25,7 +24,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     ui.painter().rect_filled(rect, 0.0, theme.bg);
     if app.cfg.on(aic_core::Module::Background) {
-        app.skin.background(ui, rect, t, &theme);
+        crate::brand::background(ui, rect, t, &theme);
     }
 
     let typing = ui.ctx().egui_wants_keyboard_input();
@@ -67,9 +66,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     let body = Rect::from_min_max(Pos2::new(rect.center().x - 520.0, top + 130.0), Pos2::new(rect.center().x + 520.0, rect.bottom() - 70.0));
     let mut child = ui.new_child(UiBuilder::new().max_rect(body));
     match st.step {
-        0 => step_theme(app, &mut child, left, right, t),
-        1 => step_view(app, &mut child, left, right, &theme),
-        2 => step_modules(app, &mut child, &theme),
+        0 => step_view(app, &mut child, left, right, &theme),
+        1 => step_modules(app, &mut child, &theme),
         _ => step_paths(app, &mut child, &mut st, &theme),
     }
 
@@ -111,48 +109,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     }
 }
 
-fn step_theme(app: &mut App, ui: &mut Ui, left: bool, right: bool, t: f64) {
-    let all = skins::all();
-    let mut sel = all.iter().position(|s| s.id() == app.skin.id()).unwrap_or(0);
-    if left && sel > 0 {
-        sel -= 1;
-    }
-    if right && sel + 1 < all.len() {
-        sel += 1;
-    }
-    ui.label(RichText::new("Escolha o tema").size(18.0));
-    ui.add_space(12.0);
-    let area = ui.available_rect_before_wrap();
-    let cw = 300.0;
-    let total = all.len() as f32 * cw + (all.len() as f32 - 1.0) * 30.0;
-    let mut clicked = None;
-    for (i, s) in all.iter().enumerate() {
-        let th = s.theme(s.variants()[0]);
-        let r = Rect::from_min_size(Pos2::new(area.center().x - total / 2.0 + i as f32 * (cw + 30.0), area.top()), Vec2::new(cw, 340.0));
-        let resp = ui.interact(r, egui::Id::new(("setup-theme", i)), Sense::click());
-        if resp.clicked() {
-            clicked = Some(i);
-        }
-        card(ui, r, &th, i == sel);
-        let m = Rect::from_center_size(r.center_top() + Vec2::new(0.0, 120.0), Vec2::splat(170.0));
-        s.background(ui, r.shrink(2.0), t, &th);
-        s.mascot(ui, m, if i == sel { SessionState::Done } else { SessionState::Idle }, t, &th);
-        ui.painter().text(r.center_top() + Vec2::new(0.0, 222.0), Align2::CENTER_TOP, s.name(), FontId::monospace(24.0), th.accent_hi);
-        let tag = ui.painter().layout(s.tagline().to_string(), FontId::proportional(13.0), th.ink, cw - 30.0);
-        ui.painter().galley(Pos2::new(r.center().x - tag.size().x / 2.0, r.top() + 258.0), tag, th.ink);
-        for (k, c) in th.agents.iter().take(6).enumerate() {
-            ui.painter().circle_filled(Pos2::new(r.center().x - 37.5 + k as f32 * 15.0, r.bottom() - 18.0), 5.0, *c);
-        }
-    }
-    if let Some(i) = clicked {
-        sel = i;
-    }
-    if all[sel].id() != app.skin.id() {
-        let ctx = ui.ctx().clone();
-        app.set_theme(&ctx, all[sel].id().to_string(), None);
-    }
-}
-
 fn step_view(app: &mut App, ui: &mut Ui, left: bool, right: bool, theme: &Theme) {
     let views = SessionView::ALL;
     let mut sel = views.iter().position(|v| *v == app.cfg.view).unwrap_or(0);
@@ -163,7 +119,7 @@ fn step_view(app: &mut App, ui: &mut Ui, left: bool, right: bool, theme: &Theme)
         sel += 1;
     }
     ui.label(RichText::new("Como você quer ver as sessões?").size(18.0));
-    ui.label(RichText::new("Dá pra trocar a qualquer momento com o atalho de visualização (Ctrl+Shift+V).").color(theme.dim));
+    ui.label(RichText::new("Dá pra trocar a qualquer momento com Ctrl+B v (ou Ctrl+Shift+F).").color(theme.dim));
     ui.add_space(12.0);
     let area = ui.available_rect_before_wrap();
     let cw = 240.0;
@@ -246,7 +202,7 @@ pub fn diagram(ui: &Ui, r: Rect, v: SessionView, theme: &Theme) {
 
 fn step_modules(app: &mut App, ui: &mut Ui, theme: &Theme) {
     ui.label(RichText::new("O que você quer ligado?").size(18.0));
-    ui.label(RichText::new("Tudo vem ligado. Desligar some com a aba, os atalhos e as ações do módulo. Em Config dá pra ajustar por tema.").color(theme.dim));
+    ui.label(RichText::new("Tudo vem ligado. Desligar some com a aba, os atalhos e as ações do módulo. Muda depois em Config → Módulos.").color(theme.dim));
     ui.add_space(10.0);
     egui::ScrollArea::vertical().max_height(ui.available_height() - 10.0).show(ui, |ui| {
         let mut group = "";
@@ -257,7 +213,7 @@ fn step_modules(app: &mut App, ui: &mut Ui, theme: &Theme) {
                     ui.label(RichText::new(group.to_uppercase()).font(FontId::monospace(11.0)).color(theme.accent));
                     ui.end_row();
                 }
-                let mut on = modules::enabled(m.module, &app.cfg.modules, None);
+                let mut on = modules::enabled(m.module, &app.cfg.modules);
                 if ui.checkbox(&mut on, RichText::new(m.name).strong()).changed() {
                     app.cfg.modules.insert(m.id.to_string(), on);
                 }
@@ -281,16 +237,29 @@ fn step_paths(app: &mut App, ui: &mut Ui, st: &mut SetupState, theme: &Theme) {
     };
     ui.label(RichText::new(format!("{} repos encontrados: {}", found.len(), found.iter().take(8).cloned().collect::<Vec<_>>().join(", "))).small().color(theme.dim));
     ui.add_space(16.0);
-    ui.label(RichText::new("Tecla líder").size(18.0));
-    ui.label(RichText::new("Aperte a líder e aparece um menu com todos os atalhos, agrupados (como o prefixo do tmux, mas mostrando as opções).").color(theme.dim));
+    ui.label(RichText::new("Prefixo (o jeito tmux)").size(18.0));
+    ui.label(RichText::new("Aperte o prefixo, solte e aperte a tecla: c abre um Claude, x fecha o que está em foco, n/p trocam de aba, 1-9 trocam de workspace.").color(theme.dim));
     ui.horizontal(|ui| {
-        for opt in ["Ctrl+Space", "Ctrl+A", "Ctrl+B", "Alt+Space"] {
-            if ui.selectable_label(app.cfg.leader == opt, opt).clicked() {
+        for opt in ["Ctrl+B", "Ctrl+A", "Ctrl+Space"] {
+            if ui.selectable_label(app.cfg.prefix == opt, opt).clicked() {
+                if app.cfg.leader == opt {
+                    app.cfg.leader = if opt == "Ctrl+Space" { "Alt+Space".into() } else { "Ctrl+Space".into() };
+                }
+                app.cfg.prefix = opt.to_string();
+            }
+        }
+    });
+    ui.label(RichText::new("Pra mandar o próprio Ctrl+B pro terminal, aperte duas vezes (Ctrl+B Ctrl+B).").small().color(theme.faint));
+    ui.add_space(12.0);
+    ui.label(RichText::new("Catálogo de atalhos (tecla líder)").size(18.0));
+    ui.label(RichText::new("Aperte e aparece um menu com todos os atalhos, agrupados, pra ir descobrindo.").color(theme.dim));
+    ui.horizontal(|ui| {
+        for opt in ["Ctrl+Space", "Alt+Space", "Ctrl+A"] {
+            if opt != app.cfg.prefix && ui.selectable_label(app.cfg.leader == opt, opt).clicked() {
                 app.cfg.leader = opt.to_string();
             }
         }
     });
-    ui.label(RichText::new("Ctrl+A/Ctrl+B roubam a tecla do terminal (o tmux faz isso); Ctrl+Space é a mais segura.").small().color(theme.faint));
 }
 
 fn parse_dirs(txt: &str) -> Vec<std::path::PathBuf> {

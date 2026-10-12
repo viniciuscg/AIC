@@ -359,7 +359,7 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
     app.notion.ctx = Some(ui.ctx().clone());
     let theme = app.theme.clone();
     if !app.cfg.on(aic_core::Module::Notion) {
-        ui.label(widgets::subtle("Notion desligado neste tema.", &theme));
+        ui.label(widgets::subtle("Módulo Notion desligado (Config → Módulos).", &theme));
         return;
     }
     ui.label(RichText::new(format!("{}  Notion", widgets::I_NOTION)).strong());

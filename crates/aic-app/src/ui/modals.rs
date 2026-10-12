@@ -20,6 +20,7 @@ pub enum Modal {
     OpenCard(crate::connector::OpenCardForm),
     LinkTask { session: Id, query: String, selected: usize },
     Workspaces { query: String, selected: usize },
+    RenameWorkspace { text: String, first: bool },
     Palette { query: String, selected: usize },
     Restore,
     ConfirmQuit,
@@ -134,6 +135,7 @@ pub fn show(app: &mut App, ctx: &Context) {
         Modal::OpenCard(f) => crate::connector::open_card_modal(app, ctx, f),
         Modal::LinkTask { session, query, selected } => link_task(app, ctx, session, query, selected),
         Modal::Workspaces { query, selected } => workspaces(app, ctx, query, selected),
+        Modal::RenameWorkspace { text, first } => rename_workspace(app, ctx, text, first),
         Modal::Palette { query, selected } => palette(app, ctx, query, selected),
         Modal::Restore => restore(app, ctx),
         Modal::ConfirmQuit => confirm_quit(app, ctx),
@@ -499,6 +501,32 @@ fn rename(app: &mut App, ctx: &Context, id: Id, mut text: String, first: bool) -
     (!closed && !cancel).then_some(Modal::Rename { id, text, first: false })
 }
 
+fn rename_workspace(app: &mut App, ctx: &Context, mut text: String, first: bool) -> Option<Modal> {
+    let mut done = false;
+    let mut cancel = false;
+    let closed = frame(ctx, "rename-workspace", 380.0, |ui| {
+        ui.label("Renomear workspace");
+        let r = ui.add(TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
+        if first {
+            r.request_focus();
+            if let Some(mut state) = TextEdit::load_state(ui.ctx(), r.id) {
+                let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(text.chars().count()));
+                state.cursor.set_char_range(Some(range));
+                state.store(ui.ctx(), r.id);
+            }
+        }
+        if ui.input(|i| i.key_pressed(Key::Enter)) {
+            done = true;
+        }
+        ok_cancel(ui, "Salvar  ⏎", &mut done, &mut cancel);
+    });
+    if done {
+        app.rename_workspace(&text);
+        return None;
+    }
+    (!closed && !cancel).then_some(Modal::RenameWorkspace { text, first: false })
+}
+
 fn rename_block(app: &mut App, ctx: &Context, id: Id, mut text: String, first: bool) -> Option<Modal> {
     let mut done = false;
     let mut cancel = false;
@@ -711,13 +739,12 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
             items.push((format!("{} › {}", m.group, m.name), app.keymap.label(a), PaletteItem::Action(a)));
         }
     }
-    for w in &app.workspaces {
-        for id in &w.sessions {
-            if let Some(rt) = app.sessions.get(id) {
-                let label = format!("Sessão › {} ({})", rt.s.name, w.name);
-                if matches(&label) {
-                    items.push((label, app.skin.state_label(rt.state()).to_string(), PaletteItem::Session(*id)));
-                }
+    // só as sessões do workspace atual: as de outro aparecem quando você troca pra ele
+    for id in app.ws_sessions() {
+        if let Some(rt) = app.sessions.get(&id) {
+            let label = format!("Sessão › {}", rt.s.name);
+            if matches(&label) {
+                items.push((label, crate::brand::state_label(rt.state()).to_string(), PaletteItem::Session(id)));
             }
         }
     }
@@ -792,7 +819,7 @@ fn restore(app: &mut App, ctx: &Context) -> Option<Modal> {
         ui.set_width(520.0);
         ui.horizontal(|ui| {
             let (r, _) = ui.allocate_exact_size(Vec2::splat(84.0), Sense::hover());
-            app.skin.mascot(ui, r, aic_core::SessionState::Waiting, t, &theme);
+            crate::brand::mascot(ui, r, aic_core::SessionState::Waiting, t, &theme);
             ui.vertical(|ui| {
                 ui.label(RichText::new("Reabrir a última sessão?").size(18.0).strong());
                 ui.label(widgets::subtle(format!("{n} sessões em {ws} workspace(s) ficaram salvas."), &theme));
@@ -831,7 +858,7 @@ fn confirm_quit(app: &mut App, ctx: &Context) -> Option<Modal> {
     let closed = frame(ctx, "quit", 560.0, |ui| {
         ui.horizontal(|ui| {
             let (r, _) = ui.allocate_exact_size(Vec2::splat(72.0), Sense::hover());
-            app.skin.mascot(ui, r, aic_core::SessionState::GameOver, t, &theme);
+            crate::brand::mascot(ui, r, aic_core::SessionState::GameOver, t, &theme);
             ui.vertical(|ui| {
                 ui.label(RichText::new("Tem certeza que quer fechar?").size(18.0).strong());
                 ui.label(widgets::subtle(format!("{} sessões abertas serão encerradas.", app.sessions.len()), &theme));

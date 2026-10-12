@@ -182,7 +182,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 for u in &users {
                     let state = app.state_of(*u);
                     ui.horizontal(|ui| {
-                        widgets::state_badge(ui, app.skin.state_label(state), state, &theme, app.t());
+                        widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, app.t());
                         if ui.link(app.session_label(*u)).clicked() {
                             app.focus(*u);
                         }

@@ -1,5 +1,4 @@
-//! Feature flags. Cada módulo pode ser ligado/desligado globalmente (`[modules]` no
-//! config.toml) e por tema (`[themes.<id>.modules]`). Precedência: tema > global > padrão.
+//! Feature flags. Cada módulo liga/desliga em `[modules]` no config.toml (ou em Config → Módulos).
 //!
 //! Desligar um módulo some com a aba, os atalhos e as ações dele.
 
@@ -66,9 +65,9 @@ pub const ALL: &[ModuleInfo] = &[
     ModuleInfo { module: Notion, id: "notion", name: "Notion", desc: "Cards do Notion no board e no bloco (via Claude Code ou token).", group: "Integrações", default: true, requires: &[] },
     ModuleInfo { module: Slack, id: "slack", name: "Slack", desc: "Threads do Slack vinculadas a tarefas e blocos (via Claude Code).", group: "Integrações", default: true, requires: &[] },
     ModuleInfo { module: Statusbar, id: "statusbar", name: "Barra de status", desc: "Modelo, contexto, branch, limites e custo da sessão em foco.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Hints, id: "hints", name: "Dicas de atalho", desc: "Tecla líder com menu de atalhos e barra de dicas no rodapé.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Mascot, id: "mascot", name: "Mascote", desc: "Mascote animado conforme o estado de cada sessão.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Background, id: "background", name: "Fundo animado", desc: "Efeito de fundo do tema (poeira, bolhas…).", group: "Interface", default: true, requires: &[] },
+    ModuleInfo { module: Hints, id: "hints", name: "Dicas de atalho", desc: "Catálogo de atalhos (tecla líder) e barra de dicas no rodapé.", group: "Interface", default: true, requires: &[] },
+    ModuleInfo { module: Mascot, id: "mascot", name: "Mascote", desc: "O pote de moscas, animado conforme o estado de cada sessão.", group: "Interface", default: true, requires: &[] },
+    ModuleInfo { module: Background, id: "background", name: "Fundo animado", desc: "Grão de película e poeira na luz, atrás de tudo.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Sound, id: "sound", name: "Som", desc: "Toca um som quando uma sessão termina ou pede permissão.", group: "Avisos", default: true, requires: &[] },
     ModuleInfo { module: Notifications, id: "notifications", name: "Notificações", desc: "Notificação do sistema quando uma sessão termina ou precisa de você.", group: "Avisos", default: true, requires: &[] },
 ];
@@ -84,14 +83,11 @@ pub fn by_id(id: &str) -> Option<Module> {
 /// Overrides por id (`"notion" = false`).
 pub type Flags = BTreeMap<String, bool>;
 
-/// Ligado? tema > global > padrão, e só se as dependências também estiverem.
-pub fn enabled(m: Module, global: &Flags, theme: Option<&Flags>) -> bool {
+/// Ligado? O que está no config ou o padrão, e só se as dependências também estiverem.
+pub fn enabled(m: Module, flags: &Flags) -> bool {
     let i = info(m);
-    let own = theme
-        .and_then(|t| t.get(i.id).copied())
-        .or_else(|| global.get(i.id).copied())
-        .unwrap_or(i.default);
-    own && i.requires.iter().all(|r| enabled(*r, global, theme))
+    let own = flags.get(i.id).copied().unwrap_or(i.default);
+    own && i.requires.iter().all(|r| enabled(*r, flags))
 }
 
 #[cfg(test)]
@@ -99,14 +95,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn precedencia() {
+    fn padrao_e_override() {
         let mut g = Flags::new();
-        assert!(enabled(Module::Notion, &g, None));
+        assert!(enabled(Module::Notion, &g));
         g.insert("notion".into(), false);
-        assert!(!enabled(Module::Notion, &g, None));
-        let mut t = Flags::new();
-        t.insert("notion".into(), true);
-        assert!(enabled(Module::Notion, &g, Some(&t)));
+        assert!(!enabled(Module::Notion, &g));
     }
 
     #[test]

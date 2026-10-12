@@ -13,7 +13,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use aic_app::app::{App, View};
 use aic_app::ui::modals::Modal;
-use aic_app::ui::widgets::{I_BOARD, I_CHART, I_GEAR, I_PLUS, I_TERM, I_WORKTREE};
+use aic_app::ui::widgets::{I_BOARD, I_PLUS, I_TERM};
 use aic_core::{Id, SessionKind, Subtask, Task, TaskStatus};
 
 /// Os testes mexem em variáveis de ambiente: um de cada vez.
@@ -45,7 +45,7 @@ type H = Harness<'static, Option<App>>;
 fn harness(size: [f32; 2]) -> H {
     let mut h = Harness::builder().with_size(egui::vec2(size[0], size[1])).build_ui_state(
         |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), Some("aic".into()), true).expect("app"));
+            let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
             aic_app::ui::draw(a, ui);
         },
         None,
@@ -319,13 +319,14 @@ fn modais_toasts_e_abas() {
 
     // abas da topbar
     for (label, view) in [
-        (format!("{I_BOARD}  Board"), View::Board),
-        (format!("{I_WORKTREE}  Worktrees"), View::Worktrees),
-        (format!("{I_CHART}  Tokens"), View::Usage),
-        (format!("{I_GEAR}  Config"), View::Settings),
-        (format!("{I_TERM}  Sessões"), View::Sessions),
+        ("Aba Board", View::Board),
+        ("Aba Worktrees", View::Worktrees),
+        ("Aba Tokens", View::Usage),
+        ("Aba Config", View::Settings),
+        ("Aba Ajuda", View::Help),
+        ("Aba Sessões", View::Sessions),
     ] {
-        click(&mut h, &label);
+        click(&mut h, label);
         assert_eq!(app(&mut h).view, view, "aba {label}");
     }
 
@@ -457,6 +458,182 @@ fn config_alterar_atalho() {
     key(&mut h, Modifiers::NONE, Key::Escape);
     click(&mut h, "Tecla líder padrão");
     assert_eq!(app(&mut h).cfg.leader, "Ctrl+Space");
+
+    // tecla de prefixo de uma ação: grava a próxima tecla (texto vence: "q")
+    click(&mut h, "Alterar tecla de prefixo: Sair do AIC");
+    assert_eq!(app(&mut h).settings.capturing_prefix, Some(Action::Quit));
+    key(&mut h, Modifiers::NONE, Key::X);
+    assert_eq!(app(&mut h).keymap.prefix_keys(Action::Quit), ["x"]);
+    assert!(app(&mut h).keymap.prefix_keys(Action::CloseFocused).is_empty(), "x sai de quem tinha");
+    click(&mut h, "Tecla de prefixo padrão: Fechar o que está em foco (terminal, bloco vazio, cartão aberto ou a aba)");
+    assert_eq!(app(&mut h).keymap.prefix_keys(Action::CloseFocused), ["x"]);
+    assert!(app(&mut h).keymap.prefix_keys(Action::Quit).is_empty(), "e volta pro dono");
+
+    // o prefixo em si: não aceita colidir com a líder
+    click(&mut h, "Alterar o prefixo");
+    key(&mut h, ctrl(), Key::Space);
+    assert_eq!(app(&mut h).cfg.prefix, "Ctrl+B", "Ctrl+Space é a líder");
+    click(&mut h, "Alterar o prefixo");
+    key(&mut h, ctrl(), Key::A);
+    assert_eq!(app(&mut h).cfg.prefix, "Ctrl+A");
+    click(&mut h, "Prefixo padrão");
+    assert_eq!(app(&mut h).cfg.prefix, "Ctrl+B");
+}
+
+// ───────────────────────── busca na Config ─────────────────────────
+
+#[test]
+fn busca_na_config() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("busca", "");
+    let mut h = harness([1400.0, 9000.0]);
+    app(&mut h).set_view(View::Settings);
+    frames(&mut h, 3);
+    assert!(exists(&h, "Fonte do terminal"));
+
+    // "/" foca a busca; digitar filtra
+    key(&mut h, Modifiers::NONE, Key::Slash);
+    h.event(egui::Event::Text("fonte".into()));
+    frames(&mut h, 3);
+    assert_eq!(app(&mut h).settings.search, "fonte");
+    assert!(exists(&h, "Fonte do terminal"), "a linha buscada fica");
+    assert!(!exists(&h, "Escala da interface"), "o resto da seção some");
+    assert!(!exists(&h, "Alterar atalho: Sair do AIC"), "outras seções somem");
+
+    // sem acento e por palavra-chave: "notificacao" acha a linha de notificação
+    app(&mut h).settings.search = "notificacao".into();
+    frames(&mut h, 3);
+    assert!(exists(&h, "testar notificação"));
+    assert!(!exists(&h, "Fonte do terminal"));
+
+    // busca que acha atalhos pela tecla
+    app(&mut h).settings.search = "workspace 3".into();
+    frames(&mut h, 3);
+    assert!(exists(&h, "Alterar atalho: Ir pro workspace 3"));
+    assert!(!exists(&h, "Alterar atalho: Ir pro workspace 4"));
+
+    app(&mut h).settings.search = "xyzzy".into();
+    frames(&mut h, 3);
+    assert!(exists(&h, "Nada encontrado para \"xyzzy\""));
+    click(&mut h, "Limpar busca");
+    assert!(app(&mut h).settings.search.is_empty());
+
+    // Ctrl+B / abre a Config com a busca focada, de qualquer aba
+    app(&mut h).set_view(View::Board);
+    frames(&mut h, 2);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::Slash);
+    assert_eq!(app(&mut h).view, View::Settings);
+    h.event(egui::Event::Text("som".into()));
+    frames(&mut h, 3);
+    assert_eq!(app(&mut h).settings.search, "som", "a busca já estava focada");
+}
+
+// ───────────────────────── prefixo (tmux) ─────────────────────────
+
+#[test]
+fn prefixo_estilo_tmux() {
+    use aic_app::actions::Action;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("prefixo", "");
+    let mut h = harness([1480.0, 900.0]);
+    let a = terminal(&mut h, "api", "sleep 60");
+    assert!(app(&mut h).term_focus, "terminal focado");
+
+    // Ctrl+B arma (com o terminal focado) e acende o indicador
+    key(&mut h, ctrl(), Key::B);
+    assert!(app(&mut h).prefix_pending);
+    assert!(exists(&h, "Prefixo armado"));
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    assert!(!app(&mut h).prefix_pending, "Esc cancela");
+
+    // x fecha o que está em foco: o terminal (pede confirmação)
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::X);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseSession { id, .. } if *id == a)), "Ctrl+B x fecha o terminal em foco");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    app(&mut h).modal = None;
+
+    // n/p andam pelas abas da barra; x numa aba volta pras Sessões
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::N);
+    assert_eq!(app(&mut h).view, View::Board, "Ctrl+B n");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::N);
+    assert_eq!(app(&mut h).view, View::Worktrees);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::P);
+    assert_eq!(app(&mut h).view, View::Board, "Ctrl+B p");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::X);
+    assert_eq!(app(&mut h).view, View::Sessions, "Ctrl+B x na aba volta pras sessões");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::P);
+    let last = *app(&mut h).tabs().last().unwrap();
+    assert_eq!(app(&mut h).view, last, "p dá a volta");
+    app(&mut h).set_view(View::Sessions);
+
+    // workspaces: criar, Ctrl+B 1 / 2, Tab vai e volta
+    app(&mut h).new_workspace("front");
+    frames(&mut h, 2);
+    assert_eq!(app(&mut h).ws, 1);
+    assert!(exists(&h, "Workspace 2 front"), "workspace na barra");
+    assert!(app(&mut h).ws_sessions().is_empty(), "o workspace novo só mostra as sessões dele");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::Num1);
+    assert_eq!(app(&mut h).ws, 0, "Ctrl+B 1");
+    assert_eq!(app(&mut h).ws_sessions(), vec![a]);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::Tab);
+    assert_eq!(app(&mut h).ws, 1, "Ctrl+B Tab volta pro anterior");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::Tab);
+    assert_eq!(app(&mut h).ws, 0, "e vai de novo");
+    click(&mut h, "Workspace 2 front");
+    assert_eq!(app(&mut h).ws, 1, "clique no workspace da barra");
+    // ( e ) vêm como texto (Shift+9/0 no teclado)
+    key(&mut h, ctrl(), Key::B);
+    h.event(egui::Event::Text("(".into()));
+    frames(&mut h, 2);
+    assert_eq!(app(&mut h).ws, 0, "Ctrl+B (");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::Num9);
+    assert_eq!(app(&mut h).ws, 0, "workspace que não existe não muda nada");
+
+    // $ renomeia o workspace atual
+    key(&mut h, ctrl(), Key::B);
+    h.event(egui::Event::Text("$".into()));
+    frames(&mut h, 2);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::RenameWorkspace { .. })), "Ctrl+B $");
+    app(&mut h).modal = None;
+    app(&mut h).rename_workspace("api");
+    assert_eq!(app(&mut h).current_ws().unwrap().name, "api");
+
+    // tecla sem ação: avisa e desarma
+    app(&mut h).toasts.clear();
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::Y);
+    assert!(!app(&mut h).prefix_pending);
+    assert!(app(&mut h).toasts.iter().any(|t| t.text.contains("não faz nada")));
+
+    // ? abre o catálogo; Ctrl+B Ctrl+B não dispara nada (vai pro terminal)
+    key(&mut h, ctrl(), Key::B);
+    h.event(egui::Event::Text("?".into()));
+    frames(&mut h, 2);
+    assert!(app(&mut h).leader.is_some(), "Ctrl+B ? abre o catálogo");
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, ctrl(), Key::B);
+    assert!(!app(&mut h).prefix_pending && app(&mut h).modal.is_none() && app(&mut h).leader.is_none());
+
+    // prefixo remapeado pelo keybinds: vale a tecla nova
+    app(&mut h).keymap.set_prefix(Action::NewWorkspace, vec!["N".into()]);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::SHIFT, Key::N);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::Workspaces { .. })), "Ctrl+B N (remapeado)");
+    app(&mut h).modal = None;
+
+    kill_all(&mut h);
 }
 
 // ───────────────────────── tecla líder e dicas ─────────────────────────
