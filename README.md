@@ -18,6 +18,7 @@ Feito em Rust com [egui](https://github.com/emilk/egui). Roda no Linux (X11 e Wa
 - **Barra no estilo i3**: workspaces numerados em destaque, abas com a tecla do prefixo e status (quem espera você, custo, limites, relógio) à direita.
 - **Workspaces como contexto**: a tela mostra só o workspace aceso na barra; pra ver outro, troca de workspace.
 - **Captura rápida**: uma linha vira tarefa, com marcadores (`#repo @hoje !alta ^DEV-142`).
+- **Layne**: um assistente (Claude sempre aberto no painel lateral) que você usa por texto ou voz pra criar workspaces, anotar tarefas e abrir sessões e cards por você.
 - **Abrir card**: cole o link de um card e o AIC monta o bloco com um worktree e um Claude por repositório.
 - **Board** kanban com tarefas locais e cards do Notion, **worktrees** por card e uma aba de **tokens** com limites da conta e custo por sessão.
 - **Módulos**: tudo além dos terminais liga e desliga.
@@ -68,6 +69,8 @@ aic --fresh                  # começa sem reabrir as sessões salvas
 aic add "revisar PR #api !alta @amanha"   # cria tarefa pelo terminal
 aic tasks [--all] [--json]   # lista tarefas
 aic done <id>                # conclui
+aic ws new 'Pessoal' --go    # workspaces, sessões e cards no app aberto (veja Layne)
+aic voz                      # liga/desliga a gravação pro Layne
 ```
 
 Na primeira vez, um assistente pergunta a visualização, os módulos, as pastas dos seus repositórios, o prefixo e a tecla do catálogo.
@@ -79,6 +82,7 @@ Aperte `Ctrl+B`, solte e aperte a tecla. A barra de cima acende enquanto o prefi
 | Tecla | Ação |
 | --- | --- |
 | `c` / `%` | novo Claude / shell ao lado |
+| `L` / `m` | painel do Layne / falar com ele |
 | `x` | fecha o que está em foco (terminal, bloco vazio, cartão aberto ou a aba) |
 | `h j k l`, setas | move o foco |
 | `z` | maximiza o terminal |
@@ -128,6 +132,28 @@ Dentro de uma sessão aberta pelo AIC, `/aic:tarefa texto` cria a tarefa já vin
 
 `Ctrl+Shift+J`, cole o link do card. O AIC cria um worktree por repositório (`<repo>.worktrees/<branch>`, branch com o nome do card), abre um Claude em cada, um shell e as notas. O plugin `aic` dá ao Claude as skills para puxar o contexto do card e da thread do Slack, quebrar o trabalho entre repositórios e fechar a entrega.
 
+### Layne (assistente)
+
+O Layne é um Claude sempre aberto num painel à direita (`Ctrl+B L` ou `Ctrl+Alt+L`). Você pede em português, digitando ou falando, e ele mexe no AIC por você: cria workspaces, anota tarefas, abre sessões do Claude num repo ou worktree com a primeira mensagem já escrita, abre um card do Notion montando o bloco.
+
+> "cria um workspace pessoal e anota pra eu lembrar: renovar a CNH sexta, comprar ração"
+> "abre uma sessão com o card DEV-142 no projeto api"
+
+- **Voz**: `Ctrl+B m` (ou `Ctrl+Alt+V`, ou o microfone no painel) começa a gravar; de novo para, transcreve e manda. `Esc` no painel descarta. Fora do app, `aic voz` faz o mesmo (bom pra um atalho do i3: `bindsym $mod+v exec aic voz`).
+- **Microfone e transcrição**: em Config → Layne. Escolha o mic da lista (ou o padrão do sistema) e quem transcreve: **whisper.cpp** local (nada sai da máquina; precisa do `whisper-cli` e de um modelo `ggml-*.bin`), uma **API** no formato da OpenAI (OpenAI ou Groq; chave no `~/.config/aic/.env`) ou um **comando seu** (`{file}` e `{lang}`).
+- **A conversa continua**: a sessão tem id fixo e volta com `--resume`. "Conversa nova" (Config → Layne) começa outra.
+- **Como ele opera**: pelo `aic` de linha de comando (agente `aic:layne` + skill `aic:layne` do plugin), que pede ao app aberto por uma caixa de entrada em `~/.local/state/aic/inbox/`. Os mesmos comandos servem pra você ou pra scripts:
+
+```bash
+aic ws new 'Pessoal' --go              # cria workspace (e vai pra ele)
+aic ws go pess                          # troca (nome ou começo)
+aic add --ws Pessoal 'renovar CNH @sexta'
+aic session --repo api --branch fix/juros -- 'corrija o cálculo de juros'
+aic card DEV-142 --auto --repos api     # monta o bloco sem perguntar
+aic sessions | aic ws ls | aic repos    # o que está aberto
+aic layne --send 'o que tenho pra hoje?'
+```
+
 ### tmux por baixo
 
 O AIC sobe um servidor tmux só dele, com config própria em `~/.local/share/aic/tmux.conf` (sem barra nem atalhos, invisível). O seu tmux e o seu `~/.tmux.conf` não são tocados. Dá para desligar no módulo **Persistência (tmux)**.
@@ -138,7 +164,7 @@ Ao terminar uma sessão o AIC toca um som (e, se quiser, outro quando ela pede p
 
 ### Módulos
 
-Em Config → Módulos: tmux, workspaces, abrir card, board, notas, worktrees, tokens, Notion, Slack, barra de status, dicas de atalho, mascote, fundo animado, som e notificações.
+Em Config → Módulos: tmux, workspaces, Layne, abrir card, board, notas, worktrees, tokens, Notion, Slack, barra de status, dicas de atalho, mascote, fundo animado, som e notificações.
 
 O manual completo, com todos os atalhos, fica dentro do app (`F1`) e em [`docs/MANUAL.md`](docs/MANUAL.md).
 

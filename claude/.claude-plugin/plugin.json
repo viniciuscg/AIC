@@ -1,6 +1,6 @@
 {
   "name": "aic",
-  "description": "Skills, comando e agente que o AIC injeta nas sessões do Claude Code: contexto da tarefa (Notion/Slack), pendências, worktrees por card e entrega.",
+  "description": "Skills, comando e agentes (incluindo o Layne, o assistente) que o AIC injeta nas sessões do Claude Code: contexto da tarefa (Notion/Slack), pendências, worktrees por card e entrega.",
   "version": "0.1.0",
   "author": {
     "name": "Vinicius Gonçalves"

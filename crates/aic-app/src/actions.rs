@@ -20,6 +20,10 @@ pub enum Action {
     CloseFocused,
     // Sessões
     NewSession,
+    /// Painel do Layne (assistente).
+    ToggleLayne,
+    /// Gravar/parar a voz pro Layne.
+    LayneVoice,
     NewShell,
     CloseSession,
     RenameSession,
@@ -102,7 +106,7 @@ impl Action {
     pub fn all() -> Vec<Action> {
         use Action::*;
         let mut v = vec![
-            CloseFocused, NewSession, NewShell, CloseSession, RenameSession, RestartSession, SendContext, NextSession, PrevSession, NextWaiting,
+            CloseFocused, NewSession, ToggleLayne, LayneVoice, NewShell, CloseSession, RenameSession, RestartSession, SendContext, NextSession, PrevSession, NextWaiting,
             FocusLeft, FocusRight, FocusUp, FocusDown,
         ];
         v.extend((1..=9).map(Goto));
@@ -129,6 +133,7 @@ impl Action {
             Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_) | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
             FocusNotes => Some(Module::Notes),
             OpenCard => Some(Module::Launcher),
+            ToggleLayne | LayneVoice => Some(Module::Layne),
             ToggleHints | Catalog => Some(Module::Hints),
             _ => None,
         }
@@ -144,6 +149,8 @@ impl Action {
         let (id, name, group, default) = match self {
             CloseFocused => ("close_focused", "Fechar o que está em foco (terminal, bloco vazio, cartão aberto ou a aba)", "Foco", None),
             NewSession => ("new_session", "Novo Claude no bloco atual (escolhe pasta/worktree)", "Sessões", ks(CS, Key::N)),
+            ToggleLayne => ("toggle_layne", "Layne: abrir/fechar o assistente (ou pegar o teclado dele)", "Layne", ks(CA, Key::L)),
+            LayneVoice => ("layne_voice", "Layne: falar (grava; de novo para e manda)", "Layne", ks(CA, Key::V)),
             NewShell => ("new_shell", "Novo terminal ao lado, na mesma pasta (split)", "Sessões", ks(CS, Key::T)),
             CloseSession => ("close_session", "Fechar o terminal em foco", "Sessões", ks(CS, Key::W)),
             RenameSession => ("rename_session", "Renomear o terminal em foco", "Sessões", ks(CS, Key::R)),
@@ -242,6 +249,8 @@ impl Action {
         match self {
             CloseFocused => &["x"],
             NewSession => &["c"],
+            ToggleLayne => &["L"],
+            LayneVoice => &["m"],
             NewShell => &["%", "\""],
             CloseBlock => &["&"],
             RenameSession => &["r"],

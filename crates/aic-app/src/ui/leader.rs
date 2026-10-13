@@ -118,6 +118,8 @@ fn tree() -> Vec<Item> {
         ]),
         Run('g', "Worktrees", ViewWorktrees),
         Run('c', "Abrir card", OpenCard),
+        Run('l', "Layne (assistente)", ToggleLayne),
+        Run('m', "Falar com o Layne", LayneVoice),
         Run('n', "Notas do bloco", FocusNotes),
         Run('k', "Tokens e custo", ViewUsage),
         Run('p', "Paleta de comandos", Palette),

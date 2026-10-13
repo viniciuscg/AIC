@@ -7,6 +7,7 @@ pub mod cli;
 pub mod connector;
 pub mod sounds;
 pub mod injection;
+pub mod layne;
 pub mod notify;
 pub mod notion_ui;
 pub mod session;

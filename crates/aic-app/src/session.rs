@@ -56,7 +56,10 @@ impl Runtime {
         let mut env: HashMap<String, String> = HashMap::new();
         env.insert("AIC".into(), "1".into());
         env.insert("AIC_SESSION".into(), self.s.id.to_string());
-        env.insert("AIC_WORKSPACE".into(), self.s.workspace.to_string());
+        // o Layne não tem workspace: sem a variável, `aic add` cai no workspace que ele escolher
+        if !self.s.workspace.is_nil() {
+            env.insert("AIC_WORKSPACE".into(), self.s.workspace.to_string());
+        }
         if let Ok(exe) = std::env::current_exe() {
             env.insert("AIC_BIN".into(), exe.to_string_lossy().into());
         }

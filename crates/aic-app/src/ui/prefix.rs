@@ -156,7 +156,8 @@ fn send_prefix_to_terminal(app: &mut App, key: Key, mods: Modifiers) {
         .filter(|c| c.is_ascii_alphabetic())
         .map(|c| (c.to_ascii_uppercase() as u8) - b'@');
     let Some(byte) = byte else { return };
-    if let Some(t) = app.focused().and_then(|id| app.sessions.get(&id)).and_then(|r| r.term.as_ref()) {
+    let term = if app.layne.focus { app.layne.rt.as_ref() } else { app.focused().and_then(|id| app.sessions.get(&id)) };
+    if let Some(t) = term.and_then(|r| r.term.as_ref()) {
         t.write(vec![byte]);
     }
 }

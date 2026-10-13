@@ -94,6 +94,11 @@ const SOM: &[(&str, &str)] = &[
     ("Notificação", "notify-send desktop sistema foco"),
 ];
 const CLAUDE: &[(&str, &str)] = &[("Sua statusline", "statusline script"), ("Injeção por sessão", "settings plugin hooks")];
+const LAYNE: &[(&str, &str)] = &[
+    ("Sessão do Layne", "assistente agente iniciar modelo conversa"),
+    ("Microfone", "mic áudio voz gravar entrada pulseaudio pipewire"),
+    ("Transcrição", "whisper api openai groq comando idioma voz texto"),
+];
 const INTEGRACOES: &[(&str, &str)] = &[("Notion e Slack", "notion slack conector token database sprint cards status propriedade sync")];
 const CACHE: &[(&str, &str)] = &[("Limpar cache", "tmux sessões salvar layout restaurar")];
 const SOBRE: &[(&str, &str)] = &[("Versão e pastas", "versão config dados eventos caminho")];
@@ -295,6 +300,12 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     ui.end_row();
                 }
             });
+        }
+
+        if f.any("Layne (assistente)", LAYNE) {
+            shown += 1;
+            section(ui, &theme, "Layne (assistente)");
+            crate::layne::settings(app, ui, |i| f.row("Layne (assistente)", LAYNE[i].0, LAYNE[i].1));
         }
 
         if f.any("Integrações", INTEGRACOES) {

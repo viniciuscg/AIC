@@ -30,7 +30,7 @@ fn sandbox(name: &str) -> PathBuf {
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
     }
     std::fs::create_dir_all(dir.join("claude/projects")).unwrap();
-    std::fs::write(dir.join("config/config.toml"), "setup_done = true\nanimations = true\n\n[modules]\ntmux = false\n").unwrap();
+    std::fs::write(dir.join("config/config.toml"), "setup_done = true\nanimations = true\n\n[modules]\ntmux = false\nlayne = false\n").unwrap();
     dir
 }
 

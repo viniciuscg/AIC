@@ -24,7 +24,7 @@ directories = "6"
 rusqlite = { version = "0.40", features = ["bundled"] }
 notify-rust = "4"
 open = "5"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
 
 aic-term = { path = "crates/aic-term" }
 aic-core = { path = "crates/aic-core" }
