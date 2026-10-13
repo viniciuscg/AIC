@@ -105,6 +105,10 @@ pub fn start(app: &mut App, ctx: &Context) {
     }
     let cwd = dir();
     let _ = std::fs::create_dir_all(&cwd);
+    // a pasta é do AIC: sem isso o Claude abre parado em "Do you trust this folder?"
+    if let Err(e) = aic_core::claude::ensure_trusted(&cwd) {
+        app.toast(&format!("Layne: não consegui marcar a pasta como confiável ({e:#}); responda a pergunta no painel"), ToastKind::Warn);
+    }
     let mut s = Session::new(Id::nil(), NAME, SessionKind::Claude, cwd);
     s.id = session_id(app);
     s.claude_session = s.id;

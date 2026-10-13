@@ -246,8 +246,11 @@ impl App {
 
     pub fn start_fresh(&mut self, _ctx: &Context) {
         let _ = self.store.clear_cache();
-        // sessões que sobraram rodando no tmux de uma vez anterior
-        crate::tmux::kill_all();
+        // sessões que sobraram rodando no tmux de uma vez anterior (sem o módulo, o servidor
+        // não é nosso: os testes rodam com tmux desligado e não podem derrubar o AIC aberto)
+        if self.cfg.on(aic_core::Module::Tmux) {
+            crate::tmux::kill_all();
+        }
         self.blocks.clear();
         let ws = Workspace::new("Principal");
         let _ = self.store.save_workspace(&ws);
@@ -1278,7 +1281,9 @@ impl App {
             let _ = self.store.mark_cache(true);
         } else {
             let _ = self.store.clear_cache();
-            crate::tmux::kill_all();
+            if self.cfg.on(aic_core::Module::Tmux) {
+                crate::tmux::kill_all();
+            }
         }
         let _ = self.cfg.save();
         let _ = self.keymap.save();
