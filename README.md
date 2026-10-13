@@ -18,8 +18,9 @@ Feito em Rust com [egui](https://github.com/emilk/egui). Roda no Linux (X11 e Wa
 - **Barra no estilo i3**: workspaces numerados em destaque, abas com a tecla do prefixo e status (quem espera você, custo, limites, relógio) à direita.
 - **Workspaces como contexto**: a tela mostra só o workspace aceso na barra; pra ver outro, troca de workspace.
 - **Captura rápida**: uma linha vira tarefa, com marcadores (`#repo @hoje !alta ^DEV-142`).
-- **Layne**: um assistente (Claude sempre aberto no painel lateral) que você usa por texto ou voz pra criar workspaces, anotar tarefas e abrir sessões e cards por você.
+- **Layne**: um assistente (Claude sempre aberto no painel lateral, aberto pelo ícone no canto da barra) que você usa por texto ou voz pra criar workspaces, anotar tarefas e abrir sessões e cards por você.
 - **Abrir card**: cole o link de um card e o AIC monta o bloco com um worktree e um Claude por repositório.
+- **Changes**: arquivos mudados do repo e o diff de cada um, como o Source Control do VS Code (stage, descartar, commit). Segue o terminal em foco.
 - **Board** kanban com tarefas locais e cards do Notion, **worktrees** por card e uma aba de **tokens** com limites da conta e custo por sessão.
 - **Módulos**: tudo além dos terminais liga e desliga.
 - **Config com busca**: `Ctrl+B /` e digita (`fonte`, `som`, `notion`…).

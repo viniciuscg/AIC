@@ -121,6 +121,10 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         // ── status (direita → esquerda) ──
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 3.0;
+            if app.cfg.on(aic_core::Module::Layne) {
+                layne_button(app, ui, &theme, t);
+                sep(ui, &theme);
+            }
             ui.label(RichText::new(chrono::Local::now().format("%H:%M").to_string()).font(widgets::mono(12.5)).color(theme.ink));
             if let Some(acc) = app.account.clone() {
                 if let Some(w) = acc.seven_day {
@@ -171,6 +175,36 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             }
         });
     });
+}
+
+/// Ícone do Layne (o assistente): clica e abre/fecha o painel. A cor diz o estado dele:
+/// aceso com o painel aberto, pulsando quando ele precisa de você ou está gravando.
+fn layne_button(app: &mut App, ui: &mut Ui, theme: &Theme, t: f64) {
+    let state = app.layne.state();
+    let pulse = 0.55 + 0.45 * ((t * 4.0).sin() as f32 * 0.5 + 0.5);
+    let (color, fill, tip) = if app.layne.recording() {
+        (theme.bg, theme.err.gamma_multiply(pulse), "Layne: gravando (clique pra abrir o painel)")
+    } else if state == SessionState::Waiting {
+        (theme.attention.gamma_multiply(pulse), theme.attention.gamma_multiply(0.18), "Layne precisa de você")
+    } else if app.layne.open {
+        (theme.bg, theme.accent, "Fechar o Layne")
+    } else if state == SessionState::Working {
+        (theme.ok, Color32::TRANSPARENT, "Layne trabalhando")
+    } else {
+        (theme.ink, Color32::TRANSPARENT, "Abrir o Layne (assistente)")
+    };
+    let mut job = LayoutJob::default();
+    push(&mut job, crate::layne::I_LAYNE, color, 14.0);
+    let resp = block(ui, "Layne", job, fill, Stroke::NONE, None);
+    if resp.on_hover_text(app.keymap.tip(Action::ToggleLayne, tip)).clicked() {
+        let ctx = ui.ctx().clone();
+        if app.layne.open {
+            app.layne.open = false;
+            app.layne.focus = false;
+        } else {
+            crate::layne::show(app, &ctx);
+        }
+    }
 }
 
 /// Um bloco por workspace: `1 Principal`, o atual aceso; quem tem alguém esperando fica roxo.

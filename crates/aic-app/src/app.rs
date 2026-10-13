@@ -24,19 +24,21 @@ pub enum View {
     Sessions,
     Board,
     Worktrees,
+    Changes,
     Usage,
     Settings,
     Help,
 }
 
 impl View {
-    pub const ALL: [View; 6] = [View::Sessions, View::Board, View::Worktrees, View::Usage, View::Settings, View::Help];
+    pub const ALL: [View; 7] = [View::Sessions, View::Board, View::Worktrees, View::Changes, View::Usage, View::Settings, View::Help];
 
     pub fn label(self) -> &'static str {
         match self {
             View::Sessions => "Sessões",
             View::Board => "Board",
             View::Worktrees => "Worktrees",
+            View::Changes => "Changes",
             View::Usage => "Tokens",
             View::Settings => "Config",
             View::Help => "Ajuda",
@@ -48,6 +50,7 @@ impl View {
             View::Sessions => ui::widgets::I_TERM,
             View::Board => ui::widgets::I_BOARD,
             View::Worktrees => ui::widgets::I_WORKTREE,
+            View::Changes => ui::widgets::I_DIFF,
             View::Usage => ui::widgets::I_CHART,
             View::Settings => ui::widgets::I_GEAR,
             View::Help => ui::widgets::I_HELP,
@@ -60,6 +63,7 @@ impl View {
             View::Sessions => Action::ViewSessions,
             View::Board => Action::ViewBoard,
             View::Worktrees => Action::ViewWorktrees,
+            View::Changes => Action::ViewChanges,
             View::Usage => Action::ViewUsage,
             View::Settings => Action::ViewSettings,
             View::Help => Action::ViewHelp,
@@ -122,6 +126,7 @@ pub struct App {
 
     pub board: ui::board::BoardState,
     pub worktrees: ui::worktrees::WorktreeState,
+    pub changes: ui::changes::ChangesState,
     pub settings: ui::settings::SettingsState,
     /// Menu da tecla líder aberto (caminho dentro da árvore de atalhos).
     pub leader: Option<ui::leader::LeaderState>,
@@ -204,6 +209,7 @@ impl App {
             window_focused: true,
             board: Default::default(),
             worktrees: Default::default(),
+            changes: Default::default(),
             settings: Default::default(),
             leader: None,
             prefix_pending: false,
@@ -1187,6 +1193,7 @@ impl App {
             }
             ViewBoard => self.set_view(View::Board),
             ViewWorktrees => self.set_view(View::Worktrees),
+            ViewChanges => self.set_view(View::Changes),
             ViewUsage => self.set_view(View::Usage),
             ViewSettings => self.set_view(View::Settings),
             ViewHelp => self.set_view(View::Help),

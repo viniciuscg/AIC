@@ -92,6 +92,12 @@ pub fn context(app: &App) -> Vec<(String, &'static str)> {
             }
             act(&mut v, Action::NextView, "aba");
         }
+        View::Changes => {
+            for (keys, desc) in [("j/k", "arquivo"), ("s", "stage"), ("u", "unstage"), ("r", "atualizar")] {
+                v.push((keys.into(), desc));
+            }
+            act(&mut v, Action::NextView, "aba");
+        }
         View::Settings => {
             v.push(("/".into(), "pesquisar"));
             v.push(("alterar".into(), "gravar atalho"));

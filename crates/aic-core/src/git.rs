@@ -52,6 +52,117 @@ pub fn status(dir: &Path) -> Option<GitStatus> {
     Some(st)
 }
 
+/// Um arquivo mudado, como na aba "Source Control" do VS Code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Change {
+    /// Caminho relativo à raiz do repo.
+    pub path: String,
+    /// Caminho antigo, num rename.
+    pub orig: Option<String>,
+    /// Letra no índice (staged): `M`, `A`, `D`, `R`, `?`, ` `…
+    pub index: char,
+    /// Letra na árvore de trabalho (não staged).
+    pub worktree: char,
+}
+
+impl Change {
+    pub fn untracked(&self) -> bool {
+        self.index == '?'
+    }
+    pub fn conflict(&self) -> bool {
+        matches!((self.index, self.worktree), ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D'))
+    }
+    /// Tem algo no índice.
+    pub fn staged(&self) -> bool {
+        !self.untracked() && !self.conflict() && self.index != ' '
+    }
+    /// Tem algo fora do índice (inclui arquivo novo).
+    pub fn unstaged(&self) -> bool {
+        self.untracked() || self.conflict() || self.worktree != ' '
+    }
+}
+
+/// Arquivos mudados (`git status --porcelain -z`), na ordem do git.
+pub fn changes(dir: &Path) -> Result<Vec<Change>> {
+    let out = git(dir, &["--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all"])?;
+    Ok(parse_changes(&out))
+}
+
+fn parse_changes(out: &str) -> Vec<Change> {
+    let mut v = Vec::new();
+    let mut parts = out.split('\0').filter(|p| !p.is_empty());
+    while let Some(p) = parts.next() {
+        let mut c = p.chars();
+        let (Some(index), Some(worktree)) = (c.next(), c.next()) else { continue };
+        let path = p.get(3..).unwrap_or_default().to_string();
+        // rename/cópia: o caminho antigo vem no campo seguinte
+        let orig = matches!(index, 'R' | 'C').then(|| parts.next().map(str::to_string)).flatten();
+        v.push(Change { path, orig, index, worktree });
+    }
+    v
+}
+
+/// Diff de um arquivo: `staged` compara índice × HEAD; senão árvore × índice.
+/// Arquivo novo (não rastreado) vira um diff de "tudo adicionado".
+pub fn diff(dir: &Path, c: &Change, staged: bool) -> Result<String> {
+    if c.untracked() && !staged {
+        let bytes = std::fs::read(dir.join(&c.path)).context("lendo o arquivo")?;
+        if bytes.contains(&0) {
+            return Ok("arquivo binário".into());
+        }
+        let text = String::from_utf8_lossy(&bytes);
+        let mut out = format!("@@ arquivo novo: {} linhas @@\n", text.lines().count());
+        for l in text.lines().take(5000) {
+            out.push('+');
+            out.push_str(l);
+            out.push('\n');
+        }
+        return Ok(out);
+    }
+    let mut args = vec!["--no-optional-locks", "diff", "--no-color", "--no-ext-diff"];
+    if staged {
+        args.push("--cached");
+    }
+    args.push("--");
+    if let Some(o) = &c.orig {
+        args.push(o);
+    }
+    args.push(&c.path);
+    git(dir, &args)
+}
+
+/// `git add` (também marca a remoção de arquivos apagados).
+pub fn stage(dir: &Path, paths: &[&str]) -> Result<()> {
+    let mut args = vec!["add", "-A", "--"];
+    args.extend_from_slice(paths);
+    git(dir, &args).map(|_| ())
+}
+
+/// Tira do índice, mantendo a mudança no arquivo.
+pub fn unstage(dir: &Path, paths: &[&str]) -> Result<()> {
+    let mut args = vec!["restore", "--staged", "--"];
+    args.extend_from_slice(paths);
+    if git(dir, &args).is_ok() {
+        return Ok(());
+    }
+    // repo sem nenhum commit ainda: não há HEAD pra restaurar
+    let mut args = vec!["rm", "--cached", "-r", "-q", "--"];
+    args.extend_from_slice(paths);
+    git(dir, &args).map(|_| ())
+}
+
+/// Descarta a mudança fora do índice (arquivo novo é apagado). Não tem volta.
+pub fn discard(dir: &Path, c: &Change) -> Result<()> {
+    if c.untracked() {
+        return std::fs::remove_file(dir.join(&c.path)).context("apagando o arquivo novo");
+    }
+    git(dir, &["restore", "--worktree", "--", &c.path]).map(|_| ())
+}
+
+pub fn commit(dir: &Path, message: &str) -> Result<String> {
+    git(dir, &["commit", "-m", message])
+}
+
 /// Raiz do repositório principal (mesmo de dentro de um worktree).
 pub fn main_root(dir: &Path) -> Option<PathBuf> {
     let common = git(dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"]).ok()?;
@@ -196,6 +307,17 @@ pub fn branch_slug(card: Option<&str>, title: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_de_changes() {
+        let v = parse_changes(" M src/a.rs\0M  b.rs\0R  novo.rs\0velho.rs\0?? x/y.txt\0UU c.rs\0");
+        assert_eq!(v.len(), 5);
+        assert!(v[0].unstaged() && !v[0].staged());
+        assert!(v[1].staged() && !v[1].unstaged());
+        assert_eq!((v[2].path.as_str(), v[2].orig.as_deref()), ("novo.rs", Some("velho.rs")));
+        assert!(v[3].untracked() && v[3].unstaged() && !v[3].staged());
+        assert!(v[4].conflict() && !v[4].staged());
+    }
 
     #[test]
     fn slug() {

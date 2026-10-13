@@ -2,6 +2,7 @@
 
 pub mod blocks;
 pub mod board;
+pub mod changes;
 pub mod help;
 pub mod hints;
 pub mod leader;
@@ -42,6 +43,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     let view_module = match app.view {
         View::Board => Some(aic_core::Module::Board),
         View::Worktrees => Some(aic_core::Module::Worktrees),
+        View::Changes => Some(aic_core::Module::Changes),
         View::Usage => Some(aic_core::Module::Usage),
         _ => None,
     };
@@ -105,6 +107,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             View::Sessions => sessions::show(app, ui),
             View::Board => board::show(app, ui),
             View::Worktrees => worktrees::show(app, ui),
+            View::Changes => changes::show(app, ui),
             View::Usage => usage::show(app, ui),
             View::Settings => settings::show(app, ui),
             View::Help => help::show(app, ui),

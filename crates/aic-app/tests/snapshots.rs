@@ -255,6 +255,33 @@ fn telas() {
         settle(&mut h, 300);
         shot(&mut h, name);
     }
+    // Changes: repo de mentira com um arquivo staged, um modificado e um novo
+    {
+        let repo = std::env::temp_dir().join(format!("aic-snap-repo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&repo);
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        let git = |args: &[&str]| assert!(std::process::Command::new("git").arg("-C").arg(&repo).args(args).output().unwrap().status.success(), "git {args:?}");
+        git(&["init", "-q"]);
+        std::fs::write(repo.join("src/juros.rs"), "pub fn juros(v: f64) -> f64 {\n    v * 0.01\n}\n").unwrap();
+        std::fs::write(repo.join("README.md"), "# api\n").unwrap();
+        git(&["add", "."]);
+        git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"]);
+        std::fs::write(repo.join("src/juros.rs"), "pub fn juros(v: f64, dias: u32) -> f64 {\n    (v * 0.01 * dias as f64 * 100.0).round() / 100.0\n}\n").unwrap();
+        std::fs::write(repo.join("README.md"), "# api\n\nPagamentos.\n").unwrap();
+        git(&["add", "README.md"]);
+        std::fs::write(repo.join("src/novo.rs"), "// arquivo novo\n").unwrap();
+        let app = h.state_mut().as_mut().unwrap();
+        app.changes.pinned = Some(repo);
+        app.cfg.layne.auto_start = false;
+        app.cfg.modules.insert("layne".into(), true);
+        app.set_view(View::Changes);
+        settle(&mut h, 300);
+        let app = h.state_mut().as_mut().unwrap();
+        app.changes.message = "fix: juros por dia".into();
+        settle(&mut h, 200);
+        shot(&mut h, "changes");
+        h.state_mut().as_mut().unwrap().cfg.modules.insert("layne".into(), false);
+    }
     let app = h.state_mut().as_mut().unwrap();
     app.set_view(View::Settings);
     app.settings.search = "prefixo".into();

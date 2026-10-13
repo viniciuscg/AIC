@@ -68,6 +68,7 @@ pub enum Action {
     ViewSessions,
     ViewBoard,
     ViewWorktrees,
+    ViewChanges,
     ViewUsage,
     ViewSettings,
     ViewHelp,
@@ -117,7 +118,7 @@ impl Action {
         ]);
         v.extend((1..=9).map(GotoWorkspace));
         v.extend([
-            LastWorkspace, RenameWorkspace, ViewSessions, ViewBoard, ViewWorktrees, ViewUsage, ViewSettings, ViewHelp, NextView, PrevView,
+            LastWorkspace, RenameWorkspace, ViewSessions, ViewBoard, ViewWorktrees, ViewChanges, ViewUsage, ViewSettings, ViewHelp, NextView, PrevView,
             SearchSettings, Catalog, Palette, ZoomIn, ZoomOut, ZoomReset, ToggleSidebar, ToggleHints, Quit,
         ]);
         v
@@ -129,6 +130,7 @@ impl Action {
         match self {
             QuickAdd | LinkTaskToSession | SendContext | ViewBoard => Some(Module::Board),
             ViewWorktrees => Some(Module::Worktrees),
+            ViewChanges => Some(Module::Changes),
             ViewUsage => Some(Module::Usage),
             Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_) | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
             FocusNotes => Some(Module::Notes),
@@ -224,6 +226,7 @@ impl Action {
             ViewSessions => ("view_sessions", "Ir pra aba Sessões", "Visões", ks(CS, Key::S)),
             ViewBoard => ("view_board", "Ir pra aba Board (tarefas)", "Visões", ks(CS, Key::B)),
             ViewWorktrees => ("view_worktrees", "Ir pra aba Worktrees", "Visões", ks(CS, Key::G)),
+            ViewChanges => ("view_changes", "Ir pra aba Changes (arquivos mudados e diff)", "Visões", ks(CA, Key::G)),
             ViewUsage => ("view_usage", "Ir pra aba Tokens (limites e custo)", "Visões", ks(CS, Key::U)),
             ViewSettings => ("view_settings", "Abrir configurações e atalhos", "Visões", ks(C, Key::Comma)),
             ViewHelp => ("view_help", "Abrir o manual", "Visões", ks(N, Key::F1)),
@@ -289,6 +292,7 @@ impl Action {
             ViewSessions => &["s"],
             ViewBoard => &["b"],
             ViewWorktrees => &["g"],
+            ViewChanges => &["G"],
             ViewUsage => &["u"],
             ViewSettings => &[","],
             NextView => &["n"],
