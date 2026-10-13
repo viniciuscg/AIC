@@ -261,7 +261,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
         session_menu(app, &resp, id);
     }
 
-    let term_focus = app.term_focus && is_focused && app.modal.is_none();
+    let term_focus = app.term_focus && is_focused && app.modal.is_none() && !app.layne.focus;
     let Some(rt) = app.sessions.get_mut(&id) else { return };
     if let Some(err) = rt.spawn_error.clone() {
         let mut child = ui.new_child(UiBuilder::new().max_rect(inner.shrink(16.0)));

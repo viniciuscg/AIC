@@ -24,19 +24,21 @@ pub enum View {
     Sessions,
     Board,
     Worktrees,
+    Changes,
     Usage,
     Settings,
     Help,
 }
 
 impl View {
-    pub const ALL: [View; 6] = [View::Sessions, View::Board, View::Worktrees, View::Usage, View::Settings, View::Help];
+    pub const ALL: [View; 7] = [View::Sessions, View::Board, View::Worktrees, View::Changes, View::Usage, View::Settings, View::Help];
 
     pub fn label(self) -> &'static str {
         match self {
             View::Sessions => "Sessões",
             View::Board => "Board",
             View::Worktrees => "Worktrees",
+            View::Changes => "Changes",
             View::Usage => "Tokens",
             View::Settings => "Config",
             View::Help => "Ajuda",
@@ -48,6 +50,7 @@ impl View {
             View::Sessions => ui::widgets::I_TERM,
             View::Board => ui::widgets::I_BOARD,
             View::Worktrees => ui::widgets::I_WORKTREE,
+            View::Changes => ui::widgets::I_DIFF,
             View::Usage => ui::widgets::I_CHART,
             View::Settings => ui::widgets::I_GEAR,
             View::Help => ui::widgets::I_HELP,
@@ -60,6 +63,7 @@ impl View {
             View::Sessions => Action::ViewSessions,
             View::Board => Action::ViewBoard,
             View::Worktrees => Action::ViewWorktrees,
+            View::Changes => Action::ViewChanges,
             View::Usage => Action::ViewUsage,
             View::Settings => Action::ViewSettings,
             View::Help => Action::ViewHelp,
@@ -122,6 +126,7 @@ pub struct App {
 
     pub board: ui::board::BoardState,
     pub worktrees: ui::worktrees::WorktreeState,
+    pub changes: ui::changes::ChangesState,
     pub settings: ui::settings::SettingsState,
     /// Menu da tecla líder aberto (caminho dentro da árvore de atalhos).
     pub leader: Option<ui::leader::LeaderState>,
@@ -134,6 +139,8 @@ pub struct App {
     pub connector: crate::connector::ConnectorState,
     /// Histórico de tokens/custo lido dos transcripts numa thread.
     pub usage_history: crate::usage_history::UsageHistory,
+    /// O assistente (painel à direita, sessão sempre aberta).
+    pub layne: crate::layne::LayneState,
 
     pub account: Option<StatusSnapshot>,
     pub md_cache: egui_commonmark::CommonMarkCache,
@@ -202,6 +209,7 @@ impl App {
             window_focused: true,
             board: Default::default(),
             worktrees: Default::default(),
+            changes: Default::default(),
             settings: Default::default(),
             leader: None,
             prefix_pending: false,
@@ -209,6 +217,7 @@ impl App {
             notion: Default::default(),
             connector: Default::default(),
             usage_history: crate::usage_history::UsageHistory::start(ctx),
+            layne: Default::default(),
             account: StatusSnapshot::latest(),
             md_cache: Default::default(),
             account_at: None,
@@ -223,6 +232,7 @@ impl App {
             pending_restore: had_cache && !fresh,
         };
         app.reload_tasks();
+        aic_core::inbox::mark_running();
         if !needs_setup {
             app.enter_main(ctx);
         }
@@ -242,8 +252,11 @@ impl App {
 
     pub fn start_fresh(&mut self, _ctx: &Context) {
         let _ = self.store.clear_cache();
-        // sessões que sobraram rodando no tmux de uma vez anterior
-        crate::tmux::kill_all();
+        // sessões que sobraram rodando no tmux de uma vez anterior (sem o módulo, o servidor
+        // não é nosso: os testes rodam com tmux desligado e não podem derrubar o AIC aberto)
+        if self.cfg.on(aic_core::Module::Tmux) {
+            crate::tmux::kill_all();
+        }
         self.blocks.clear();
         let ws = Workspace::new("Principal");
         let _ = self.store.save_workspace(&ws);
@@ -286,6 +299,13 @@ impl App {
         } else {
             self.toast(&format!("{count} sessões reabertas"), ToastKind::Ok);
         }
+    }
+
+    /// Id do próximo terminal (cada `TerminalBackend` tem o seu).
+    pub fn alloc_term_id(&mut self) -> u64 {
+        let id = self.next_term_id;
+        self.next_term_id += 1;
+        id
     }
 
     fn spawn(&mut self, ctx: &Context, rt: &mut Runtime) {
@@ -450,6 +470,7 @@ impl App {
                 bl.focused = Some(id);
             }
         }
+        self.layne.focus = false;
         if let Some(rt) = self.sessions.get_mut(&id) {
             rt.live.seen();
             rt.unseen = false;
@@ -915,7 +936,10 @@ impl App {
                 let target = e.aic_session.filter(|id| self.sessions.contains_key(id)).or_else(|| {
                     self.sessions.values().find(|r| r.s.claude_session.to_string() == e.claude_session).map(|r| r.s.id)
                 });
-                let Some(id) = target else { continue };
+                let Some(id) = target else {
+                    crate::layne::on_event(self, &e);
+                    continue;
+                };
                 let effect = self.sessions.get_mut(&id).and_then(|rt| rt.live.apply(&e));
                 if let Some(effect) = effect {
                     self.on_effect(id, effect);
@@ -950,6 +974,7 @@ impl App {
 
         self.usage_history.poll();
         crate::connector::poll(self, ctx);
+        crate::layne::tick(self, ctx);
         self.toasts.retain(|t| t.until > Instant::now());
 
         if self.fonts_dirty {
@@ -1133,7 +1158,12 @@ impl App {
                 self.toast(&format!("Visualização: {} — {}", self.cfg.view.label(), self.cfg.view.desc()), ToastKind::Info);
             }
             ToggleMaximize => self.maximized = !self.maximized,
-            ReleaseTerminal => self.term_focus = false,
+            ReleaseTerminal => {
+                self.term_focus = false;
+                self.layne.focus = false;
+            }
+            ToggleLayne => crate::layne::toggle(self, ctx),
+            LayneVoice => crate::layne::toggle_voice(self, ctx),
             QuickAdd => self.open_quick_add(None),
             LinkTaskToSession => {
                 if let Some(id) = self.focused() {
@@ -1163,6 +1193,7 @@ impl App {
             }
             ViewBoard => self.set_view(View::Board),
             ViewWorktrees => self.set_view(View::Worktrees),
+            ViewChanges => self.set_view(View::Changes),
             ViewUsage => self.set_view(View::Usage),
             ViewSettings => self.set_view(View::Settings),
             ViewHelp => self.set_view(View::Help),
@@ -1257,11 +1288,15 @@ impl App {
             let _ = self.store.mark_cache(true);
         } else {
             let _ = self.store.clear_cache();
-            crate::tmux::kill_all();
+            if self.cfg.on(aic_core::Module::Tmux) {
+                crate::tmux::kill_all();
+            }
         }
         let _ = self.cfg.save();
         let _ = self.keymap.save();
         self.quitting = true;
+        crate::layne::quit(self);
+        aic_core::inbox::clear_running();
         for rt in self.sessions.values() {
             if let Some(t) = &rt.term {
                 t.kill();

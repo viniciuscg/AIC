@@ -32,12 +32,25 @@ pub struct ConnectorState {
     pending: HashSet<Id>,
     /// Resumo por tarefa (lido do `kv` uma vez).
     summaries: RefCell<HashMap<Id, Option<String>>>,
+    /// "Abrir card" sem diálogo, pedido pelo `aic card --auto` (Layne): busca → monta o bloco.
+    auto: Vec<AutoOpen>,
+}
+
+/// Uma abertura automática em andamento.
+struct AutoOpen {
+    rx: Receiver<FetchResult>,
+    /// Repos escolhidos por quem pediu (vazio = os sugeridos pelo card).
+    repos: Vec<String>,
+    /// Workspace onde montar (o atual na hora do pedido).
+    ws: Option<Id>,
+    /// Id do pedido na caixa de entrada (pra responder).
+    reply: String,
 }
 
 impl Default for ConnectorState {
     fn default() -> Self {
         let (tx, rx) = channel();
-        Self { tx, rx, ctx: None, pending: HashSet::new(), summaries: RefCell::new(HashMap::new()) }
+        Self { tx, rx, ctx: None, pending: HashSet::new(), summaries: RefCell::new(HashMap::new()), auto: Vec::new() }
     }
 }
 
@@ -95,6 +108,90 @@ pub fn poll(app: &mut App, ctx: &Context) {
             }
             Err(e) => app.toast(&format!("Buscar card: {e}"), ToastKind::Err),
         }
+    }
+    poll_auto(app, ctx);
+}
+
+// ───────────────────────── abrir card sem diálogo (Layne / CLI) ─────────────────────────
+
+/// Valida o link do card; `Err` com a mensagem pro usuário.
+fn check_link(app: &App, input: &str) -> Result<(), String> {
+    if input.is_empty() {
+        Err("passe o link do card ou a chave (ex: DEV-123)".into())
+    } else if matches!(card::card_ref(input), card::CardRef::Unknown) {
+        Err("não reconheci: passe um link do Notion ou uma chave tipo DEV-123".into())
+    } else if !app.cfg.on(Module::Launcher) {
+        Err("módulo \"Abrir card\" desligado (Config → Módulos)".into())
+    } else if !app.cfg.on(Module::Notion) {
+        Err("módulo Notion desligado (Config → Módulos)".into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Abre o diálogo "Abrir card" com o link e já começa a buscar.
+pub fn open_card_prefilled(app: &mut App, ctx: &Context, link: &str) {
+    let mut f = OpenCardForm { link: link.trim().to_string(), ..Default::default() };
+    if app.cfg.on(Module::Launcher) {
+        start_fetch(app, ctx, &mut f);
+    }
+    app.modal = Some(Modal::OpenCard(f));
+}
+
+/// Busca o card e monta o bloco sem perguntar. A resposta (`reply`) sai quando terminar.
+pub fn open_card_auto(app: &mut App, ctx: &Context, link: &str, repos: Vec<String>, reply: String) -> Result<(), String> {
+    let input = link.trim().to_string();
+    check_link(app, &input)?;
+    let (tx, rx) = channel();
+    let label = format!("Buscando {} {}…", card::ref_label(&input), via(app));
+    spawn_fetch(app, input, Arc::new(AtomicBool::new(false)), Some(ctx.clone()), move |r| {
+        let _ = tx.send(r);
+    });
+    let ws = app.current_ws().map(|w| w.id);
+    app.connector.auto.push(AutoOpen { rx, repos, ws, reply });
+    app.toast(&label, ToastKind::Info);
+    Ok(())
+}
+
+fn poll_auto(app: &mut App, ctx: &Context) {
+    let mut i = 0;
+    while i < app.connector.auto.len() {
+        let r = match app.connector.auto[i].rx.try_recv() {
+            Ok(r) => r,
+            Err(TryRecvError::Empty) => {
+                i += 1;
+                continue;
+            }
+            Err(TryRecvError::Disconnected) => Err("a busca parou sem resposta".into()),
+        };
+        let job = app.connector.auto.remove(i);
+        let c = match r {
+            Ok(c) => c,
+            Err(e) => {
+                app.toast(&format!("Abrir card: {e}"), ToastKind::Err);
+                aic_core::inbox::reply(&job.reply, false, e);
+                continue;
+            }
+        };
+        if let Some(w) = job.ws.and_then(|id| app.workspaces.iter().position(|w| w.id == id)) {
+            app.switch_ws(w);
+        }
+        let all = app.cfg.repo_paths();
+        let wanted = if job.repos.is_empty() { c.repos.clone() } else { job.repos.clone() };
+        let picks: Vec<(String, PathBuf)> = wanted.iter().filter_map(|n| all.iter().find(|(r, _)| r == n || r.starts_with(n.as_str())).cloned()).collect();
+        let missing: Vec<&String> = wanted.iter().filter(|n| !all.iter().any(|(r, _)| r == *n || r.starts_with(n.as_str()))).collect();
+        let opts = CreateOptions { worktree: app.cfg.on(Module::Worktrees), notes: app.cfg.on(Module::Notes), ..Default::default() };
+        launch(app, ctx, &c, picks.clone(), &opts);
+        let key = c.key.clone().unwrap_or_else(|| c.title.clone());
+        let mut msg = if picks.is_empty() {
+            format!("bloco do card {key} montado sem repos (nenhum sugerido); abra sessões com `aic session --repo`")
+        } else {
+            format!("bloco do card {key} montado com {}", picks.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", "))
+        };
+        if !missing.is_empty() {
+            msg.push_str(&format!(" (não achei: {})", missing.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
+        }
+        aic_core::inbox::reply(&job.reply, true, msg);
     }
 }
 

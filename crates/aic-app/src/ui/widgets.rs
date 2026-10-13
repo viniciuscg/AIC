@@ -20,6 +20,7 @@ pub const I_TASK: &str = "\u{f0ae}";
 pub const I_SLACK: &str = "\u{f198}";
 pub const I_NOTION: &str = "\u{f0ff9}";
 pub const I_WORKTREE: &str = "\u{f126}";
+pub const I_DIFF: &str = "\u{f440}";
 pub const I_CLOCK: &str = "\u{f017}";
 pub const I_PLUS: &str = "\u{f067}";
 pub const I_KEY: &str = "\u{f11c}";

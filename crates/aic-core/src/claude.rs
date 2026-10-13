@@ -112,6 +112,45 @@ pub fn find_transcript(cwd: &Path, session_id: &str) -> Option<PathBuf> {
         .find(|p| p.exists())
 }
 
+/// Config global do Claude Code (`~/.claude.json`, ou dentro do `CLAUDE_CONFIG_DIR`).
+fn global_config_path() -> PathBuf {
+    match std::env::var_os("CLAUDE_CONFIG_DIR") {
+        Some(d) => PathBuf::from(d).join(".claude.json"),
+        None => paths::home_dir().join(".claude.json"),
+    }
+}
+
+/// Marca a pasta como confiável no Claude Code, como se o usuário tivesse respondido "Yes, I
+/// trust this folder". Serve pras pastas que o próprio AIC cria (a do Layne): sem isso o Claude
+/// abre parado na pergunta. Só escreve se a pasta (ou uma acima dela) ainda não for confiável.
+pub fn ensure_trusted(dir: &Path) -> anyhow::Result<()> {
+    let path = global_config_path();
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".into());
+    let mut v: Value = serde_json::from_str(&text)?;
+    let trusted = |v: &Value, d: &Path| v.pointer("/projects").and_then(|p| p.get(d.to_string_lossy().as_ref())).and_then(|p| p.get("hasTrustDialogAccepted")).and_then(Value::as_bool) == Some(true);
+    if dir.ancestors().any(|d| trusted(&v, d)) {
+        return Ok(());
+    }
+    let root = v.as_object_mut().ok_or_else(|| anyhow::anyhow!("{} não é um objeto", path.display()))?;
+    let projects = root.entry("projects").or_insert_with(|| Value::Object(Default::default()));
+    let entry = projects
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("projects não é um objeto"))?
+        .entry(dir.to_string_lossy().to_string())
+        .or_insert_with(|| Value::Object(Default::default()));
+    if let Some(o) = entry.as_object_mut() {
+        o.insert("hasTrustDialogAccepted".into(), Value::Bool(true));
+    }
+    // grava num temporário e renomeia: o Claude Code lê esse arquivo o tempo todo
+    let tmp = path.with_extension(format!("json.aic-{}", std::process::id()));
+    std::fs::write(&tmp, serde_json::to_string_pretty(&v)?)?;
+    if let Ok(m) = std::fs::metadata(&path) {
+        let _ = std::fs::set_permissions(&tmp, m.permissions());
+    }
+    std::fs::rename(&tmp, &path)?;
+    Ok(())
+}
+
 /// Onde ficam o plugin e o settings que o AIC injeta nas sessões.
 #[derive(Debug, Clone)]
 pub struct Injection {

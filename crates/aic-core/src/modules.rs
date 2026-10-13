@@ -15,6 +15,8 @@ pub enum Module {
     Notes,
     /// Aba de worktrees e worktree por sessão.
     Worktrees,
+    /// Aba Changes: arquivos mudados e diff do repo, como o "Source Control" do VS Code.
+    Changes,
     /// Aba de tokens, limites e histórico de custo.
     Usage,
     /// Cards do Notion no board e no bloco.
@@ -39,6 +41,8 @@ pub enum Module {
     Statusbar,
     /// Dicas de atalho (tecla líder + barra de dicas).
     Hints,
+    /// Layne: assistente pessoal (um Claude sempre aberto, por texto ou voz) que mexe no AIC por você.
+    Layne,
 }
 
 pub struct ModuleInfo {
@@ -58,9 +62,11 @@ pub const ALL: &[ModuleInfo] = &[
     ModuleInfo { module: Tmux, id: "tmux", name: "Persistência (tmux)", desc: "Terminais rodam num servidor tmux próprio do AIC: fechar a janela não mata nada, e ao abrir ele reconecta.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Workspaces, id: "workspaces", name: "Workspaces", desc: "Vários contextos de trabalho, cada um com seus blocos e layout.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Launcher, id: "launcher", name: "Abrir card", desc: "Cola o link do card e o AIC monta o bloco: worktrees, um Claude por repo, shell e notas.", group: "Sessões", default: true, requires: &[] },
+    ModuleInfo { module: Layne, id: "layne", name: "Layne (assistente)", desc: "Um Claude sempre aberto no painel lateral: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Board, id: "board", name: "Board de tarefas", desc: "Kanban com tarefas locais e cards, captura rápida com marcadores (#repo @hoje !alta).", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Notes, id: "notes", name: "Notas", desc: "Anotações em Markdown por bloco, salvas junto do bloco.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Worktrees, id: "worktrees", name: "Worktrees", desc: "Aba de worktrees e opção de isolar cada sessão num worktree.", group: "Organização", default: true, requires: &[] },
+    ModuleInfo { module: Changes, id: "changes", name: "Changes", desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Usage, id: "usage", name: "Tokens e custo", desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Notion, id: "notion", name: "Notion", desc: "Cards do Notion no board e no bloco (via Claude Code ou token).", group: "Integrações", default: true, requires: &[] },
     ModuleInfo { module: Slack, id: "slack", name: "Slack", desc: "Threads do Slack vinculadas a tarefas e blocos (via Claude Code).", group: "Integrações", default: true, requires: &[] },

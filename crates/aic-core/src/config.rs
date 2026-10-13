@@ -84,6 +84,7 @@ pub struct Config {
     pub animations: bool,
     pub notion: NotionConfig,
     pub slack: SlackConfig,
+    pub layne: LayneConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -202,6 +203,99 @@ pub struct SlackConfig {
     pub workspace_url: Option<String>,
 }
 
+/// Layne: o assistente pessoal (módulo `layne`). Um Claude com o agente `aic:layne`, sempre aberto.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct LayneConfig {
+    /// Sobe a sessão junto com o app (senão, na primeira vez que o painel abre).
+    pub auto_start: bool,
+    /// Modelo do Claude (`--model`). Vazio = o padrão da conta.
+    pub model: Option<String>,
+    /// Largura do painel lateral (px).
+    pub width: f32,
+    pub voice: VoiceConfig,
+}
+
+impl Default for LayneConfig {
+    fn default() -> Self {
+        Self { auto_start: true, model: None, width: 480.0, voice: VoiceConfig::default() }
+    }
+}
+
+/// Quem transforma o áudio em texto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Transcriber {
+    /// whisper.cpp local (`whisper-cli`): nada sai da máquina.
+    #[default]
+    WhisperCpp,
+    /// API compatível com a da OpenAI (`/audio/transcriptions`): OpenAI, Groq…
+    Api,
+    /// Um comando seu: `{file}` vira o caminho do .wav, `{lang}` o idioma; o stdout é o texto.
+    Command,
+}
+
+impl Transcriber {
+    pub const ALL: [Transcriber; 3] = [Self::WhisperCpp, Self::Api, Self::Command];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::WhisperCpp => "whisper.cpp (local)",
+            Self::Api => "API (OpenAI, Groq…)",
+            Self::Command => "comando próprio",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct VoiceConfig {
+    /// Fonte do PulseAudio/PipeWire (`pactl list short sources`). Vazio = o microfone padrão do sistema.
+    pub mic: Option<String>,
+    pub transcriber: Transcriber,
+    /// Idioma falado (código ISO: `pt`, `en`). Vazio = detectar.
+    pub language: String,
+    /// Binário do whisper.cpp.
+    pub whisper_bin: String,
+    /// Modelo `ggml-*.bin` do whisper.cpp. Vazio = `~/.local/share/aic/whisper/ggml-small.bin`.
+    pub whisper_model: Option<PathBuf>,
+    /// Endpoint de transcrição (formato da OpenAI).
+    pub api_url: String,
+    pub api_model: String,
+    /// Variável de ambiente com a chave (fica no `~/.config/aic/.env`, nunca no config.toml).
+    pub api_key_env: String,
+    /// Comando próprio (transcriber = command).
+    pub command: String,
+    /// Manda a mensagem sozinho depois de transcrever (senão só cola e espera o Enter).
+    pub auto_send: bool,
+    /// Limite de uma gravação (s).
+    pub max_seconds: u32,
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            mic: None,
+            transcriber: Transcriber::WhisperCpp,
+            language: "pt".into(),
+            whisper_bin: "whisper-cli".into(),
+            whisper_model: None,
+            api_url: "https://api.openai.com/v1/audio/transcriptions".into(),
+            api_model: "gpt-4o-mini-transcribe".into(),
+            api_key_env: "OPENAI_API_KEY".into(),
+            command: String::new(),
+            auto_send: true,
+            max_seconds: 300,
+        }
+    }
+}
+
+impl VoiceConfig {
+    pub fn model_path(&self) -> PathBuf {
+        self.whisper_model.clone().unwrap_or_else(|| paths::data_dir().join("whisper/ggml-small.bin"))
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -222,6 +316,7 @@ impl Default for Config {
             animations: true,
             notion: NotionConfig::default(),
             slack: SlackConfig::default(),
+            layne: LayneConfig::default(),
         }
     }
 }

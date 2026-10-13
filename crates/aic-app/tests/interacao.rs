@@ -33,7 +33,7 @@ fn sandbox(name: &str, extra_config: &str) -> PathBuf {
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
     }
     let cfg = format!(
-        "setup_done = true\nanimations = false\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nsound = false\nnotifications = false\n",
+        "setup_done = true\nanimations = false\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nlayne = false\nsound = false\nnotifications = false\n",
         dir.join("repos").display()
     );
     std::fs::write(dir.join("config/config.toml"), cfg).unwrap();
@@ -711,5 +711,55 @@ fn tecla_lider() {
     frames(&mut h, 3);
     h.render().expect("render").save(out.join("lider-sessoes.png")).unwrap();
 
+    kill_all(&mut h);
+}
+
+/// O `aic` de linha de comando (Layne) pede ao app aberto pela caixa de entrada.
+#[test]
+fn caixa_de_entrada_do_layne() {
+    use aic_core::inbox::{self, Command};
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = sandbox("inbox", "");
+    std::fs::create_dir_all(dir.join("repos/api/.git")).unwrap();
+    let mut h = harness([1400.0, 900.0]);
+    assert!(inbox::app_running(), "o app marca que está aberto");
+
+    let id = inbox::send(Command::NewWorkspace { name: "Pessoal".into(), switch: false }).unwrap();
+    wait_until(&mut h, "workspace criado", |a| a.workspaces.iter().any(|w| w.name == "Pessoal"));
+    let r = inbox::wait_reply(&id, Duration::from_secs(2)).expect("resposta");
+    assert!(r.ok, "{}", r.message);
+    assert_eq!(app(&mut h).current_ws().unwrap().name, "Principal", "sem --go fica onde estava");
+
+    let id = inbox::send(Command::GotoWorkspace { name: "pess".into() }).unwrap();
+    wait_until(&mut h, "trocar de workspace", |a| a.current_ws().is_some_and(|w| w.name == "Pessoal"));
+    assert!(inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok);
+
+    let id = inbox::send(Command::GotoWorkspace { name: "nada".into() }).unwrap();
+    frames(&mut h, 2);
+    std::thread::sleep(Duration::from_millis(350));
+    frames(&mut h, 2);
+    assert!(!inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok, "workspace inexistente é erro");
+
+    let id = inbox::send(Command::NewSession {
+        workspace: Some("Trabalho".into()),
+        name: None,
+        repo: Some("ap".into()),
+        cwd: None,
+        shell: true,
+        branch: None,
+        prompt: None,
+        task: None,
+    })
+    .unwrap();
+    wait_until(&mut h, "sessão aberta", |a| a.sessions.values().any(|r| r.s.name == "api (shell)"));
+    let r = inbox::wait_reply(&id, Duration::from_secs(2)).unwrap();
+    assert!(r.ok && r.message.contains("Trabalho"), "{}", r.message);
+    assert_eq!(app(&mut h).current_ws().unwrap().name, "Trabalho", "workspace criado e aberto");
+
+    let id = inbox::send(Command::NewSession { workspace: None, name: None, repo: Some("naoexiste".into()), cwd: None, shell: true, branch: None, prompt: None, task: None }).unwrap();
+    frames(&mut h, 2);
+    std::thread::sleep(Duration::from_millis(350));
+    frames(&mut h, 2);
+    assert!(!inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok, "repo inexistente é erro");
     kill_all(&mut h);
 }

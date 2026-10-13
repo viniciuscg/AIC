@@ -72,6 +72,28 @@ Uma linha, no espírito do i3bar:
 - **abas** com a tecla do prefixo de cada uma (`s Sessões`, `b Board`…);
 - à direita, em blocos: quem está aguardando, quem está trabalhando, custo de hoje, limites de 5h e da semana, e o relógio.
 
+## Layne (assistente)
+
+O Layne é um Claude sempre aberto num painel à direita (`Ctrl+B L` ou `Ctrl+Alt+L`). Você pede em português, digitando ou falando, e ele mexe no AIC por você: cria workspaces, anota tarefas, abre sessões do Claude num repo ou worktree com a primeira mensagem já escrita, abre um card do Notion montando o bloco.
+
+> "cria um workspace pessoal e anota pra eu lembrar: renovar a CNH sexta, comprar ração"
+> "abre uma sessão com o card DEV-142 no projeto api"
+
+- **Voz**: `Ctrl+B m` (ou `Ctrl+Alt+V`, ou o microfone no painel) começa a gravar; de novo para, transcreve e manda. `Esc` no painel descarta. Fora do app, `aic voz` faz o mesmo (bom pra um atalho do i3: `bindsym $mod+v exec aic voz`).
+- **Microfone e transcrição**: em Config → Layne. Escolha o mic da lista (ou o padrão do sistema) e quem transcreve: **whisper.cpp** local (nada sai da máquina; precisa do `whisper-cli` e de um modelo `ggml-*.bin`), uma **API** no formato da OpenAI (OpenAI ou Groq; chave no `~/.config/aic/.env`) ou um **comando seu** (`{file}` e `{lang}`).
+- **A conversa continua**: a sessão tem id fixo e volta com `--resume`. "Conversa nova" (Config → Layne) começa outra.
+- **Como ele opera**: pelo `aic` de linha de comando (agente `aic:layne` + skill `aic:layne` do plugin), que pede ao app aberto por uma caixa de entrada em `~/.local/state/aic/inbox/`. Os mesmos comandos servem pra você ou pra scripts:
+
+```bash
+aic ws new 'Pessoal' --go              # cria workspace (e vai pra ele)
+aic ws go pess                          # troca (nome ou começo)
+aic add --ws Pessoal 'renovar CNH @sexta'
+aic session --repo api --branch fix/juros -- 'corrija o cálculo de juros'
+aic card DEV-142 --auto --repos api     # monta o bloco sem perguntar
+aic sessions | aic ws ls | aic repos    # o que está aberto
+aic layne --send 'o que tenho pra hoje?'
+```
+
 ## Workspaces
 
 Um workspace é um contexto inteiro: blocos, terminais, layout e tarefas. O que aparece na tela é sempre só o do workspace aceso na barra, inclusive o board e a paleta. Para ver outra coisa, troque de workspace: **Ctrl+B 1..9**, **Ctrl+B ( )**, **Ctrl+B Tab** pra voltar pro anterior, ou clique na barra.
