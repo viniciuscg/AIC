@@ -32,6 +32,8 @@ struct ViewState {
     dragging: bool,
     scroll_px: f32,
     mouse_point: Option<Point>,
+    /// Último ponto reportado em movimento (evita mandar o mesmo ponto várias vezes).
+    motion_point: Option<Point>,
 }
 
 pub struct TerminalView<'a> {
@@ -177,6 +179,9 @@ impl<'a> TerminalView<'a> {
         if !hovered {
             return;
         }
+        // A roda sobre o terminal é do terminal: zera o delta pra ScrollArea em volta
+        // (lista de blocos) não rolar a tela junto.
+        ui.ctx().input_mut(|i| i.smooth_scroll_delta = Vec2::ZERO);
 
         let events = ui.input(|i| i.events.clone());
         let mods = ui.input(|i| i.modifiers);
@@ -216,6 +221,8 @@ impl<'a> TerminalView<'a> {
                         if let Some(p) = state.mouse_point {
                             self.backend.mouse_report(0, p, pressed);
                         }
+                        state.dragging = pressed;
+                        state.motion_point = state.mouse_point;
                     } else if pressed {
                         if modifiers.command && self.backend.hovered_link.is_some() {
                             self.backend.open_hovered_link();
@@ -238,6 +245,21 @@ impl<'a> TerminalView<'a> {
                     }
                 }
                 egui::Event::PointerMoved(pos) => {
+                    // Arrastar com o programa pedindo mouse (Claude Code em tela cheia, tmux):
+                    // manda o movimento, senão ele só vê clique e soltura e não seleciona nada.
+                    if mouse_mode && !mods.shift {
+                        let report = if state.dragging {
+                            mode.intersects(TermMode::MOUSE_DRAG | TermMode::MOUSE_MOTION).then_some(32)
+                        } else {
+                            mode.contains(TermMode::MOUSE_MOTION).then_some(35)
+                        };
+                        if let (Some(btn), Some(p)) = (report, state.mouse_point) {
+                            if state.motion_point != Some(p) {
+                                state.motion_point = Some(p);
+                                self.backend.mouse_report(btn, p, true);
+                            }
+                        }
+                    }
                     if state.dragging && !mouse_mode {
                         let rel = pos - inner.min;
                         self.backend.select_update(rel.x, rel.y);
