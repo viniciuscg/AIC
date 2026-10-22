@@ -4,12 +4,10 @@ pub mod actions;
 pub mod app;
 pub mod brand;
 pub mod cli;
-pub mod connector;
 pub mod sounds;
 pub mod injection;
 pub mod layne;
 pub mod notify;
-pub mod notion_ui;
 pub mod session;
 pub mod theme;
 pub mod tmux;
@@ -23,7 +21,6 @@ pub struct AicApp(pub App);
 
 impl eframe::App for AicApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        crate::notion_ui::tick(&mut self.0);
         ui::draw(&mut self.0, ui);
     }
 

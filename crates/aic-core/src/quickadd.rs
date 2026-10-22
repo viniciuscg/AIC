@@ -10,7 +10,7 @@
 //! | `@hoje` `@sexta` `@12/10` | prazo                        |
 //! | `!alta` `!!` `!!!` `!baixa` | prioridade                 |
 //! | `+workspace`    | workspace (por prefixo do nome)        |
-//! | `^DEV-142`     | card do Notion                         |
+//! | `^DEV-142`     | chave do card (vira nome de branch)    |
 //! | `~tag`          | etiqueta livre                         |
 //!
 //! Marcadores podem estar em qualquer posição; o resto é o título.

@@ -16,7 +16,7 @@ use aic_core::{Module, paths};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Action {
     // Foco
-    /// Fecha o que está em foco: terminal, bloco vazio, cartão aberto ou a aba atual.
+    /// Fecha o que está em foco: terminal, bloco vazio ou a aba atual.
     CloseFocused,
     // Sessões
     NewSession,
@@ -48,12 +48,10 @@ pub enum Action {
     MoveBlockUp,
     MoveBlockDown,
     FocusNotes,
-    OpenCard,
     ToggleMaximize,
     ReleaseTerminal,
     // Tarefas
     QuickAdd,
-    LinkTaskToSession,
     // Workspaces
     Workspaces,
     NewWorkspace,
@@ -66,7 +64,6 @@ pub enum Action {
     RenameWorkspace,
     // Visões
     ViewSessions,
-    ViewBoard,
     ViewWorktrees,
     ViewChanges,
     ViewUsage,
@@ -113,12 +110,12 @@ impl Action {
         v.extend((1..=9).map(Goto));
         v.extend([
             ToggleLayout, CycleView, ToggleMaximize, ReleaseTerminal, NewBlock, CloseBlock, RenameBlock, CycleSplit, ToggleBlockSide,
-            CollapseBlock, MoveBlockUp, MoveBlockDown, FocusNotes, OpenCard, QuickAdd, LinkTaskToSession, Workspaces, NewWorkspace,
+            CollapseBlock, MoveBlockUp, MoveBlockDown, FocusNotes, QuickAdd, Workspaces, NewWorkspace,
             NextWorkspace, PrevWorkspace,
         ]);
         v.extend((1..=9).map(GotoWorkspace));
         v.extend([
-            LastWorkspace, RenameWorkspace, ViewSessions, ViewBoard, ViewWorktrees, ViewChanges, ViewUsage, ViewSettings, ViewHelp, NextView, PrevView,
+            LastWorkspace, RenameWorkspace, ViewSessions, ViewWorktrees, ViewChanges, ViewUsage, ViewSettings, ViewHelp, NextView, PrevView,
             SearchSettings, Catalog, Palette, ZoomIn, ZoomOut, ZoomReset, ToggleSidebar, ToggleHints, Quit,
         ]);
         v
@@ -128,13 +125,12 @@ impl Action {
     pub fn module(self) -> Option<Module> {
         use Action::*;
         match self {
-            QuickAdd | LinkTaskToSession | SendContext | ViewBoard => Some(Module::Board),
+            QuickAdd | SendContext => Some(Module::Tasks),
             ViewWorktrees => Some(Module::Worktrees),
             ViewChanges => Some(Module::Changes),
             ViewUsage => Some(Module::Usage),
             Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_) | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
             FocusNotes => Some(Module::Notes),
-            OpenCard => Some(Module::Launcher),
             ToggleLayne | LayneVoice => Some(Module::Layne),
             ToggleHints | Catalog => Some(Module::Hints),
             _ => None,
@@ -149,7 +145,7 @@ impl Action {
     pub fn meta(self) -> Meta {
         use Action::*;
         let (id, name, group, default) = match self {
-            CloseFocused => ("close_focused", "Fechar o que está em foco (terminal, bloco vazio, cartão aberto ou a aba)", "Foco", None),
+            CloseFocused => ("close_focused", "Fechar o que está em foco (terminal, bloco vazio ou a aba)", "Foco", None),
             NewSession => ("new_session", "Novo Claude no bloco atual (escolhe pasta/worktree)", "Sessões", ks(CS, Key::N)),
             ToggleLayne => ("toggle_layne", "Layne: abrir/fechar o assistente (ou pegar o teclado dele)", "Layne", ks(CA, Key::L)),
             LayneVoice => ("layne_voice", "Layne: falar (grava; de novo para e manda)", "Layne", ks(CA, Key::V)),
@@ -197,9 +193,7 @@ impl Action {
             MoveBlockUp => ("move_block_up", "Subir o bloco na lista", "Blocos", ks(CA, Key::ArrowUp)),
             MoveBlockDown => ("move_block_down", "Descer o bloco na lista", "Blocos", ks(CA, Key::ArrowDown)),
             FocusNotes => ("focus_notes", "Escrever nas notas do bloco", "Blocos", ks(CS, Key::E)),
-            OpenCard => ("open_card", "Abrir card (link → bloco montado com worktrees e Claudes)", "Blocos", ks(CS, Key::J)),
             QuickAdd => ("quick_add", "Nova tarefa (captura rápida)", "Tarefas", ks(CS, Key::Space)),
-            LinkTaskToSession => ("link_task", "Vincular uma tarefa ao terminal em foco", "Tarefas", ks(CS, Key::K)),
             Workspaces => ("workspaces", "Trocar de workspace", "Workspaces", ks(CS, Key::O)),
             NewWorkspace => ("new_workspace", "Criar workspace", "Workspaces", ks(CA, Key::O)),
             NextWorkspace => ("next_workspace", "Ir pro próximo workspace", "Workspaces", ks(CS, Key::PageDown)),
@@ -224,13 +218,12 @@ impl Action {
             LastWorkspace => ("last_workspace", "Voltar pro workspace anterior (vai e volta)", "Workspaces", None),
             RenameWorkspace => ("rename_workspace", "Renomear o workspace atual", "Workspaces", None),
             ViewSessions => ("view_sessions", "Ir pra aba Sessões", "Visões", ks(CS, Key::S)),
-            ViewBoard => ("view_board", "Ir pra aba Board (tarefas)", "Visões", ks(CS, Key::B)),
             ViewWorktrees => ("view_worktrees", "Ir pra aba Worktrees", "Visões", ks(CS, Key::G)),
             ViewChanges => ("view_changes", "Ir pra aba Changes (arquivos mudados e diff)", "Visões", ks(CA, Key::G)),
             ViewUsage => ("view_usage", "Ir pra aba Tokens (limites e custo)", "Visões", ks(CS, Key::U)),
             ViewSettings => ("view_settings", "Abrir configurações e atalhos", "Visões", ks(C, Key::Comma)),
             ViewHelp => ("view_help", "Abrir o manual", "Visões", ks(N, Key::F1)),
-            NextView => ("next_view", "Próxima aba da barra (Sessões → Board → Worktrees → …)", "Visões", ks(C, Key::Tab)),
+            NextView => ("next_view", "Próxima aba da barra (Sessões → Worktrees → …)", "Visões", ks(C, Key::Tab)),
             PrevView => ("prev_view", "Aba anterior da barra", "Visões", ks(CS, Key::Tab)),
             SearchSettings => ("search_settings", "Pesquisar nas configurações", "Visões", None),
             Catalog => ("catalog", "Catálogo de atalhos (o mesmo da tecla líder)", "Visões", None),
@@ -275,9 +268,7 @@ impl Action {
             ToggleBlockSide => &["i"],
             CollapseBlock => &["-"],
             FocusNotes => &["e"],
-            OpenCard => &["C"],
             QuickAdd => &["t"],
-            LinkTaskToSession => &["T"],
             SendContext => &["K"],
             Workspaces => &["w"],
             NewWorkspace => &["W"],
@@ -290,7 +281,6 @@ impl Action {
             LastWorkspace => &["Tab"],
             RenameWorkspace => &["$"],
             ViewSessions => &["s"],
-            ViewBoard => &["b"],
             ViewWorktrees => &["g"],
             ViewChanges => &["G"],
             ViewUsage => &["u"],
@@ -343,21 +333,6 @@ pub const CONTEXT_KEYS: &[(&str, &str, &str)] = &[
     ("Tecla líder", "letra", "Entra no grupo / roda a ação"),
     ("Tecla líder", "Backspace", "Volta um nível"),
     ("Tecla líder", "Esc", "Fecha o menu"),
-    ("Board", "j / k  ou  ↓ / ↑", "Navegar entre cartões"),
-    ("Board", "h / l  ou  ← / →", "Navegar entre colunas"),
-    ("Board", "Shift+H / Shift+L", "Mover o cartão de coluna"),
-    ("Board", "Enter", "Abrir/criar a sessão da tarefa (no worktree certo)"),
-    ("Board", "e", "Editar o título da tarefa"),
-    ("Board", "x", "Concluir / reabrir"),
-    ("Board", "d", "Arquivar"),
-    ("Board", "Delete", "Apagar (pede confirmação)"),
-    ("Board", "Space", "Marcar várias"),
-    ("Board", "t  ou  n", "Nova tarefa nesta coluna"),
-    ("Board", "Shift+P", "Promover pro Notion"),
-    ("Board", "1 / 2 / 3", "Filtro: Tudo / Notion / Minhas"),
-    ("Board", "/", "Buscar"),
-    ("Board", "Esc", "Fechar o editor / desmarcar"),
-    ("Editor de tarefa", "Tab", "Nova subtarefa a partir da linha"),
     ("Captura rápida", "#repo @hoje !alta +workspace ^DEV-1 ~tag", "Marcadores inline"),
     ("Captura rápida", "Enter / Esc", "Criar / cancelar"),
     ("Captura rápida", "Alt+L", "Vincular (ou não) ao terminal em foco"),

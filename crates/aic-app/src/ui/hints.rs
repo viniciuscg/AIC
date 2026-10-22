@@ -71,20 +71,13 @@ pub fn context(app: &App) -> Vec<(String, &'static str)> {
             act(&mut v, Action::ToggleMaximize, "maximizar");
         }
         View::Sessions => {
-            if app.cfg.on(aic_core::Module::Board) {
+            if app.cfg.on(aic_core::Module::Tasks) {
                 v.push(("t".into(), "nova tarefa"));
             }
             v.push(("clique no terminal".into(), "digitar"));
             act(&mut v, Action::NewSession, "Claude");
             act(&mut v, Action::NextView, "aba");
             v.push(("Alt+1-9".into(), "bloco"));
-        }
-        View::Board => {
-            for (keys, desc) in [("j/k", "mover"), ("h/l", "coluna"), ("Shift+H/L", "mover cartão"), ("Enter", "abrir"), ("e", "editar"), ("x", "concluir"), ("t", "nova"), ("/", "buscar")] {
-                v.push((keys.into(), desc));
-            }
-            act(&mut v, Action::CloseFocused, "fechar");
-            act(&mut v, Action::NextView, "aba");
         }
         View::Worktrees => {
             for (keys, desc) in [("j/k", "escolher"), ("Enter", "abrir sessão"), ("n", "novo"), ("Delete", "remover"), ("r", "atualizar")] {

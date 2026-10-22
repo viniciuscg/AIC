@@ -1,5 +1,5 @@
 //! Visualizações por bloco:
-//! - **Blocos**: um bloco embaixo do outro, cada um com seus terminais, card, notas e tarefas;
+//! - **Blocos**: um bloco embaixo do outro, cada um com seus terminais e tarefas;
 //! - **Abas**: um bloco por aba, terminais divididos (o jeito tmux).
 
 use egui::{Align, Color32, CursorIcon, FontId, Layout, Pos2, Rect, RichText, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2};
@@ -74,9 +74,6 @@ pub fn list(app: &mut App, ui: &mut Ui) {
             if ui.button(format!("{I_PLUS}  Novo bloco  ({})", app.keymap.label(Action::NewBlock))).clicked() {
                 app.run_action(ui.ctx(), Action::NewBlock);
             }
-            if app.cfg.on(Module::Launcher) && ui.button(format!("{I_TASK}  Abrir card  ({})", app.keymap.label(Action::OpenCard))).clicked() {
-                app.run_action(ui.ctx(), Action::OpenCard);
-            }
         });
     });
 }
@@ -124,7 +121,7 @@ fn block_section(app: &mut App, ui: &mut Ui, id: Id, index: usize, current: bool
     }
 }
 
-/// Cabeçalho do bloco: nome, card, estados dos terminais e ações (com o atalho na dica).
+/// Cabeçalho do bloco: nome, tarefa, estados dos terminais e ações (com o atalho na dica).
 fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, current: bool, collapsible: bool) {
     let Some(b) = app.blocks.get(&id).cloned() else { return };
     let theme = app.theme.clone();
@@ -165,8 +162,7 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
             _ => theme.accent_hi,
         };
         if widgets::chip(ui, label, color, &theme).on_hover_text(format!("{} · {}", task.title, task.status.label())).clicked() {
-            app.board.selected = Some(task.id);
-            app.set_view(crate::app::View::Board);
+            app.update_block(id, |b| b.side = true);
         }
     }
     // pontinho por terminal
@@ -188,7 +184,7 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::CloseBlock);
         }
-        if widgets::icon_button(ui, "◧", "Painel do bloco", &app.keymap.tip(Action::ToggleBlockSide, "Painel do bloco: card, notas, tarefas")).clicked() {
+        if widgets::icon_button(ui, "◧", "Painel do bloco", &app.keymap.tip(Action::ToggleBlockSide, "Painel do bloco: notas, tarefas")).clicked() {
             app.update_block(id, |b| b.side = !b.side);
         }
         if ui.small_button(format!("⊞ {}", b.split.label())).on_hover_text(app.keymap.tip(Action::CycleSplit, "Arranjo dos terminais")).clicked() {
@@ -211,11 +207,6 @@ fn block_menu(app: &mut App, resp: &egui::Response, id: Id) {
             app.focus_block(id);
             let name = app.blocks.get(&id).map(|b| b.name.clone()).unwrap_or_default();
             app.modal = Some(super::modals::Modal::RenameBlock { id, text: name, first: true });
-            ui.close();
-        }
-        if app.cfg.on(Module::Board) && ui.button(format!("Vincular tarefa/card  ({})", app.keymap.label(Action::LinkTaskToSession))).clicked() {
-            app.focus_block(id);
-            app.run_action(ui.ctx(), Action::LinkTaskToSession);
             ui.close();
         }
         ui.menu_button("Arranjo", |ui| {
@@ -294,12 +285,11 @@ fn empty_block(app: &mut App, ui: &mut Ui, id: Id, r: Rect) {
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 enum SideTab {
     #[default]
-    Card,
-    Notes,
     Tasks,
+    Notes,
 }
 
-/// Card / Notas / Tarefas do bloco.
+/// Tarefas / Notas do bloco.
 fn side_panel(app: &mut App, ui: &mut Ui, id: Id, r: Rect) {
     let theme = app.theme.clone();
     ui.painter().rect_filled(r, theme.radius(), theme.bg);
@@ -313,7 +303,7 @@ fn side_panel(app: &mut App, ui: &mut Ui, id: Id, r: Rect) {
         tab = SideTab::Notes;
     }
     ui.horizontal(|ui| {
-        for (t, label) in [(SideTab::Card, "Card"), (SideTab::Notes, "Notas"), (SideTab::Tasks, "Tarefas")] {
+        for (t, label) in [(SideTab::Tasks, "Tarefas"), (SideTab::Notes, "Notas")] {
             if (t != SideTab::Notes || app.cfg.on(Module::Notes)) && ui.selectable_label(tab == t, label).clicked() {
                 tab = t;
             }
@@ -322,70 +312,9 @@ fn side_panel(app: &mut App, ui: &mut Ui, id: Id, r: Rect) {
     ui.data_mut(|d| d.insert_temp(key, tab));
     ui.separator();
     match tab {
-        SideTab::Card => card_tab(app, ui, id, &theme),
         SideTab::Notes => notes_tab(app, ui, id),
         SideTab::Tasks => tasks_tab(app, ui, id, &theme),
     }
-}
-
-fn card_tab(app: &mut App, ui: &mut Ui, id: Id, theme: &Theme) {
-    let task = app.blocks.get(&id).and_then(|b| b.task).and_then(|tid| app.tasks.iter().find(|t| t.id == tid)).cloned();
-    let Some(task) = task else {
-        ui.label(widgets::subtle("Sem card neste bloco.", theme));
-        ui.add_space(4.0);
-        if ui.button(format!("{I_TASK} Vincular tarefa/card ({})", app.keymap.label(Action::LinkTaskToSession))).clicked() {
-            app.focus_block(id);
-            app.run_action(ui.ctx(), Action::LinkTaskToSession);
-        }
-        return;
-    };
-    egui::ScrollArea::vertical().id_salt(("card", id)).show(ui, |ui| {
-        if let Some(k) = &task.card_key {
-            ui.label(RichText::new(k).font(FontId::monospace(12.0)).color(theme.accent_hi));
-        }
-        ui.label(RichText::new(&task.title).size(15.0).strong());
-        ui.horizontal_wrapped(|ui| {
-            widgets::chip(ui, task.status.label(), theme.accent, theme);
-            widgets::chip(ui, task.priority.label(), theme.warn, theme);
-            if let Some(r) = &task.repo {
-                widgets::chip(ui, format!("#{r}"), theme.dim, theme);
-            }
-        });
-        if let Some((a, n)) = task.subtasks_progress() {
-            ui.label(widgets::subtle(format!("☑ {a}/{n} subtarefas"), theme));
-        }
-        if !task.notes.trim().is_empty() {
-            ui.add_space(4.0);
-            ui.label(RichText::new(&task.notes).small());
-        }
-        ui.add_space(6.0);
-        ui.horizontal_wrapped(|ui| {
-            if let Some(u) = task.notion_url.clone() {
-                if ui.button(format!("{} Notion ↗", widgets::I_NOTION)).clicked() {
-                    let _ = open::that_detached(u);
-                }
-            }
-            if let Some(u) = task.slack_thread.clone() {
-                if ui.button(format!("{} Thread ↗", widgets::I_SLACK)).clicked() {
-                    let _ = open::that_detached(u);
-                }
-            }
-            if ui.button("󰈙 Mandar pro Claude").on_hover_text("Escreve .aic/context.md e cita no prompt do Claude em foco").clicked() {
-                let target = app.blocks.get(&id).and_then(|b| b.focused.or_else(|| b.panes.first().copied()));
-                if let Some(s) = target {
-                    app.write_context(s);
-                }
-            }
-            if app.cfg.on(Module::Notion) && ui.button("↻ Buscar no Notion").on_hover_text("Atualiza o card pelo conector").clicked() {
-                crate::connector::refresh_card(app, task.id);
-            }
-        });
-        if let Some(sum) = crate::connector::summary_of(app, task.id) {
-            ui.add_space(6.0);
-            ui.label(RichText::new("RESUMO DO CARD").font(FontId::monospace(10.5)).color(theme.dim));
-            ui.label(RichText::new(sum).small());
-        }
-    });
 }
 
 fn notes_tab(app: &mut App, ui: &mut Ui, id: Id) {
@@ -438,9 +367,8 @@ fn tasks_tab(app: &mut App, ui: &mut Ui, id: Id, theme: &Theme) {
                     app.update_task(t.id, |x| x.status = st);
                 }
                 let label = RichText::new(truncate(&t.title, 34));
-                if ui.link(if done { label.strikethrough() } else { label }).clicked() {
-                    app.board.selected = Some(t.id);
-                    app.set_view(crate::app::View::Board);
+                if ui.link(if done { label.strikethrough() } else { label }).on_hover_text("Abrir a sessão da tarefa").clicked() {
+                    app.open_task(t.id);
                 }
             });
             for (k, s) in t.subtasks.iter().enumerate() {

@@ -1,7 +1,6 @@
 //! Desenho. `draw` é chamado uma vez por frame com o `Ui` raiz.
 
 pub mod blocks;
-pub mod board;
 pub mod changes;
 pub mod help;
 pub mod hints;
@@ -45,7 +44,6 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
 
     // aba de um módulo que foi desligado: volta pras sessões
     let view_module = match app.view {
-        View::Board => Some(aic_core::Module::Board),
         View::Worktrees => Some(aic_core::Module::Worktrees),
         View::Changes => Some(aic_core::Module::Changes),
         View::Usage => Some(aic_core::Module::Usage),
@@ -65,8 +63,8 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             app.run_action(&ctx, a);
         }
         let typing = ctx.egui_wants_keyboard_input();
-        let free = !(app.view == View::Sessions && app.term_focus) && !app.layne.focus && app.view != View::Board && !typing && app.modal.is_none();
-        if free && app.cfg.on(aic_core::Module::Board) && ctx.input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::NONE, Key::T)) {
+        let free = !(app.view == View::Sessions && app.term_focus) && !app.layne.focus && !typing && app.modal.is_none();
+        if free && app.cfg.on(aic_core::Module::Tasks) && ctx.input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::NONE, Key::T)) {
             app.open_quick_add(None);
         }
     }
@@ -109,7 +107,6 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
         .frame(Frame::new().inner_margin(Margin::same(if app.view == View::Sessions { 6 } else { 16 })))
         .show(ui, |ui| match app.view {
             View::Sessions => sessions::show(app, ui),
-            View::Board => board::show(app, ui),
             View::Worktrees => worktrees::show(app, ui),
             View::Changes => changes::show(app, ui),
             View::Usage => {

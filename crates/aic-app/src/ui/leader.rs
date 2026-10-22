@@ -76,8 +76,6 @@ fn tree() -> Vec<Item> {
         ]),
         Group('t', "Tarefas", vec![
             Run('n', "Nova tarefa", QuickAdd),
-            Run('v', "Vincular ao terminal", LinkTaskToSession),
-            Run('b', "Abrir o board", ViewBoard),
         ]),
         Group('v', "Visualização", vec![
             Run('v', "Trocar visualização", CycleView),
@@ -107,7 +105,6 @@ fn tree() -> Vec<Item> {
         ]),
         Group('a', "Abas", vec![
             Run('s', "Sessões", ViewSessions),
-            Run('b', "Board", ViewBoard),
             Run('g', "Worktrees", ViewWorktrees),
             Run('d', "Changes (diff)", ViewChanges),
             Run('k', "Tokens", ViewUsage),
@@ -119,7 +116,6 @@ fn tree() -> Vec<Item> {
         ]),
         Run('g', "Worktrees", ViewWorktrees),
         Run('d', "Changes (diff)", ViewChanges),
-        Run('c', "Abrir card", OpenCard),
         Run('l', "Layne (assistente)", ToggleLayne),
         Run('m', "Falar com o Layne", LayneVoice),
         Run('n', "Notas do bloco", FocusNotes),

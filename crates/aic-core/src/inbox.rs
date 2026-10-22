@@ -45,17 +45,6 @@ pub enum Command {
         #[serde(default)]
         task: Option<String>,
     },
-    /// "Abrir card": com `auto`, busca o card e monta o bloco sem perguntar (repos sugeridos ou os de
-    /// `repos`); sem `auto`, abre o diálogo já com o link, buscando.
-    OpenCard {
-        link: String,
-        #[serde(default)]
-        workspace: Option<String>,
-        #[serde(default)]
-        repos: Vec<String>,
-        #[serde(default)]
-        auto: bool,
-    },
     /// Escreve no terminal do Layne (e manda, se `send`).
     Say { text: String, #[serde(default)] send: bool },
     /// Liga/desliga a gravação de voz pro Layne.

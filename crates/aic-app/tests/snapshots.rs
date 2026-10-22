@@ -64,7 +64,6 @@ fn tasks(app: &mut App) {
     let mut d = Task::new("Atualizar docker-compose do infra");
     d.status = TaskStatus::Done;
     let mut e = Task::new("Ler a thread sobre o rate limit da API");
-    e.slack_thread = Some("https://minhaempresa.slack.com/archives/C1/p1".into());
     e.priority = Priority::Low;
     for t in [a, b, c, d, e] {
         app.save_task(t);
@@ -185,7 +184,7 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     let b0 = app.block_of(ids[0]).unwrap();
     app.update_block(b0, |b| b.notes = "## Plano\n- reproduzir com a pedido 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
     let t0 = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id).unwrap();
-    app.link(t0, ids[0]);
+    app.update_task(t0, |t| t.session = Some(ids[0]));
     app.update_block(b0, |b| b.task = Some(t0));
     // estados via hooks
     hook(ids[0], "SessionStart", &[]);
@@ -246,12 +245,9 @@ fn telas() {
     }
     settle(&mut h, 200);
     shot(&mut h, "workspaces");
-    for (view, name) in [(View::Board, "board"), (View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::Help, "ajuda")] {
+    for (view, name) in [(View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::Help, "ajuda")] {
         let app = h.state_mut().as_mut().unwrap();
         app.set_view(view);
-        if view == View::Board {
-            app.board.selected = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id);
-        }
         settle(&mut h, 300);
         shot(&mut h, name);
     }
@@ -391,41 +387,4 @@ fn mascotes() {
         let img = h.render().expect("render");
         img.save(out(name)).unwrap();
     }
-}
-
-/// Diálogo "Abrir card" com um card já lido (sem rede): repos sugeridos marcados e opções.
-#[test]
-fn abrir_card() {
-    use aic_app::connector::OpenCardForm;
-    use aic_app::ui::modals::Modal;
-    use aic_core::card::CardInfo;
-
-    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let dir = sandbox("abrir-card");
-    let repos = dir.join("repos");
-    for r in ["api-pagamentos", "infra", "notificador", "web-app"] {
-        std::fs::create_dir_all(repos.join(r).join(".git")).unwrap();
-    }
-    let mut h = harness([1280.0, 860.0]);
-    h.step();
-    let app = h.state_mut().as_mut().unwrap();
-    app.cfg.repos_dirs = vec![repos];
-    let card = CardInfo {
-        title: "Corrigir cálculo de juros no checkout".into(),
-        key: Some("DEV-1256".into()),
-        url: Some("https://www.notion.so/minhaempresa/Corrigir-juros-0123456789abcdef0123456789abcdef".into()),
-        status: Some("Em andamento".into()),
-        assignee: Some("Vinicius".into()),
-        summary: "O juros diário erra alguns centavos quando a proposta cruza a virada do mês. Na thread, o time decidiu arredondar só no fim (não por parcela) e expor o valor corrigido também na tela de simulação.".into(),
-        criteria: vec!["juros arredondado só no total".into(), "teste de regressão com a proposta 9912".into(), "simulação mostra o valor corrigido".into()],
-        slack_threads: vec!["https://minhaempresa.slack.com/archives/C1/p1".into()],
-        repos: vec!["api-pagamentos".into(), "web-app".into()],
-    };
-    app.modal = Some(Modal::OpenCard(OpenCardForm::with_card(app, card)));
-    settle(&mut h, 300);
-    shot(&mut h, "abrir-card");
-    let app = h.state_mut().as_mut().unwrap();
-    app.modal = Some(Modal::OpenCard(OpenCardForm { link: "dev-12".into(), error: Some("o Claude não conseguiu ler o card: página não encontrada".into()), ..Default::default() }));
-    settle(&mut h, 200);
-    shot(&mut h, "abrir-card-link");
 }

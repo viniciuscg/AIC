@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Module {
-    /// Board de tarefas (kanban) e captura rápida.
-    Board,
+    /// Tarefas locais: captura rápida e o painel Tarefas do bloco.
+    Tasks,
     /// Notas por bloco.
     Notes,
     /// Aba de worktrees e worktree por sessão.
@@ -19,12 +19,6 @@ pub enum Module {
     Changes,
     /// Aba de tokens, limites e histórico de custo.
     Usage,
-    /// Cards do Notion no board e no bloco.
-    Notion,
-    /// Threads do Slack nas tarefas/blocos.
-    Slack,
-    /// "Abrir card": link do card → bloco montado (worktrees, Claudes, shell, notas).
-    Launcher,
     /// Terminais sobre tmux: sobrevivem ao fechar o app.
     Tmux,
     /// Vários workspaces.
@@ -61,15 +55,12 @@ use Module::*;
 pub const ALL: &[ModuleInfo] = &[
     ModuleInfo { module: Tmux, id: "tmux", name: "Persistência (tmux)", desc: "Terminais rodam num servidor tmux próprio do AIC: fechar a janela não mata nada, e ao abrir ele reconecta.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Workspaces, id: "workspaces", name: "Workspaces", desc: "Vários contextos de trabalho, cada um com seus blocos e layout.", group: "Sessões", default: true, requires: &[] },
-    ModuleInfo { module: Launcher, id: "launcher", name: "Abrir card", desc: "Cola o link do card e o AIC monta o bloco: worktrees, um Claude por repo, shell e notas.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Layne, id: "layne", name: "Layne (assistente)", desc: "Um Claude sempre aberto no painel lateral: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.", group: "Sessões", default: true, requires: &[] },
-    ModuleInfo { module: Board, id: "board", name: "Board de tarefas", desc: "Kanban com tarefas locais e cards, captura rápida com marcadores (#repo @hoje !alta).", group: "Organização", default: true, requires: &[] },
+    ModuleInfo { module: Tasks, id: "tasks", name: "Tarefas", desc: "Tarefas locais: captura rápida com marcadores (#repo @hoje !alta) e o painel Tarefas do bloco.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Notes, id: "notes", name: "Notas", desc: "Anotações em Markdown por bloco, salvas junto do bloco.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Worktrees, id: "worktrees", name: "Worktrees", desc: "Aba de worktrees e opção de isolar cada sessão num worktree.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Changes, id: "changes", name: "Changes", desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Usage, id: "usage", name: "Tokens e custo", desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Notion, id: "notion", name: "Notion", desc: "Cards do Notion no board e no bloco (via Claude Code ou token).", group: "Integrações", default: true, requires: &[] },
-    ModuleInfo { module: Slack, id: "slack", name: "Slack", desc: "Threads do Slack vinculadas a tarefas e blocos (via Claude Code).", group: "Integrações", default: true, requires: &[] },
     ModuleInfo { module: Statusbar, id: "statusbar", name: "Barra de status", desc: "Modelo, contexto, branch, limites e custo da sessão em foco.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Hints, id: "hints", name: "Dicas de atalho", desc: "Catálogo de atalhos (tecla líder) e barra de dicas no rodapé.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Mascot, id: "mascot", name: "Mascote", desc: "O pote de moscas, animado conforme o estado de cada sessão.", group: "Interface", default: true, requires: &[] },
@@ -86,7 +77,7 @@ pub fn by_id(id: &str) -> Option<Module> {
     ALL.iter().find(|i| i.id == id).map(|i| i.module)
 }
 
-/// Overrides por id (`"notion" = false`).
+/// Overrides por id (`"tasks" = false`).
 pub type Flags = BTreeMap<String, bool>;
 
 /// Ligado? O que está no config ou o padrão, e só se as dependências também estiverem.
@@ -103,9 +94,9 @@ mod tests {
     #[test]
     fn padrao_e_override() {
         let mut g = Flags::new();
-        assert!(enabled(Module::Notion, &g));
-        g.insert("notion".into(), false);
-        assert!(!enabled(Module::Notion, &g));
+        assert!(enabled(Module::Tasks, &g));
+        g.insert("tasks".into(), false);
+        assert!(!enabled(Module::Tasks, &g));
     }
 
     #[test]

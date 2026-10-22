@@ -116,7 +116,7 @@ impl Theme {
         style.spacing.window_margin = egui::Margin::same(14);
         // Rótulo selecionável sente clique e arrasto: o título de um cartão, o nome do bloco
         // ou do terminal roubavam o clique do fundo (clicar no texto não fazia nada) e o
-        // arrasto do cartão no board. Texto pra copiar fica no terminal e nos campos.
+        // arrasto. Texto pra copiar fica no terminal e nos campos.
         style.interaction.selectable_labels = false;
         style.text_styles = [
             (TextStyle::Small, FontId::new(11.0, FontFamily::Proportional)),

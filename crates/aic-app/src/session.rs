@@ -185,12 +185,6 @@ pub fn task_prompt(t: &Task) -> String {
             p.push_str(&format!("\n- [{}] {}", if s.done { "x" } else { " " }, s.text));
         }
     }
-    if let Some(u) = &t.notion_url {
-        p.push_str(&format!("\nCard no Notion: {u}"));
-    }
-    if let Some(u) = &t.slack_thread {
-        p.push_str(&format!("\nThread no Slack: {u}"));
-    }
-    p.push_str("\nSe existir .aic/context.md no diretório, leia antes de começar. Use a skill aic:contexto para buscar card e thread.");
+    p.push_str("\nSe existir .aic/context.md no diretório, leia antes de começar.");
     p
 }

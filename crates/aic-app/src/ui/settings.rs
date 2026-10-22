@@ -1,4 +1,4 @@
-//! Aba Config: geral, som, integrações, cache e o catálogo de atalhos (editável).
+//! Aba Config: geral, som, Layne, cache e o catálogo de atalhos (editável).
 
 use egui::{FontId, Key, KeyboardShortcut, RichText, ScrollArea, TextEdit, Ui};
 
@@ -99,7 +99,6 @@ const LAYNE: &[(&str, &str)] = &[
     ("Microfone", "mic áudio voz gravar entrada pulseaudio pipewire"),
     ("Transcrição", "whisper api openai groq comando idioma voz texto"),
 ];
-const INTEGRACOES: &[(&str, &str)] = &[("Notion e Slack", "notion slack conector token database sprint cards status propriedade sync")];
 const CACHE: &[(&str, &str)] = &[("Limpar cache", "tmux sessões salvar layout restaurar")];
 const SOBRE: &[(&str, &str)] = &[("Versão e pastas", "versão config dados eventos caminho")];
 
@@ -118,7 +117,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         ui.add_space(12.0);
         let r = ui.add(
             TextEdit::singleline(&mut app.settings.search)
-                .hint_text("/  pesquisar (fonte, som, prefixo, notion, workspace…)")
+                .hint_text("/  pesquisar (fonte, som, prefixo, workspace…)")
                 .desired_width(420.0)
                 .margin(egui::vec2(8.0, 5.0)),
         );
@@ -306,12 +305,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             shown += 1;
             section(ui, &theme, "Layne (assistente)");
             crate::layne::settings(app, ui, |i| f.row("Layne (assistente)", LAYNE[i].0, LAYNE[i].1));
-        }
-
-        if f.any("Integrações", INTEGRACOES) {
-            shown += 1;
-            section(ui, &theme, "Integrações");
-            crate::notion_ui::settings(app, ui);
         }
 
         if f.any("Cache (estilo tmux)", CACHE) {

@@ -14,18 +14,14 @@ pub const I_COST: &str = "\u{f0126}";
 pub const I_SPEND: &str = "\u{f0820}";
 pub const I_DIR: &str = "\u{f07b}";
 pub const I_BRANCH: &str = "\u{e725}";
-pub const I_CARD: &str = "\u{f0e5c}";
 pub const I_AGENTS: &str = "\u{f0bc9}";
 pub const I_TASK: &str = "\u{f0ae}";
-pub const I_SLACK: &str = "\u{f198}";
-pub const I_NOTION: &str = "\u{f0ff9}";
 pub const I_WORKTREE: &str = "\u{f126}";
 pub const I_DIFF: &str = "\u{f440}";
 pub const I_CLOCK: &str = "\u{f017}";
 pub const I_PLUS: &str = "\u{f067}";
 pub const I_KEY: &str = "\u{f11c}";
 pub const I_GEAR: &str = "\u{f013}";
-pub const I_BOARD: &str = "\u{f0db}";
 pub const I_TERM: &str = "\u{f120}";
 pub const I_CHART: &str = "\u{f080}";
 pub const I_HELP: &str = "\u{f059}";
@@ -107,7 +103,7 @@ pub fn card(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, add: impl
     card_sense(ui, theme, active, accent, Sense::click(), add)
 }
 
-/// `card` com outro sentido (o board usa clique + arrasto pra mover cartões).
+/// `card` com outro sentido.
 pub fn card_sense(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, sense: Sense, add: impl FnOnce(&mut Ui)) -> Response {
     let stroke = if active { Stroke::new(1.5, accent) } else { Stroke::new(1.0, theme.border) };
     let frame = Frame::new()

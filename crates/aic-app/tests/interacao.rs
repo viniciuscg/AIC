@@ -13,8 +13,8 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use aic_app::app::{App, View};
 use aic_app::ui::modals::Modal;
-use aic_app::ui::widgets::{I_BOARD, I_PLUS, I_TERM};
-use aic_core::{Id, SessionKind, Subtask, Task, TaskStatus};
+use aic_app::ui::widgets::{I_PLUS, I_TERM};
+use aic_core::{Id, SessionKind};
 
 /// Os testes mexem em variáveis de ambiente: um de cada vez.
 static LOCK: Mutex<()> = Mutex::new(());
@@ -142,11 +142,6 @@ fn cabecalho_do_terminal() {
     click(&mut h, "Restaurar terminal");
     assert!(!app(&mut h).maximized, "restaurar");
 
-    click(&mut h, "Vincular tarefa");
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::LinkTask { .. })), "vincular abre o diálogo");
-    click(&mut h, "Cancelar  (Esc)");
-    assert!(app(&mut h).modal.is_none(), "cancelar fecha");
-
     click(&mut h, "Fechar terminal");
     assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseSession { .. })), "✕ pede confirmação");
     click(&mut h, "Cancelar");
@@ -221,91 +216,39 @@ fn cabecalho_do_bloco() {
     kill_all(&mut h);
 }
 
-// ───────────────────────── board e editor ─────────────────────────
-
-fn task(h: &mut H, title: &str, status: TaskStatus) -> Id {
-    let mut t = Task::new(title);
-    t.status = status;
-    t.subtasks = vec![Subtask { text: "um".into(), done: false }, Subtask { text: "dois".into(), done: false }];
-    let id = t.id;
-    app(h).save_task(t);
-    id
-}
-
-fn task_of(h: &mut H, id: Id) -> Option<Task> {
-    app(h).tasks.iter().find(|t| t.id == id).cloned()
-}
+// ───────────────────────── tarefas ─────────────────────────
 
 #[test]
-fn board_e_editor() {
+fn captura_rapida_e_tarefas_do_bloco() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let _dir = sandbox("board", "");
+    let _dir = sandbox("tarefas", "");
     let mut h = harness([1500.0, 900.0]);
-    let a = task(&mut h, "Corrigir juros", TaskStatus::Todo);
-    let _b = task(&mut h, "Revisar PR", TaskStatus::Doing);
-    app(&mut h).set_view(View::Board);
-    frames(&mut h, 3);
+    let id = terminal(&mut h, "api", "sleep 60");
+    let block = app(&mut h).block_of(id).unwrap();
 
-    // clique no cartão abre o editor
-    click(&mut h, "Corrigir juros");
-    assert_eq!(app(&mut h).board.selected, Some(a), "clique no cartão seleciona");
-    h.get_all_by_label("Corrigir juros").next().unwrap().click_secondary();
-    frames(&mut h, 3);
-    assert!(exists(&h, "Arquivar  (d)"), "botão direito no cartão abre o menu");
-    click(&mut h, "Corrigir juros");
-    assert!(!exists(&h, "Arquivar  (d)"), "clique fora fecha o menu");
-    assert_eq!(app(&mut h).board.selected, Some(a));
-
-    click_first(&mut h, "Remover subtarefa");
-    assert_eq!(task_of(&mut h, a).unwrap().subtasks.len(), 1, "× remove a subtarefa");
-
-    click(&mut h, "Fechar editor");
-    assert_eq!(app(&mut h).board.selected, None, "✕ fecha o editor");
-
-    // Shift+L move o cartão (antes o `l` engolia o Shift+L)
-    app(&mut h).board.selected = Some(a);
-    frames(&mut h, 2);
-    key(&mut h, Modifiers::SHIFT, Key::L);
-    assert_eq!(task_of(&mut h, a).unwrap().status, TaskStatus::Doing, "Shift+L move de coluna");
-    assert_eq!(app(&mut h).board.selected, Some(a), "e não muda a seleção");
-    key(&mut h, Modifiers::SHIFT, Key::H);
-    assert_eq!(task_of(&mut h, a).unwrap().status, TaskStatus::Todo, "Shift+H volta");
-
-    click(&mut h, "Arquivar");
-    assert_eq!(task_of(&mut h, a).unwrap().status, TaskStatus::Archived, "Arquivar");
-    assert_eq!(app(&mut h).board.selected, None);
-
-    let c = task(&mut h, "Apagar esta", TaskStatus::Todo);
-    app(&mut h).board.selected = Some(c);
-    frames(&mut h, 2);
-    click(&mut h, "Apagar");
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::ConfirmDeleteTask(_))), "Apagar pede confirmação");
-    click(&mut h, "Cancelar");
-    assert!(app(&mut h).modal.is_none() && task_of(&mut h, c).is_some());
-    click(&mut h, "Apagar");
-    click(&mut h, "Apagar  ⏎");
-    assert!(task_of(&mut h, c).is_none(), "apagar remove");
-
-    // + da coluna abre a adição inline
-    click(&mut h, &format!("Nova tarefa em {}", TaskStatus::Review.label()));
-    assert!(matches!(app(&mut h).board.adding, Some((TaskStatus::Review, _))), "+ da coluna");
-    key(&mut h, Modifiers::NONE, Key::Escape);
-    assert!(app(&mut h).board.adding.is_none());
-
-    // nova tarefa pelo botão → captura rápida → Criar
-    click(&mut h, &format!("{I_PLUS}  Nova tarefa"));
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::QuickAdd { .. })), "Nova tarefa abre a captura");
-    if let Some(Modal::QuickAdd { text, .. }) = &mut app(&mut h).modal {
+    // Ctrl+Shift+Space → captura rápida → Criar
+    key(&mut h, ctrl_shift(), Key::Space);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::QuickAdd { .. })), "Ctrl+Shift+Space abre a captura");
+    if let Some(Modal::QuickAdd { text, link_enabled, .. }) = &mut app(&mut h).modal {
         *text = "tarefa criada no clique".into();
+        *link_enabled = true;
     }
     frames(&mut h, 2);
     click(&mut h, "Criar  ⏎");
-    assert!(app(&mut h).tasks.iter().any(|t| t.title == "tarefa criada no clique"), "Criar cria a tarefa");
     assert!(app(&mut h).modal.is_none());
+    let t = app(&mut h).tasks.iter().find(|t| t.title == "tarefa criada no clique").cloned().expect("Criar cria a tarefa");
+    assert_eq!(t.session, Some(id), "vinculada ao terminal em foco");
 
-    click(&mut h, &format!("{I_PLUS}  Nova tarefa"));
+    key(&mut h, ctrl_shift(), Key::Space);
     click(&mut h, "Cancelar");
     assert!(app(&mut h).modal.is_none(), "Cancelar fecha a captura");
+
+    // painel Tarefas do bloco: a tarefa aparece e o check conclui
+    app(&mut h).update_block(block, |b| b.side = true);
+    frames(&mut h, 3);
+    assert!(exists(&h, "tarefa criada no clique"), "a tarefa aparece no painel do bloco");
+
+    kill_all(&mut h);
 }
 
 // ───────────────────────── modais, toasts, topbar ─────────────────────────
@@ -319,7 +262,6 @@ fn modais_toasts_e_abas() {
 
     // abas da topbar
     for (label, view) in [
-        ("Aba Board", View::Board),
         ("Aba Worktrees", View::Worktrees),
         ("Aba Tokens", View::Usage),
         ("Aba Config", View::Settings),
@@ -370,13 +312,14 @@ fn modais_toasts_e_abas() {
     assert_eq!(app(&mut h).session_label(id), "novo nome", "Salvar renomeia");
 
     // módulo desligado: aba some e atalho fica inerte (não vaza)
-    app(&mut h).cfg.modules.insert("board".into(), false);
+    app(&mut h).cfg.modules.insert("worktrees".into(), false);
     frames(&mut h, 2);
-    assert!(!exists(&h, &format!("{I_BOARD}  Board")), "aba Board some com o módulo desligado");
+    assert!(!exists(&h, "Aba Worktrees"), "aba Worktrees some com o módulo desligado");
+    key(&mut h, ctrl_shift(), Key::G);
+    assert_ne!(app(&mut h).view, View::Worktrees);
+    app(&mut h).cfg.modules.insert("tasks".into(), false);
     key(&mut h, ctrl_shift(), Key::Space);
-    assert!(app(&mut h).modal.is_none(), "captura rápida inerte com o Board desligado");
-    key(&mut h, ctrl_shift(), Key::B);
-    assert_ne!(app(&mut h).view, View::Board);
+    assert!(app(&mut h).modal.is_none(), "captura rápida inerte com Tarefas desligado");
 
     kill_all(&mut h);
 }
@@ -465,7 +408,7 @@ fn config_alterar_atalho() {
     key(&mut h, Modifiers::NONE, Key::X);
     assert_eq!(app(&mut h).keymap.prefix_keys(Action::Quit), ["x"]);
     assert!(app(&mut h).keymap.prefix_keys(Action::CloseFocused).is_empty(), "x sai de quem tinha");
-    click(&mut h, "Tecla de prefixo padrão: Fechar o que está em foco (terminal, bloco vazio, cartão aberto ou a aba)");
+    click(&mut h, "Tecla de prefixo padrão: Fechar o que está em foco (terminal, bloco vazio ou a aba)");
     assert_eq!(app(&mut h).keymap.prefix_keys(Action::CloseFocused), ["x"]);
     assert!(app(&mut h).keymap.prefix_keys(Action::Quit).is_empty(), "e volta pro dono");
 
@@ -519,7 +462,7 @@ fn busca_na_config() {
     assert!(app(&mut h).settings.search.is_empty());
 
     // Ctrl+B / abre a Config com a busca focada, de qualquer aba
-    app(&mut h).set_view(View::Board);
+    app(&mut h).set_view(View::Worktrees);
     frames(&mut h, 2);
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::Slash);
@@ -557,13 +500,13 @@ fn prefixo_estilo_tmux() {
     // n/p andam pelas abas da barra; x numa aba volta pras Sessões
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::N);
-    assert_eq!(app(&mut h).view, View::Board, "Ctrl+B n");
+    assert_eq!(app(&mut h).view, View::Worktrees, "Ctrl+B n");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::N);
-    assert_eq!(app(&mut h).view, View::Worktrees);
+    assert_eq!(app(&mut h).view, View::Changes);
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::P);
-    assert_eq!(app(&mut h).view, View::Board, "Ctrl+B p");
+    assert_eq!(app(&mut h).view, View::Worktrees, "Ctrl+B p");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::X);
     assert_eq!(app(&mut h).view, View::Sessions, "Ctrl+B x na aba volta pras sessões");
@@ -686,13 +629,13 @@ fn tecla_lider() {
     assert!(app(&mut h).cfg.hints_bar, "Ctrl+Shift+H mostra de novo");
 
     // módulo desligado: o grupo Tarefas some do menu
-    app(&mut h).cfg.modules.insert("board".into(), false);
+    app(&mut h).cfg.modules.insert("tasks".into(), false);
     key(&mut h, ctrl(), Key::Space);
     assert!(!exists(&h, "Tarefas  ›"), "grupo de módulo desligado não aparece");
     key(&mut h, Modifiers::NONE, Key::T);
     assert!(app(&mut h).leader.as_ref().unwrap().error.is_some(), "t vira tecla inválida");
     key(&mut h, Modifiers::NONE, Key::Escape);
-    app(&mut h).cfg.modules.remove("board");
+    app(&mut h).cfg.modules.remove("tasks");
 
     // Hints desligado: a líder não abre (o Ctrl+Space vai pro terminal)
     app(&mut h).cfg.modules.insert("hints".into(), false);

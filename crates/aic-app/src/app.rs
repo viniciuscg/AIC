@@ -22,7 +22,6 @@ use crate::ui;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Sessions,
-    Board,
     Worktrees,
     Changes,
     Usage,
@@ -31,12 +30,11 @@ pub enum View {
 }
 
 impl View {
-    pub const ALL: [View; 7] = [View::Sessions, View::Board, View::Worktrees, View::Changes, View::Usage, View::Settings, View::Help];
+    pub const ALL: [View; 6] = [View::Sessions, View::Worktrees, View::Changes, View::Usage, View::Settings, View::Help];
 
     pub fn label(self) -> &'static str {
         match self {
             View::Sessions => "Sessões",
-            View::Board => "Board",
             View::Worktrees => "Worktrees",
             View::Changes => "Changes",
             View::Usage => "Tokens",
@@ -48,7 +46,6 @@ impl View {
     pub fn icon(self) -> &'static str {
         match self {
             View::Sessions => ui::widgets::I_TERM,
-            View::Board => ui::widgets::I_BOARD,
             View::Worktrees => ui::widgets::I_WORKTREE,
             View::Changes => ui::widgets::I_DIFF,
             View::Usage => ui::widgets::I_CHART,
@@ -61,7 +58,6 @@ impl View {
     pub fn action(self) -> Action {
         match self {
             View::Sessions => Action::ViewSessions,
-            View::Board => Action::ViewBoard,
             View::Worktrees => Action::ViewWorktrees,
             View::Changes => Action::ViewChanges,
             View::Usage => Action::ViewUsage,
@@ -124,7 +120,6 @@ pub struct App {
     pub sidebar: bool,
     pub window_focused: bool,
 
-    pub board: ui::board::BoardState,
     pub worktrees: ui::worktrees::WorktreeState,
     pub changes: ui::changes::ChangesState,
     pub settings: ui::settings::SettingsState,
@@ -133,10 +128,6 @@ pub struct App {
     /// Prefixo (`Ctrl+B`) apertado, esperando a tecla da ação.
     pub prefix_pending: bool,
     pub usage: ui::usage::UsageState,
-    /// Sync com o Notion em background (ver `notion_ui`).
-    pub notion: crate::notion_ui::NotionState,
-    /// Buscas de card (Abrir card / Buscar no Notion) em background (ver `connector`).
-    pub connector: crate::connector::ConnectorState,
     /// Histórico de tokens/custo lido dos transcripts numa thread.
     pub usage_history: crate::usage_history::UsageHistory,
     /// O assistente (painel à direita, sessão sempre aberta).
@@ -207,15 +198,12 @@ impl App {
             maximized: false,
             sidebar: true,
             window_focused: true,
-            board: Default::default(),
             worktrees: Default::default(),
             changes: Default::default(),
             settings: Default::default(),
             leader: None,
             prefix_pending: false,
             usage: Default::default(),
-            notion: Default::default(),
-            connector: Default::default(),
             usage_history: Default::default(),
             layne: Default::default(),
             account: StatusSnapshot::latest(),
@@ -830,24 +818,6 @@ impl App {
         Some(id)
     }
 
-    /// Vincula tarefa ↔ sessão (nos dois lados).
-    pub fn link(&mut self, task: Id, session: Id) {
-        let repo = self.sessions.get(&session).and_then(|r| r.s.repo.clone());
-        self.update_task(task, |t| {
-            t.session = Some(session);
-            if t.repo.is_none() {
-                t.repo = repo;
-            }
-            if t.status == TaskStatus::Todo {
-                t.status = TaskStatus::Doing;
-            }
-        });
-        if let Some(rt) = self.sessions.get_mut(&session) {
-            rt.s.task = Some(task);
-            let _ = self.store.save_session(&rt.s);
-        }
-    }
-
     pub fn task_of(&self, session: Id) -> Option<&Task> {
         let rt = self.sessions.get(&session)?;
         rt.s.task.and_then(|id| self.tasks.iter().find(|t| t.id == id))
@@ -863,22 +833,16 @@ impl App {
         self.modal = Some(ui::modals::Modal::NewSession(ui::modals::NewSessionForm::for_task(self, &t)));
     }
 
-    /// Escreve `.aic/context.md` no diretório da sessão com card, thread e notas.
+    /// Escreve `.aic/context.md` no diretório da sessão com a tarefa e as notas dela.
     pub fn write_context(&mut self, session: Id) {
         let Some(rt) = self.sessions.get(&session) else { return };
         let Some(t) = self.task_of(session).cloned() else {
-            return self.toast("Essa sessão não tem tarefa vinculada (Ctrl+Shift+K)", ToastKind::Warn);
+            return self.toast("Essa sessão não tem tarefa vinculada", ToastKind::Warn);
         };
         let dir = rt.s.cwd.join(".aic");
         let mut md = format!("# {}\n\n", t.title);
         if let Some(k) = &t.card_key {
             md.push_str(&format!("- Card: {k}\n"));
-        }
-        if let Some(u) = &t.notion_url {
-            md.push_str(&format!("- Notion: {u}\n"));
-        }
-        if let Some(u) = &t.slack_thread {
-            md.push_str(&format!("- Thread do Slack: {u}\n"));
         }
         if let Some(r) = &t.repo {
             md.push_str(&format!("- Repo: {r}\n"));
@@ -893,7 +857,7 @@ impl App {
                 md.push_str(&format!("- [{}] {}\n", if s.done { "x" } else { " " }, s.text));
             }
         }
-        md.push_str("\n> Gerado pelo AIC. Use a skill `aic:contexto` para puxar o card e a thread completos.\n");
+        md.push_str("\n> Gerado pelo AIC.\n");
         let result = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("context.md"), md));
         // .aic/ fora do git sem mexer no .gitignore do repo
         let _ = ensure_git_exclude(&rt.s.cwd);
@@ -973,7 +937,6 @@ impl App {
         }
 
         self.usage_history.poll();
-        crate::connector::poll(self, ctx);
         crate::layne::tick(self, ctx);
         self.toasts.retain(|t| t.until > Instant::now());
 
@@ -1090,7 +1053,6 @@ impl App {
                     self.view = View::Sessions;
                 }
             }
-            OpenCard => crate::connector::open_card_dialog(self),
             CloseSession => {
                 if let Some(id) = self.focused() {
                     let has_wt = self.sessions.get(&id).is_some_and(|r| r.s.worktree.is_some());
@@ -1165,11 +1127,6 @@ impl App {
             ToggleLayne => crate::layne::toggle(self, ctx),
             LayneVoice => crate::layne::toggle_voice(self, ctx),
             QuickAdd => self.open_quick_add(None),
-            LinkTaskToSession => {
-                if let Some(id) = self.focused() {
-                    self.modal = Some(ui::modals::Modal::LinkTask { session: id, query: String::new(), selected: 0 });
-                }
-            }
             Workspaces => self.modal = Some(ui::modals::Modal::Workspaces { query: String::new(), selected: self.ws }),
             NewWorkspace => self.modal = Some(ui::modals::Modal::Workspaces { query: String::new(), selected: usize::MAX }),
             NextWorkspace => self.switch_ws((self.ws + 1) % self.workspaces.len().max(1)),
@@ -1191,7 +1148,6 @@ impl App {
                 self.view = View::Sessions;
                 self.term_focus = true;
             }
-            ViewBoard => self.set_view(View::Board),
             ViewWorktrees => self.set_view(View::Worktrees),
             ViewChanges => self.set_view(View::Changes),
             ViewUsage => self.set_view(View::Usage),
@@ -1232,12 +1188,9 @@ impl App {
     }
 
     /// Fecha o que está em foco, do mais específico pro mais geral:
-    /// cartão aberto no board → aba que não é Sessões → terminal em foco → bloco vazio.
+    /// aba que não é Sessões → terminal em foco → bloco vazio.
     pub fn close_focused(&mut self) {
         match self.view {
-            View::Board if self.board.selected.is_some() => {
-                self.board.selected = None;
-            }
             View::Sessions => {
                 if let Some(b) = self.empty_block_focus.filter(|b| self.blocks.get(b).is_some_and(|x| x.panes.is_empty())) {
                     self.modal = Some(ui::modals::Modal::CloseBlock { id: b, remove_worktrees: false, has_worktrees: false });

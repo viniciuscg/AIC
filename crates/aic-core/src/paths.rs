@@ -1,6 +1,6 @@
 //! Caminhos XDG do AIC.
 //!
-//! - config: `~/.config/aic` (config.toml, keybinds.toml, secrets.toml, .env)
+//! - config: `~/.config/aic` (config.toml, keybinds.toml, .env)
 //! - data:   `~/.local/share/aic` (aic.db, sons, cache)
 //! - state:  `~/.local/state/aic` (events/ dos hooks, statusline/ por sessão)
 
@@ -120,10 +120,10 @@ mod tests {
 
     #[test]
     fn dotenv() {
-        let text = "# comentário\n\nNOTION_TOKEN=abc\nexport A = \"com espaço\"\nB='x # y'\nC=valor # nota\nD=\n=sem\nruim chave=1\n";
+        let text = "# comentário\n\nALGUM_TOKEN=abc\nexport A = \"com espaço\"\nB='x # y'\nC=valor # nota\nD=\n=sem\nruim chave=1\n";
         let v = parse_dotenv(text);
         let get = |k: &str| v.iter().find(|(a, _)| a == k).map(|(_, b)| b.as_str());
-        assert_eq!(get("NOTION_TOKEN"), Some("abc"));
+        assert_eq!(get("ALGUM_TOKEN"), Some("abc"));
         assert_eq!(get("A"), Some("com espaço"));
         assert_eq!(get("B"), Some("x # y"));
         assert_eq!(get("C"), Some("valor"));

@@ -5,7 +5,7 @@ use aic_core::{Id, Layout, SessionKind, SessionState, TaskStatus};
 use aic_term::TerminalView;
 
 use super::statusbar::truncate;
-use super::widgets::{self, I_AGENTS, I_BRANCH, I_CLOSE, I_LINK, I_RESTART, I_TASK, I_WORKTREE};
+use super::widgets::{self, I_AGENTS, I_BRANCH, I_CLOSE, I_RESTART, I_TASK, I_WORKTREE};
 use crate::actions::Action;
 use crate::app::App;
 
@@ -62,16 +62,13 @@ pub fn empty(app: &mut App, ui: &mut Ui) {
         ui.label(widgets::subtle(crate::brand::TAGLINE, &theme));
         ui.add_space(18.0);
         ui.horizontal(|ui| {
-            let w = 3.0 * 210.0;
+            let w = 2.0 * 210.0;
             ui.add_space((ui.available_width() - w).max(0.0) / 2.0);
             if ui.add_sized([200.0, 34.0], egui::Button::new(format!("{}  Nova sessão Claude", widgets::I_PLUS))).clicked() {
                 app.run_action(ui.ctx(), Action::NewSession);
             }
             if ui.add_sized([200.0, 34.0], egui::Button::new(format!("{}  Nova tarefa", widgets::I_TASK))).clicked() {
                 app.open_quick_add(None);
-            }
-            if ui.add_sized([200.0, 34.0], egui::Button::new(format!("{}  Board", widgets::I_BOARD))).clicked() {
-                app.set_view(crate::app::View::Board);
             }
         });
         ui.add_space(8.0);
@@ -329,10 +326,7 @@ fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Co
     }
     if let Some(t) = &task {
         let label = t.card_key.clone().unwrap_or_else(|| truncate(&t.title, 30));
-        if widgets::chip(ui, format!("{I_TASK} {label}"), theme.accent_hi, &theme).on_hover_text(&t.title).clicked() {
-            app.board.selected = Some(t.id);
-            app.set_view(crate::app::View::Board);
-        }
+        widgets::chip(ui, format!("{I_TASK} {label}"), theme.accent_hi, &theme).on_hover_text(&t.title);
     }
     ui.with_layout(ELayout::right_to_left(Align::Center), |ui| {
         if widgets::icon_button(ui, I_CLOSE, "Fechar terminal", &app.keymap.tip(Action::CloseSession, "Fechar terminal")).clicked() {
@@ -345,15 +339,10 @@ fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Co
         }
         if matches!(kind, SessionKind::Claude)
             && task.is_some()
-            && app.cfg.on(aic_core::Module::Board)
+            && app.cfg.on(aic_core::Module::Tasks)
             && widgets::icon_button(ui, "󰈙", "Mandar contexto da tarefa", &app.keymap.tip(Action::SendContext, "Mandar contexto da tarefa pro Claude (.aic/context.md)")).clicked()
         {
             app.write_context(id);
-        }
-        // vincular vale pra qualquer terminal (a tarefa aparece no cabeçalho e na statusline)
-        if app.cfg.on(aic_core::Module::Board) && widgets::icon_button(ui, I_LINK, "Vincular tarefa", &app.keymap.tip(Action::LinkTaskToSession, "Vincular tarefa")).clicked() {
-            app.focus(id);
-            app.run_action(ui.ctx(), Action::LinkTaskToSession);
         }
         let max_label = if app.maximized { "Restaurar terminal" } else { "Maximizar terminal" };
         if widgets::icon_button(ui, "󰊓", max_label, &app.keymap.tip(Action::ToggleMaximize, max_label)).clicked() {
@@ -367,10 +356,6 @@ pub fn session_menu(app: &mut App, resp: &egui::Response, id: Id) {
     resp.context_menu(|ui| {
         if ui.button("Renomear").clicked() {
             app.modal = Some(super::modals::Modal::Rename { id, text: app.session_label(id), first: true });
-            ui.close();
-        }
-        if ui.button("Vincular tarefa").clicked() {
-            app.modal = Some(super::modals::Modal::LinkTask { session: id, query: String::new(), selected: 0 });
             ui.close();
         }
         if ui.button("Nova tarefa vinculada").clicked() {

@@ -1,7 +1,7 @@
 //! Barra superior no espírito do i3bar, uma linha só:
 //!
 //! ```text
-//!  ▣ AIC │ 1 Principal │ 2 api ●2 │ 3 front │ +   PREFIXO   s Sessões  b Board  g Worktrees …      ● 2 aguardando │ 🔥 1 │ $3.20 │ 5h ███░ 40% │ sem ░░ 5% │ 14:32
+//!  ▣ AIC │ 1 Principal │ 2 api ●2 │ 3 front │ +   PREFIXO   s Sessões  g Worktrees …      ● 2 aguardando │ 🔥 1 │ $3.20 │ 5h ███░ 40% │ sem ░░ 5% │ 14:32
 //! ```
 //!
 //! - **workspaces** à esquerda e em destaque: o atual aceso na cor de destaque, os que têm
@@ -105,12 +105,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             }
             let color = if active { theme.accent_hi } else { theme.dim };
             push(&mut job, &format!("{} {}", view.icon(), view.label()), color, 12.5);
-            if view == View::Board {
-                let doing = app.tasks.iter().filter(|t| t.status == aic_core::TaskStatus::Doing).count();
-                if doing > 0 {
-                    push(&mut job, &format!(" {doing}"), theme.accent, 11.0);
-                }
-            }
             let fill = if active { theme.bg3 } else { Color32::TRANSPARENT };
             let resp = block(ui, &format!("Aba {}", view.label()), job, fill, Stroke::NONE, active.then_some(theme.accent));
             if resp.on_hover_text(app.keymap.tip(view.action(), view.action().meta().name)).clicked() {

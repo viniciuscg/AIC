@@ -337,22 +337,6 @@ fn run(app: &mut App, ctx: &Context, env: Envelope) {
             None => Err(format!("nenhum workspace chamado \"{name}\" (veja `aic ws ls`)")),
         },
         Command::NewSession { workspace, name, repo, cwd, shell, branch, prompt, task } => new_session(app, ctx, workspace, name, repo, cwd, shell, branch, prompt, task),
-        Command::OpenCard { link, workspace, repos, auto } => {
-            if let Some(ws) = workspace.as_deref().filter(|w| !w.trim().is_empty()) {
-                goto_or_create(app, ws);
-            }
-            app.set_view(View::Sessions);
-            if auto {
-                // a resposta sai quando o bloco estiver montado (ver connector::poll)
-                match crate::connector::open_card_auto(app, ctx, &link, repos, id.clone()) {
-                    Ok(()) => return,
-                    Err(e) => Err(e),
-                }
-            } else {
-                crate::connector::open_card_prefilled(app, ctx, &link);
-                Ok("diálogo \"Abrir card\" aberto no AIC, buscando o card; os repos são escolhidos lá".into())
-            }
-        }
         Command::Say { text, send } => {
             if say(app, ctx, &text, send) {
                 Ok(format!("mandado pro {NAME}"))

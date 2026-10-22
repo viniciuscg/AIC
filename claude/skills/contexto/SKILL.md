@@ -9,7 +9,7 @@ Objetivo: entender o pedido antes de mexer em código. Não escreva código nest
 
 ## Passos
 
-1. **Arquivo local**: se existir `.aic/context.md` no diretório atual, leia. Ele traz título, card (`DEV-123`), links do Notion e do Slack, repo, notas e subtarefas. O prompt de sistema da sessão também pode trazer esses dados ("Tarefa vinculada: …").
+1. **Arquivo local**: se existir `.aic/context.md` no diretório atual, leia. Ele traz título, card (`DEV-123`), repo, notas e subtarefas. O prompt de sistema da sessão também pode trazer esses dados ("Tarefa vinculada: …").
 2. **Card no Notion**: use as ferramentas MCP do Notion disponíveis na sessão (nomes com `notion`, ex: `notion-fetch`, `notion-search`).
    - Com URL → busque a página direto (fetch).
    - Só com a chave (`DEV-123`) → pesquise pela chave e confirme que o título bate.

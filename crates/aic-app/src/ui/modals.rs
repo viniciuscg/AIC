@@ -16,15 +16,11 @@ pub enum Modal {
     Rename { id: Id, text: String, first: bool },
     RenameBlock { id: Id, text: String, first: bool },
     CloseBlock { id: Id, remove_worktrees: bool, has_worktrees: bool },
-    /// Abrir card: estado vive em `connector`.
-    OpenCard(crate::connector::OpenCardForm),
-    LinkTask { session: Id, query: String, selected: usize },
     Workspaces { query: String, selected: usize },
     RenameWorkspace { text: String, first: bool },
     Palette { query: String, selected: usize },
     Restore,
     ConfirmQuit,
-    ConfirmDeleteTask(Id),
 }
 
 pub struct NewSessionForm {
@@ -132,14 +128,11 @@ pub fn show(app: &mut App, ctx: &Context) {
         Modal::Rename { id, text, first } => rename(app, ctx, id, text, first),
         Modal::RenameBlock { id, text, first } => rename_block(app, ctx, id, text, first),
         Modal::CloseBlock { id, remove_worktrees, has_worktrees } => close_block(app, ctx, id, remove_worktrees, has_worktrees),
-        Modal::OpenCard(f) => crate::connector::open_card_modal(app, ctx, f),
-        Modal::LinkTask { session, query, selected } => link_task(app, ctx, session, query, selected),
         Modal::Workspaces { query, selected } => workspaces(app, ctx, query, selected),
         Modal::RenameWorkspace { text, first } => rename_workspace(app, ctx, text, first),
         Modal::Palette { query, selected } => palette(app, ctx, query, selected),
         Modal::Restore => restore(app, ctx),
         Modal::ConfirmQuit => confirm_quit(app, ctx),
-        Modal::ConfirmDeleteTask(id) => confirm_delete(app, ctx, id),
     };
     // Esc fecha qualquer diálogo (menos o de reabrir, que precisa de resposta)
     match keep {
@@ -202,7 +195,7 @@ fn quick_add(app: &mut App, ctx: &Context, mut text: String, mut status: TaskSta
         ui.horizontal(|ui| {
             ui.label(RichText::new(format!("{I_TASK}  Nova tarefa")).font(FontId::monospace(16.0)).color(theme.accent_hi));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                for s in TaskStatus::BOARD.iter().rev() {
+                for s in TaskStatus::ALL.iter().rev() {
                     if ui.selectable_label(status == *s, s.label()).clicked() {
                         status = *s;
                     }
@@ -588,70 +581,6 @@ fn close_block(app: &mut App, ctx: &Context, id: Id, mut remove_wt: bool, has_wt
     }
 }
 
-// ───────────────────────── vincular tarefa ─────────────────────────
-
-fn link_task(app: &mut App, ctx: &Context, session: Id, mut query: String, mut selected: usize) -> Option<Modal> {
-    let theme = app.theme.clone();
-    let q = query.to_lowercase();
-    let mut list: Vec<Task> = app
-        .tasks
-        .iter()
-        .filter(|t| !matches!(t.status, TaskStatus::Done | TaskStatus::Archived))
-        .filter(|t| q.is_empty() || t.title.to_lowercase().contains(&q) || t.card_key.as_deref().is_some_and(|k| k.to_lowercase().contains(&q)))
-        .cloned()
-        .collect();
-    list.sort_by(|a, b| a.status.cmp(&b.status).then(b.priority.cmp(&a.priority)));
-    let mut chosen = None;
-    let mut create = false;
-    let mut cancel = false;
-    let closed = frame(ctx, "link-task", 560.0, |ui| {
-        ui.label(RichText::new(format!("Vincular tarefa a \"{}\"", app.session_label(session))).size(15.0));
-        let r = ui.add(TextEdit::singleline(&mut query).hint_text("buscar… (Enter numa busca sem resultado cria a tarefa)").desired_width(f32::INFINITY));
-        r.request_focus();
-        let enter = list_nav(ui, &mut selected, list.len());
-        egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
-            for (i, t) in list.iter().enumerate() {
-                let label = match &t.card_key {
-                    Some(k) => format!("{k} · {}", t.title),
-                    None => t.title.clone(),
-                };
-                let resp = ui.selectable_label(i == selected, format!("[{}] {label}", t.status.label()));
-                if i == selected {
-                    resp.scroll_to_me(None);
-                }
-                if resp.clicked() {
-                    chosen = Some(t.id);
-                }
-            }
-            if list.is_empty() && !query.trim().is_empty() {
-                ui.label(widgets::subtle(format!("Enter cria \"{}\" e vincula", query.trim()), &theme));
-            }
-        });
-        if enter {
-            match list.get(selected) {
-                Some(t) => chosen = Some(t.id),
-                None => create = true,
-            }
-        }
-        if ui.button("Cancelar  (Esc)").clicked() {
-            cancel = true;
-        }
-    });
-    if cancel {
-        return None;
-    }
-    if create && !query.trim().is_empty() {
-        app.quick_add(&query, TaskStatus::Doing, Some(session));
-        return None;
-    }
-    if let Some(t) = chosen {
-        app.link(t, session);
-        app.toast("Tarefa vinculada. O Claude recebe o contexto ao reiniciar ou com o botão 󰈙.", crate::app::ToastKind::Ok);
-        return None;
-    }
-    (!closed).then_some(Modal::LinkTask { session, query, selected })
-}
-
 // ───────────────────────── workspaces ─────────────────────────
 
 fn workspaces(app: &mut App, ctx: &Context, mut query: String, mut selected: usize) -> Option<Modal> {
@@ -796,10 +725,7 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
             match item {
                 PaletteItem::Action(a) => app.run_action(ctx, a),
                 PaletteItem::Session(id) => app.focus(id),
-                PaletteItem::Task(id) => {
-                    app.board.selected = Some(id);
-                    app.set_view(crate::app::View::Board);
-                }
+                PaletteItem::Task(id) => app.open_task(id),
             }
         }
         return app.modal.take();
@@ -890,30 +816,5 @@ fn confirm_quit(app: &mut App, ctx: &Context) -> Option<Modal> {
         Some(_) => None,
         None if closed => None,
         None => Some(Modal::ConfirmQuit),
-    }
-}
-
-fn confirm_delete(app: &mut App, ctx: &Context, id: Id) -> Option<Modal> {
-    let title = app.tasks.iter().find(|t| t.id == id).map(|t| t.title.clone()).unwrap_or_default();
-    let mut choice = None;
-    let closed = frame(ctx, "del-task", 420.0, |ui| {
-        ui.label(RichText::new(format!("Apagar \"{title}\"?")).size(15.0));
-        ui.label(widgets::subtle("Pra só tirar do board, use arquivar (d).", &app.theme));
-        ui.horizontal(|ui| {
-            if ui.button(RichText::new("Apagar  ⏎").color(app.theme.err)).clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
-                choice = Some(true);
-            }
-            if ui.button("Cancelar").clicked() {
-                choice = Some(false);
-            }
-        });
-    });
-    match choice {
-        Some(true) => {
-            app.delete_task(id);
-            None
-        }
-        Some(false) => None,
-        None => (!closed).then_some(Modal::ConfirmDeleteTask(id)),
     }
 }

@@ -1,11 +1,11 @@
 ---
 name: layne
-description: Comandos para operar o AIC pela linha de comando — criar/trocar workspaces, anotar e concluir tarefas, abrir sessões do Claude (ou shell) num repo ou worktree com uma primeira mensagem, abrir um card do Notion montando o bloco, listar o que está aberto. Use quando o usuário (normalmente pelo Layne, por texto ou voz) pedir para organizar o trabalho no AIC: "cria um workspace", "anota pra eu lembrar", "abre uma sessão com o card X no projeto Y", "o que tenho aberto?".
+description: Comandos para operar o AIC pela linha de comando — criar/trocar workspaces, anotar e concluir tarefas, abrir sessões do Claude (ou shell) num repo ou worktree com uma primeira mensagem, listar o que está aberto. Use quando o usuário (normalmente pelo Layne, por texto ou voz) pedir para organizar o trabalho no AIC: "cria um workspace", "anota pra eu lembrar", "abre uma sessão com o card X no projeto Y", "o que tenho aberto?".
 ---
 
 # Operar o AIC (skill do Layne)
 
-Tudo pelo binário `aic` (no PATH). Os comandos que mudam a tela (`ws new/go`, `session`, `card`) pedem ao app aberto e esperam a resposta: a linha `✓ …` confirma; erro sai com código ≠ 0 e a mensagem diz o porquê. Use aspas simples nos textos (`!` e `$` não expandem).
+Tudo pelo binário `aic` (no PATH). Os comandos que mudam a tela (`ws new/go`, `session`) pedem ao app aberto e esperam a resposta: a linha `✓ …` confirma; erro sai com código ≠ 0 e a mensagem diz o porquê. Use aspas simples nos textos (`!` e `$` não expandem).
 
 ## Ver o estado
 
@@ -49,20 +49,10 @@ aic session --repo api --task 3f9a                                         # vin
 - `--repo` aceita o nome ou o começo dele (`aic repos`). `--branch` cria um worktree `<repo>.worktrees/<branch>`.
 - Tudo depois de `--` é a primeira mensagem do Claude: escreva-a completa (objetivo, card, onde mexer, critério de pronto), porque a sessão nova não vê esta conversa.
 
-## Abrir card (Notion)
-
-```bash
-aic card 'https://www.notion.so/…' --auto              # busca o card e monta o bloco com os repos sugeridos
-aic card DEV-142 --auto --repos api,front --ws 'Sprint 42'
-aic card DEV-142                                        # só abre o diálogo no app (o usuário escolhe os repos)
-```
-
-O `--auto` leva até um minuto ou dois (o AIC lê o card pelo Claude). Monta: worktree por repo na branch do card, um Claude em cada com o contexto do card, notas do bloco. Se o usuário citou os projetos, passe `--repos`; senão, deixe os sugeridos e diga quais foram.
-
 ## Receitas
 
 - **"Cria um workspace pessoal e abre umas tarefas pra eu lembrar: X, Y e Z"** → `aic ws new 'Pessoal' --go` e um `aic add --ws 'Pessoal' '…'` por item. Responda com a lista e os ids.
-- **"Abre uma sessão com o card DEV-142 no projeto api"** → `aic card DEV-142 --auto --repos api`. Se for só uma conversa rápida sem card, `aic session --repo api -- '…'`.
+- **"Abre uma sessão com o card DEV-142 no projeto api"** → `aic session --repo api --branch DEV-142-<slug> -- '…'` com o que o usuário disse do card na primeira mensagem (o AIC não busca cards).
 - **"O que tenho pra hoje?"** → `aic tasks --json` e filtre por prazo hoje/atrasado; responda em lista curta.
 - **"Terminei a tarefa do presente"** → `aic tasks`, ache pelo título, `aic done <id>`. Mais de uma candidata → pergunte qual.
 

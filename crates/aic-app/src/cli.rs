@@ -6,7 +6,6 @@
 //! aic done <id>                                 # conclui (prefixo do id serve)
 //! aic ws ls|new|go …                            # workspaces (new/go pedem ao app aberto)
 //! aic session [--repo r] [--ws w] [-- prompt]   # abre um Claude/shell no app aberto
-//! aic card <link> [--auto] [--repos a,b]        # abrir card no app aberto
 //! aic sessions | repos                          # o que está aberto / repos conhecidos
 //! aic layne [--send] "texto" | voz | show       # fala com o Layne (assistente)
 //! aic hook                                      # (hooks do Claude) grava evento
@@ -61,10 +60,6 @@ pub fn parse(args: Vec<String>) -> Cli {
             Cli::Run(Box::new(move || sessions(json)))
         }
         Some("repos") => Cli::Run(Box::new(repos)),
-        Some("card") => {
-            let rest: Vec<String> = it.collect();
-            Cli::Run(Box::new(move || card(rest)))
-        }
         Some("layne") => {
             let rest: Vec<String> = it.collect();
             Cli::Run(Box::new(move || layne(rest)))
@@ -112,7 +107,6 @@ Uso:
                                                          abre um Claude (ou shell) num bloco novo
   aic sessions [--json]                                  terminais abertos, por workspace
   aic repos                                              repos das pastas de projetos
-  aic card <link|DEV-1> [--ws W] [--auto [--repos a,b]]  abrir card (--auto monta sem perguntar)
   aic layne [--send] \"texto\"                             escreve pro Layne (assistente)
   aic layne show | aic voz                               mostra o Layne / liga-desliga a gravação
   aic export-icon <dir>                                  gera <dir>/aic-<N>.png (16..512)
@@ -262,18 +256,6 @@ fn repos() -> Result<()> {
         println!("{name:<32} {}", paths::pretty(&path));
     }
     Ok(())
-}
-
-fn card(mut args: Vec<String>) -> Result<()> {
-    let workspace = take_opt(&mut args, &["--ws", "--workspace", "-w"]);
-    let repos: Vec<String> = take_opt(&mut args, &["--repos", "-r"]).map(|r| r.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()).unwrap_or_default();
-    let auto = take_flag(&mut args, &["--auto", "-y"]);
-    let link = args.join(" ");
-    if link.trim().is_empty() {
-        bail!("uso: aic card <link do card | DEV-123> [--ws W] [--auto [--repos a,b]]");
-    }
-    // a busca no Notion pelo Claude pode levar um minuto
-    ask(Cmd::OpenCard { link, workspace, repos, auto }, if auto { 180 } else { 10 }).map(|_| ())
 }
 
 fn layne(mut args: Vec<String>) -> Result<()> {

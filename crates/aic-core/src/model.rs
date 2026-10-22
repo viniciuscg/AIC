@@ -269,7 +269,8 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
-    pub const BOARD: [TaskStatus; 4] = [Self::Todo, Self::Doing, Self::Review, Self::Done];
+    /// Os status que dá pra escolher (arquivada fica de fora).
+    pub const ALL: [TaskStatus; 4] = [Self::Todo, Self::Doing, Self::Review, Self::Done];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -320,15 +321,6 @@ impl Priority {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum TaskSource {
-    /// Criada no AIC (atalho, CLI, /tarefa).
-    #[default]
-    Local,
-    /// Espelho de um card do Notion.
-    Notion,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Subtask {
     pub text: String,
@@ -354,23 +346,14 @@ pub struct Task {
     pub workspace: Option<Id>,
     #[serde(default)]
     pub session: Option<Id>,
-    #[serde(default)]
-    pub source: TaskSource,
-    /// Chave do card (ex: `DEV-142`).
+    /// Chave do card (ex: `DEV-142`, marcador `^`): vira o começo do nome da branch.
     #[serde(default)]
     pub card_key: Option<String>,
-    /// Page id do Notion, quando vinculado.
-    #[serde(default)]
-    pub notion_page: Option<String>,
-    #[serde(default)]
-    pub notion_url: Option<String>,
-    #[serde(default)]
-    pub slack_thread: Option<String>,
     #[serde(default)]
     pub subtasks: Vec<Subtask>,
     #[serde(default)]
     pub tags: Vec<String>,
-    /// Ordem dentro da coluna (menor = mais em cima).
+    /// Ordem na lista (menor = mais em cima).
     #[serde(default)]
     pub rank: f64,
     pub created_at: DateTime<Utc>,
@@ -390,11 +373,7 @@ impl Task {
             repo: None,
             workspace: None,
             session: None,
-            source: TaskSource::Local,
             card_key: None,
-            notion_page: None,
-            notion_url: None,
-            slack_thread: None,
             subtasks: vec![],
             tags: vec![],
             rank: now.timestamp_millis() as f64,
