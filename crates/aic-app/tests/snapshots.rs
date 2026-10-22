@@ -204,7 +204,7 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     usage_sessions.push(("7c1e9a52-0000-4000-8000-000000000001".into(), "/home/dev/projetos/notificador".into()));
     usage_sessions.push(("9d2f0b63-0000-4000-8000-000000000002".into(), "/home/dev/dotfiles".into()));
     usage_fixtures(&usage_sessions);
-    app.usage_history.refresh();
+    app.usage_history.ensure_started(&ctx);
     // snapshot de statusline falso pra sessão em foco
     let snap = serde_json::json!({
         "session_id": app.sessions[&ids[0]].s.claude_session.to_string(),

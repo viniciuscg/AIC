@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use alacritty_terminal::event::{Event, EventListener, Notify, OnResize, WindowSize};
 use alacritty_terminal::event_loop::{EventLoop, EventLoopSender, Msg, Notifier};
@@ -64,6 +64,33 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Intervalo mínimo entre redesenhos pedidos pelos terminais (~30 fps).
+const FRAME_MS: u64 = 33;
+
+/// Quadro (ms desde epoch) do último redesenho pedido por QUALQUER terminal: o imediato ou o
+/// agendado. Compartilhado: vários Claudes animando o spinner ao mesmo tempo somam um redesenho
+/// por quadro, não um por pedaço de saída que chega.
+static FRAME_AT_MS: AtomicU64 = AtomicU64::new(0);
+
+/// Pede um redesenho limitado a ~30 fps. Dentro do intervalo, agenda pro próximo quadro: a
+/// última saída sempre aparece, só que no máximo um quadro depois.
+fn request_repaint_coalesced(ctx: &egui::Context) {
+    let now = now_ms();
+    let last = FRAME_AT_MS.load(Ordering::Relaxed);
+    if now >= last + FRAME_MS {
+        // livre: desenha já
+        let _ = FRAME_AT_MS.compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed);
+        ctx.request_repaint();
+    } else if last > now {
+        // já tem quadro agendado: ele pega esta saída também
+        ctx.request_repaint_after(Duration::from_millis(last - now));
+    } else {
+        let at = last + FRAME_MS;
+        let _ = FRAME_AT_MS.compare_exchange(last, at, Ordering::Relaxed, Ordering::Relaxed);
+        ctx.request_repaint_after(Duration::from_millis(at - now));
+    }
+}
+
 #[derive(Clone)]
 pub struct EventProxy {
     shared: Arc<Shared>,
@@ -84,13 +111,13 @@ impl EventListener for EventProxy {
         match event {
             Event::Wakeup => {
                 s.last_output_ms.store(now_ms(), Ordering::Relaxed);
-                self.ctx.request_repaint();
+                request_repaint_coalesced(&self.ctx);
             }
             Event::Title(t) => *s.title.lock().unwrap() = Some(t),
             Event::ResetTitle => *s.title.lock().unwrap() = None,
             Event::Bell => {
                 s.bells.fetch_add(1, Ordering::Relaxed);
-                self.ctx.request_repaint();
+                request_repaint_coalesced(&self.ctx);
             }
             Event::ClipboardStore(_, text) => *s.clipboard.lock().unwrap() = Some(text),
             // Respostas que o programa espera (DA, cor de fundo, tamanho): sem elas

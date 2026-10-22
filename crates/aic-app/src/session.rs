@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
 use aic_core::claude::{self, Injection, StatusSnapshot};
@@ -17,6 +18,8 @@ pub struct Runtime {
     pub live: Live,
     pub git: Option<GitStatus>,
     git_at: Option<Instant>,
+    /// `git status` rodando numa thread (nunca na thread da UI).
+    git_rx: Option<Receiver<Option<GitStatus>>>,
     pub snap: Option<StatusSnapshot>,
     snap_at: Option<Instant>,
     pub started: Instant,
@@ -39,6 +42,7 @@ impl Runtime {
             live: Live::default(),
             git: None,
             git_at: None,
+            git_rx: None,
             snap: None,
             snap_at: None,
             started: Instant::now(),
@@ -117,11 +121,21 @@ impl Runtime {
         }
     }
 
-    /// Atualiza git (a cada 5s) e snapshot da statusline (a cada 2s).
+    /// Atualiza git (a cada 5s, numa thread) e snapshot da statusline (a cada 2s).
     pub fn refresh(&mut self) {
-        if self.git_at.is_none_or(|t| t.elapsed() > Duration::from_secs(5)) {
+        if let Some(rx) = &self.git_rx {
+            if let Ok(st) = rx.try_recv() {
+                self.git = st;
+                self.git_rx = None;
+            }
+        }
+        if self.git_rx.is_none() && self.git_at.is_none_or(|t| t.elapsed() > Duration::from_secs(5)) {
             self.git_at = Some(Instant::now());
-            self.git = git::status(&self.s.cwd);
+            let (tx, rx) = mpsc::channel();
+            let cwd = self.s.cwd.clone();
+            if std::thread::Builder::new().name("aic-git".into()).spawn(move || tx.send(git::status(&cwd))).is_ok() {
+                self.git_rx = Some(rx);
+            }
         }
         if matches!(self.s.kind, SessionKind::Claude) && self.snap_at.is_none_or(|t| t.elapsed() > Duration::from_secs(2)) {
             self.snap_at = Some(Instant::now());

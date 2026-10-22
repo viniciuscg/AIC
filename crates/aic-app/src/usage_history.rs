@@ -1,8 +1,9 @@
 //! Histórico de uso (tokens/custo por dia, modelo, sessão) a partir dos transcripts.
 //!
 //! Uma thread em segundo plano lê `~/.claude/projects/**.jsonl` com o
-//! [`Aggregator`](aic_core::usage::Aggregator): varredura completa (30 dias) na
-//! abertura e incremental a cada 30 s. O relatório chega por canal; a UI só desenha.
+//! [`Aggregator`](aic_core::usage::Aggregator): varredura completa (30 dias) quando a aba
+//! Tokens abre pela primeira vez e incremental a cada 30 s depois disso. O relatório chega por
+//! canal; a UI só desenha.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -40,6 +41,15 @@ impl Default for UsageHistory {
 }
 
 impl UsageHistory {
+    /// Sobe a thread de leitura na primeira vez (a aba Tokens chama a cada frame). Antes disso
+    /// nada lê os transcripts.
+    pub fn ensure_started(&mut self, ctx: &egui::Context) {
+        if self.rx.is_none() {
+            let period = self.period;
+            *self = Self { period, ..Self::start(ctx) };
+        }
+    }
+
     /// Sobe a thread de leitura. Caminhos e preços são resolvidos aqui (thread da UI),
     /// assim a thread não depende de variáveis de ambiente mudando depois.
     pub fn start(ctx: &egui::Context) -> Self {

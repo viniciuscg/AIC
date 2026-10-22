@@ -216,7 +216,7 @@ impl App {
             usage: Default::default(),
             notion: Default::default(),
             connector: Default::default(),
-            usage_history: crate::usage_history::UsageHistory::start(ctx),
+            usage_history: Default::default(),
             layne: Default::default(),
             account: StatusSnapshot::latest(),
             md_cache: Default::default(),

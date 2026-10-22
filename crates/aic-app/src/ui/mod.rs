@@ -23,6 +23,10 @@ use egui::{Align2, Frame, Key, Margin, RichText, Ui, Vec2};
 
 use crate::app::{App, Phase, ToastKind, View};
 
+/// Redesenho de fundo, sem nada acontecendo: relógio, estados dos hooks, avisos. Saída de
+/// terminal e input redesenham na hora (a saída limitada a ~30 fps, ver `aic_term::backend`).
+pub const IDLE_REPAINT: Duration = Duration::from_millis(500);
+
 pub fn draw(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
 
@@ -35,7 +39,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
 
     if matches!(app.phase, Phase::Setup(_)) {
         setup::show(app, ui);
-        ctx.request_repaint_after(Duration::from_millis(33));
+        ctx.request_repaint_after(IDLE_REPAINT);
         return;
     }
 
@@ -108,7 +112,10 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             View::Board => board::show(app, ui),
             View::Worktrees => worktrees::show(app, ui),
             View::Changes => changes::show(app, ui),
-            View::Usage => usage::show(app, ui),
+            View::Usage => {
+                app.usage_history.ensure_started(ui.ctx());
+                usage::show(app, ui)
+            }
             View::Settings => settings::show(app, ui),
             View::Help => help::show(app, ui),
         });
@@ -117,8 +124,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     leader::show(app, &ctx);
     toasts(app, &ctx);
 
-    let animating = app.cfg.animations;
-    ctx.request_repaint_after(Duration::from_millis(if animating { 40 } else { 250 }));
+    ctx.request_repaint_after(IDLE_REPAINT);
 }
 
 fn toasts(app: &mut App, ctx: &egui::Context) {
