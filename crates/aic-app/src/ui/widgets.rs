@@ -150,6 +150,10 @@ pub fn heading(ui: &mut Ui, text: &str, theme: &Theme) {
     ui.label(RichText::new(text).font(FontId::new(18.0, FontFamily::Monospace)).color(theme.accent_hi).strong());
 }
 
+pub fn truncate(s: &str, n: usize) -> String {
+    if s.chars().count() <= n { s.to_string() } else { format!("{}…", s.chars().take(n - 1).collect::<String>()) }
+}
+
 pub fn subtle(text: impl Into<String>, theme: &Theme) -> RichText {
     RichText::new(text.into()).color(theme.dim)
 }

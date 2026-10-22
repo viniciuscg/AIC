@@ -1,5 +1,5 @@
 //! Prefixo estilo tmux: aperta `cfg.prefix` (padrão `Ctrl+B`), solta e aperta a tecla da ação.
-//! Não abre menu nenhum, só acende o indicador na barra de cima e troca as dicas do rodapé;
+//! Não abre menu nenhum, só acende o indicador na barra de cima;
 //! quem quer ver tudo usa `Ctrl+B ?` ou a tecla líder (catálogo).
 //!
 //! - `Ctrl+B Ctrl+B` manda um Ctrl+B de verdade pro terminal em foco;

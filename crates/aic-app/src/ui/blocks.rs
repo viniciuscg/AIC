@@ -6,7 +6,7 @@ use egui::{Align, Color32, CursorIcon, FontId, Layout, Pos2, Rect, RichText, Sen
 use aic_core::{Id, Module, SessionState, Split, TaskStatus};
 
 use super::sessions::pane;
-use super::statusbar::truncate;
+use super::widgets::truncate;
 use super::widgets::{self, I_CLOSE, I_PLUS, I_TASK, I_TERM};
 use crate::actions::Action;
 use crate::app::App;

@@ -1,7 +1,9 @@
 //! O que o AIC injeta em cada sessão do Claude, sem tocar no `~/.claude` global:
 //!
 //! - `--settings <data>/claude-settings.json`: hooks (todos `async`, só observam) e a
-//!   statusLine apontando pro wrapper `aic statusline`, que chama a sua statusline.
+//!   statusLine apontando pro `aic statusline`, que grava o snapshot pro AIC e não imprime nada:
+//!   dentro do AIC o terminal fica sem statusline (os dados vão pra barra de cima). Fora do AIC,
+//!   a sua statusline continua a mesma.
 //! - `--plugin-dir <plugin>`: skills, commands e agents do AIC (`claude/` do repo).
 
 use std::path::PathBuf;
@@ -69,14 +71,6 @@ pub fn prepare() -> Injection {
         }
     };
     Injection { settings, plugin_dir: plugin_dir() }
-}
-
-/// Statusline que o usuário já usava (pra o wrapper chamar depois de gravar o snapshot).
-pub fn user_statusline_from_claude_settings() -> Option<String> {
-    let text = std::fs::read_to_string(paths::claude_dir().join("settings.json")).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
-    let cmd = v.pointer("/statusLine/command")?.as_str()?.to_string();
-    (!cmd.contains("aic statusline")).then_some(cmd)
 }
 
 #[cfg(test)]

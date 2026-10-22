@@ -79,7 +79,6 @@ pub enum Action {
     ZoomOut,
     ZoomReset,
     ToggleSidebar,
-    ToggleHints,
     Quit,
 }
 
@@ -116,7 +115,7 @@ impl Action {
         v.extend((1..=9).map(GotoWorkspace));
         v.extend([
             LastWorkspace, RenameWorkspace, ViewSessions, ViewWorktrees, ViewChanges, ViewUsage, ViewSettings, ViewHelp, NextView, PrevView,
-            SearchSettings, Catalog, Palette, ZoomIn, ZoomOut, ZoomReset, ToggleSidebar, ToggleHints, Quit,
+            SearchSettings, Catalog, Palette, ZoomIn, ZoomOut, ZoomReset, ToggleSidebar, Quit,
         ]);
         v
     }
@@ -132,7 +131,7 @@ impl Action {
             Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_) | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
             FocusNotes => Some(Module::Notes),
             ToggleLayne | LayneVoice => Some(Module::Layne),
-            ToggleHints | Catalog => Some(Module::Hints),
+            Catalog => Some(Module::Hints),
             _ => None,
         }
     }
@@ -232,7 +231,6 @@ impl Action {
             ZoomOut => ("zoom_out", "Diminuir a fonte do terminal", "Visual", ks(CS, Key::Minus)),
             ZoomReset => ("zoom_reset", "Voltar a fonte do terminal ao padrão", "Visual", ks(CS, Key::Num0)),
             ToggleSidebar => ("toggle_sidebar", "Mostrar/esconder a lista lateral (visualização Foco)", "Visual", ks(CS, Key::D)),
-            ToggleHints => ("toggle_hints", "Mostrar/esconder a barra de dicas do rodapé", "Visual", ks(CS, Key::H)),
             Quit => ("quit", "Sair do AIC", "Visual", ks(CS, Key::Q)),
         };
         Meta { id, name, group, default }
@@ -290,7 +288,6 @@ impl Action {
             SearchSettings => &["/"],
             Catalog => &["?"],
             Palette => &[":"],
-            ToggleHints => &["H"],
             ToggleSidebar => &["d"],
             _ => &[],
         }

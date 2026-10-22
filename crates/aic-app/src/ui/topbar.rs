@@ -1,20 +1,21 @@
 //! Barra superior no espírito do i3bar, uma linha só:
 //!
 //! ```text
-//!  ▣ AIC │ 1 Principal │ 2 api ●2 │ 3 front │ +   PREFIXO   s Sessões  g Worktrees …      ● 2 aguardando │ 🔥 1 │ $3.20 │ 5h ███░ 40% │ sem ░░ 5% │ 14:32
+//!  AIC │ 1 Principal │ 2 api ●2 │ 3 front │ +   PREFIXO   s Sessões  g Worktrees …    THEM BONES · api · Opus 5.5 · 17% · main ±3 · $3.83 │ L
 //! ```
 //!
 //! - **workspaces** à esquerda e em destaque: o atual aceso na cor de destaque, os que têm
 //!   alguém precisando de você em roxo (o "urgent" do i3). O número é o de `Ctrl+B N`;
 //! - **PREFIXO** acende enquanto o `Ctrl+B` espera a próxima tecla (o modo do i3);
 //! - **abas** com a tecla de prefixo de cada uma;
-//! - **status** à direita, em blocos separados como no i3status.
+//! - à direita, **a janela em foco**: estado, nome, modelo, contexto, branch e custo da sessão
+//!   (o que a statusline do Claude mostrava dentro do terminal), e o ícone do Layne.
 
 use egui::text::LayoutJob;
 use egui::{Color32, CornerRadius, FontId, Rect, RichText, Sense, Stroke, Ui, Vec2};
-use aic_core::SessionState;
+use aic_core::{SessionKind, SessionState};
 
-use super::widgets::{self, I_5H, I_WEEK, bar_job, push};
+use super::widgets::{self, I_AGENTS, I_BRANCH, I_CTX, push};
 use crate::actions::Action;
 use crate::app::{App, View};
 use crate::theme::Theme;
@@ -112,63 +113,66 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             }
         }
 
-        // ── status (direita → esquerda) ──
+        // ── à direita: a janela em foco e o Layne ──
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 3.0;
             if app.cfg.on(aic_core::Module::Layne) {
                 layne_button(app, ui, &theme, t);
                 sep(ui, &theme);
             }
-            ui.label(RichText::new(chrono::Local::now().format("%H:%M").to_string()).font(widgets::mono(12.5)).color(theme.ink));
-            if let Some(acc) = app.account.clone() {
-                if let Some(w) = acc.seven_day {
-                    sep(ui, &theme);
-                    let mut job = LayoutJob::default();
-                    push(&mut job, &format!("{I_WEEK} "), theme.dim, 12.0);
-                    bar_job(&mut job, w.used_pct, 5, &theme, 12.0);
-                    push(&mut job, &format!(" {:.0}%", w.used_pct), theme.usage_color(w.used_pct), 12.0);
-                    if ui.add(egui::Label::new(job).sense(Sense::click())).on_hover_text(format!("Semana · reseta em {} (aba Tokens)", widgets::until(w.resets_at))).clicked() {
-                        app.set_view(View::Usage);
-                    }
-                }
-                if let Some(h) = acc.five_hour {
-                    sep(ui, &theme);
-                    let mut job = LayoutJob::default();
-                    push(&mut job, &format!("{I_5H} "), theme.dim, 12.0);
-                    bar_job(&mut job, h.used_pct, 5, &theme, 12.0);
-                    push(&mut job, &format!(" {:.0}%", h.used_pct), theme.usage_color(h.used_pct), 12.0);
-                    if ui.add(egui::Label::new(job).sense(Sense::click())).on_hover_text(format!("5 horas · reseta em {} (aba Tokens)", widgets::until(h.resets_at))).clicked() {
-                        app.set_view(View::Usage);
-                    }
-                }
-            }
-            if let Some(cost) = app.usage_history.today_cost() {
-                sep(ui, &theme);
-                let text = RichText::new(format!("{} {}", widgets::I_COST, crate::usage_history::fmt_usd(cost))).font(widgets::mono(12.0)).color(theme.dim);
-                if ui.add(egui::Label::new(text).sense(Sense::click())).on_hover_text("Custo estimado de hoje pelos transcripts (aba Tokens)").clicked() {
-                    app.set_view(View::Usage);
-                }
-            }
-            let count = |s: SessionState| app.sessions.values().filter(|r| r.state() == s).count();
-            let working = count(SessionState::Working);
-            if working > 0 {
-                sep(ui, &theme);
-                ui.label(RichText::new(format!("{} {working}", widgets::I_FIRE)).font(widgets::mono(12.0)).color(theme.ok))
-                    .on_hover_text(format!("{working} trabalhando"));
-            }
-            let waiting = count(SessionState::Waiting) + app.sessions.values().filter(|r| r.unseen && r.state() == SessionState::Done).count();
-            if waiting > 0 {
-                sep(ui, &theme);
-                let a = 0.6 + 0.4 * ((t * 4.0).sin() as f32 * 0.5 + 0.5);
-                let r = ui
-                    .add(egui::Label::new(RichText::new(format!("● {waiting} aguardando")).font(widgets::mono(12.0)).color(theme.attention.gamma_multiply(a)).strong()).sense(Sense::click()))
-                    .on_hover_text(app.keymap.tip(Action::NextWaiting, "Ir pra próxima"));
-                if r.clicked() {
-                    app.next_waiting();
-                }
-            }
+            focus_status(app, ui, &theme);
         });
     });
+}
+
+/// A janela em foco numa linha, no lugar da statusline do Claude: estado, nome, modelo, contexto,
+/// branch e custo da sessão. Os números vêm do snapshot que o `aic statusline` grava.
+fn focus_status(app: &App, ui: &mut Ui, theme: &Theme) {
+    let Some(rt) = app.focused().and_then(|id| app.sessions.get(&id)) else { return };
+    let state = rt.state();
+    let mut job = LayoutJob::default();
+    let dot = |job: &mut LayoutJob| push(job, "  ·  ", theme.faint, 12.0);
+    push(&mut job, crate::brand::state_label(state), theme.state_color(state), 12.0);
+    dot(&mut job);
+    push(&mut job, &widgets::truncate(&rt.s.name, 28), theme.ink, 12.5);
+    match (&rt.s.kind, &rt.snap) {
+        (SessionKind::Claude, Some(s)) => {
+            dot(&mut job);
+            push(&mut job, &s.model, theme.dim, 12.0);
+            if let Some(pct) = s.context_pct {
+                dot(&mut job);
+                push(&mut job, &format!("{I_CTX} {pct:.0}%"), theme.usage_color(pct), 12.0);
+            }
+        }
+        (SessionKind::Claude, None) => {}
+        (SessionKind::Shell, _) => {
+            dot(&mut job);
+            push(&mut job, "shell", theme.dim, 12.0);
+        }
+        (SessionKind::Command(c), _) => {
+            dot(&mut job);
+            push(&mut job, &format!("$ {}", widgets::truncate(c.lines().next().unwrap_or(""), 24)), theme.dim, 12.0);
+        }
+    }
+    if let Some(g) = &rt.git {
+        if let Some(b) = &g.branch {
+            dot(&mut job);
+            push(&mut job, &format!("{I_BRANCH} {}", widgets::truncate(b, 32)), theme.dim, 12.0);
+            if g.dirty > 0 {
+                push(&mut job, &format!(" ±{}", g.dirty), theme.warn, 12.0);
+            }
+        }
+    }
+    if let Some(s) = rt.snap.as_ref().filter(|s| s.cost_usd > 0.0) {
+        dot(&mut job);
+        push(&mut job, &crate::usage_history::fmt_usd(s.cost_usd), theme.dim, 12.0);
+    }
+    let agents = rt.live.agents.len();
+    if agents > 0 {
+        dot(&mut job);
+        push(&mut job, &format!("{I_AGENTS} {agents}"), theme.attention, 12.0);
+    }
+    ui.add(egui::Label::new(job).wrap_mode(egui::TextWrapMode::Truncate)).on_hover_text(aic_core::paths::pretty(&rt.s.cwd));
 }
 
 /// Ícone do Layne (o assistente): clica e abre/fecha o painel. A cor diz o estado dele:

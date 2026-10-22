@@ -231,7 +231,7 @@ fn telas() {
         shot(&mut h, name);
     }
     h.state_mut().as_mut().unwrap().cfg.view = aic_core::SessionView::Blocks;
-    // prefixo armado: indicador na barra e dicas do prefixo no rodapé
+    // prefixo armado: indicador na barra
     h.state_mut().as_mut().unwrap().prefix_pending = true;
     settle(&mut h, 200);
     shot(&mut h, "prefixo");

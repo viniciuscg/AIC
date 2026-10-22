@@ -93,7 +93,7 @@ const SOM: &[(&str, &str)] = &[
     ("Quando precisar de você", "som permissão atenção"),
     ("Notificação", "notify-send desktop sistema foco"),
 ];
-const CLAUDE: &[(&str, &str)] = &[("Sua statusline", "statusline script"), ("Injeção por sessão", "settings plugin hooks")];
+const CLAUDE: &[(&str, &str)] = &[("Injeção por sessão", "settings plugin hooks statusline")];
 const LAYNE: &[(&str, &str)] = &[
     ("Sessão do Layne", "assistente agente iniciar modelo conversa"),
     ("Microfone", "mic áudio voz gravar entrada pulseaudio pipewire"),
@@ -275,15 +275,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             section(ui, &theme, "Claude Code");
             egui::Grid::new("claude").num_columns(2).spacing([16.0, 8.0]).show(ui, |ui| {
                 if f.row("Claude Code", CLAUDE[0].0, CLAUDE[0].1) {
-                    ui.label("Sua statusline");
-                    let mut s = app.cfg.user_statusline.clone().unwrap_or_default();
-                    if ui.add(TextEdit::singleline(&mut s).hint_text("~/.claude/statusline.sh").desired_width(360.0)).lost_focus() {
-                        app.cfg.user_statusline = (!s.trim().is_empty()).then(|| s.trim().to_string());
-                        let _ = app.cfg.save();
-                    }
-                    ui.end_row();
-                }
-                if f.row("Claude Code", CLAUDE[1].0, CLAUDE[1].1) {
                     ui.label("Injeção por sessão");
                     ui.vertical(|ui| {
                         match &app.inj.settings {
@@ -294,7 +285,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                             Some(p) => ui.label(widgets::subtle(format!("--plugin-dir {}", aic_core::paths::pretty(p)), &theme).small()),
                             None => ui.label(RichText::new("plugin não encontrado (rode ./install.sh do AIC)").color(theme.warn)),
                         };
-                        ui.label(widgets::subtle("hooks e statusline só valem nas sessões abertas pelo AIC; seu ~/.claude não é alterado.", &theme).small());
+                        ui.label(widgets::subtle("hooks e statusline (que só grava os dados da barra de cima, sem imprimir no terminal) valem só nas sessões abertas pelo AIC; seu ~/.claude não é alterado.", &theme).small());
                     });
                     ui.end_row();
                 }
@@ -418,7 +409,7 @@ fn binds(app: &mut App, ui: &mut Ui, f: &Find) -> bool {
                     let _ = app.cfg.save();
                 }
                 if !app.cfg.on(aic_core::Module::Hints) {
-                    ui.label(widgets::subtle("(módulo Dicas desligado)", &theme).small());
+                    ui.label(widgets::subtle("(módulo Catálogo desligado)", &theme).small());
                 }
             });
             ui.label("");

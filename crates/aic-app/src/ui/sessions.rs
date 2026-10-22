@@ -4,7 +4,7 @@ use egui::{Align, Color32, FontId, Layout as ELayout, Rect, RichText, Sense, Str
 use aic_core::{Id, Layout, SessionKind, SessionState, TaskStatus};
 use aic_term::TerminalView;
 
-use super::statusbar::truncate;
+use super::widgets::truncate;
 use super::widgets::{self, I_AGENTS, I_BRANCH, I_CLOSE, I_RESTART, I_TASK, I_WORKTREE};
 use crate::actions::Action;
 use crate::app::App;

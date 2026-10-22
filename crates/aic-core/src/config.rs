@@ -57,8 +57,6 @@ pub struct Config {
     pub leader: String,
     /// Prefixo estilo tmux: aperte, solte e aperte a tecla da ação (`Ctrl+B x` fecha o que está em foco).
     pub prefix: String,
-    /// Barra de dicas de atalho no rodapé (módulo `hints`).
-    pub hints_bar: bool,
     pub font_family: String,
     pub font_size: f32,
     pub ui_scale: f32,
@@ -66,8 +64,6 @@ pub struct Config {
     pub repos_dirs: Vec<PathBuf>,
     pub sound: SoundConfig,
     pub notify: NotifyConfig,
-    /// Statusline do usuário, chamada pelo wrapper do AIC depois de gravar o snapshot.
-    pub user_statusline: Option<String>,
     /// Mascote animado e partículas.
     pub animations: bool,
     pub layne: LayneConfig,
@@ -195,14 +191,12 @@ impl Default for Config {
             modules: Flags::new(),
             leader: "Ctrl+Space".into(),
             prefix: "Ctrl+B".into(),
-            hints_bar: true,
             font_family: "JetBrainsMono Nerd Font Mono".into(),
             font_size: 14.0,
             ui_scale: 1.0,
             repos_dirs: vec![paths::home_dir()],
             sound: SoundConfig::default(),
             notify: NotifyConfig::default(),
-            user_statusline: None,
             animations: true,
             layne: LayneConfig::default(),
         }

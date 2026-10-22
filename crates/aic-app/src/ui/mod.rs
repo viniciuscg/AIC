@@ -3,14 +3,12 @@
 pub mod blocks;
 pub mod changes;
 pub mod help;
-pub mod hints;
 pub mod leader;
 pub mod modals;
 pub mod prefix;
 pub mod sessions;
 pub mod settings;
 pub mod setup;
-pub mod statusbar;
 pub mod topbar;
 pub mod usage;
 pub mod widgets;
@@ -78,16 +76,6 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     egui::Panel::top("topbar")
         .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(6, 4)).stroke(egui::Stroke::new(1.0, app.theme.border)))
         .show(ui, |ui| topbar::show(app, ui));
-
-    if hints::visible(app) {
-        egui::Panel::bottom("hints")
-            .frame(Frame::new().fill(app.theme.bg).inner_margin(Margin::symmetric(12, 3)))
-            .show(ui, |ui| hints::show(app, ui));
-    }
-
-    egui::Panel::bottom("statusbar")
-        .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(12, 5)).stroke(egui::Stroke::new(1.0, app.theme.border)))
-        .show(ui, |ui| statusbar::show(app, ui));
 
     if app.layne.open && app.cfg.on(aic_core::Module::Layne) {
         let resp = egui::Panel::right("layne")

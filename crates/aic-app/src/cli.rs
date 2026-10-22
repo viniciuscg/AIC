@@ -9,12 +9,11 @@
 //! aic sessions | repos                          # o que está aberto / repos conhecidos
 //! aic layne [--send] "texto" | voz | show       # fala com o Layne (assistente)
 //! aic hook                                      # (hooks do Claude) grava evento
-//! aic statusline                                # (statusLine do Claude) grava snapshot + chama a sua
+//! aic statusline                                # (statusLine do Claude) grava o snapshot, sem imprimir
 //! aic export-icon <dir>                         # PNGs do ícone (16..512) em <dir>
 //! ```
 
-use std::io::{Read, Write};
-use std::process::{Command, Stdio};
+use std::io::Read;
 
 use anyhow::{Result, bail};
 use chrono::Local;
@@ -388,7 +387,8 @@ fn hook() -> Result<()> {
     Ok(())
 }
 
-/// Wrapper da statusLine: grava o snapshot e repassa o JSON pra statusline do usuário.
+/// statusLine das sessões do AIC: grava o snapshot (modelo, contexto, custo, limites) que a barra
+/// de cima e a aba Tokens leem. Não imprime nada: o terminal fica sem statusline.
 fn statusline() -> Result<()> {
     let mut input = String::new();
     let _ = std::io::stdin().read_to_string(&mut input);
@@ -404,20 +404,6 @@ fn statusline() -> Result<()> {
         }
     }
 
-    let user = Config::load().user_statusline.or_else(crate::injection::user_statusline_from_claude_settings);
-    if let Some(cmd) = user {
-        let cmd = cmd.replace('~', &paths::home_dir().to_string_lossy());
-        if let Ok(mut child) = Command::new("sh").arg("-c").arg(&cmd).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn() {
-            if let Some(mut stdin) = child.stdin.take() {
-                let _ = stdin.write_all(input.as_bytes());
-            }
-            if let Ok(out) = child.wait_with_output() {
-                let _ = std::io::stdout().write_all(&out.stdout);
-                return Ok(());
-            }
-        }
-    }
-    println!("󰧑 aic");
     Ok(())
 }
 

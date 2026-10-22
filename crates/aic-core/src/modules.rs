@@ -31,9 +31,7 @@ pub enum Module {
     Sound,
     /// Notificação do sistema.
     Notifications,
-    /// Barra de status estilo statusline do Claude.
-    Statusbar,
-    /// Dicas de atalho (tecla líder + barra de dicas).
+    /// Catálogo de atalhos (tecla líder).
     Hints,
     /// Layne: assistente pessoal (um Claude sempre aberto, por texto ou voz) que mexe no AIC por você.
     Layne,
@@ -61,8 +59,7 @@ pub const ALL: &[ModuleInfo] = &[
     ModuleInfo { module: Worktrees, id: "worktrees", name: "Worktrees", desc: "Aba de worktrees e opção de isolar cada sessão num worktree.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Changes, id: "changes", name: "Changes", desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Usage, id: "usage", name: "Tokens e custo", desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Statusbar, id: "statusbar", name: "Barra de status", desc: "Modelo, contexto, branch, limites e custo da sessão em foco.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Hints, id: "hints", name: "Dicas de atalho", desc: "Catálogo de atalhos (tecla líder) e barra de dicas no rodapé.", group: "Interface", default: true, requires: &[] },
+    ModuleInfo { module: Hints, id: "hints", name: "Catálogo de atalhos", desc: "Tecla líder (Ctrl+Space) com todos os atalhos agrupados.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Mascot, id: "mascot", name: "Mascote", desc: "O pote de moscas, animado conforme o estado de cada sessão.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Background, id: "background", name: "Fundo animado", desc: "Grão de película e poeira na luz, atrás de tudo.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Sound, id: "sound", name: "Som", desc: "Toca um som quando uma sessão termina ou pede permissão.", group: "Avisos", default: true, requires: &[] },

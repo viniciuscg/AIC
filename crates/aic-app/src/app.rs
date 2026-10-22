@@ -151,10 +151,7 @@ impl App {
     pub fn new(ctx: &Context, fresh: bool) -> anyhow::Result<Self> {
         paths::ensure_dirs()?;
         egui_extras::install_image_loaders(ctx);
-        let mut cfg = Config::load();
-        if cfg.user_statusline.is_none() {
-            cfg.user_statusline = injection::user_statusline_from_claude_settings();
-        }
+        let cfg = Config::load();
         let store = Store::open(&paths::db_path())?;
 
         let needs_setup = !cfg.setup_done;
@@ -1083,10 +1080,6 @@ impl App {
                 if let Some(b) = self.current_block() {
                     ui::blocks::move_block(self, b, if a == MoveBlockUp { -1 } else { 1 });
                 }
-            }
-            ToggleHints => {
-                self.cfg.hints_bar = !self.cfg.hints_bar;
-                let _ = self.cfg.save();
             }
             NextSession => self.cycle_session(1),
             PrevSession => self.cycle_session(-1),

@@ -579,7 +579,7 @@ fn prefixo_estilo_tmux() {
     kill_all(&mut h);
 }
 
-// ───────────────────────── tecla líder e dicas ─────────────────────────
+// ───────────────────────── tecla líder ─────────────────────────
 
 #[test]
 fn tecla_lider() {
@@ -619,15 +619,6 @@ fn tecla_lider() {
     click(&mut h, "Fechar menu");
     assert!(app(&mut h).leader.is_none(), "Fechar menu");
 
-    // barra de dicas: o atalho da líder nela abre o menu; ✕ esconde; Ctrl+Shift+H volta
-    click(&mut h, "Ctrl+Space");
-    assert!(app(&mut h).leader.is_some(), "dica da líder é clicável");
-    key(&mut h, Modifiers::NONE, Key::Escape);
-    click(&mut h, "Esconder dicas");
-    assert!(!app(&mut h).cfg.hints_bar, "✕ esconde a barra");
-    key(&mut h, ctrl_shift(), Key::H);
-    assert!(app(&mut h).cfg.hints_bar, "Ctrl+Shift+H mostra de novo");
-
     // módulo desligado: o grupo Tarefas some do menu
     app(&mut h).cfg.modules.insert("tasks".into(), false);
     key(&mut h, ctrl(), Key::Space);
@@ -643,7 +634,7 @@ fn tecla_lider() {
     assert!(app(&mut h).leader.is_none());
     app(&mut h).cfg.modules.remove("hints");
 
-    // shot: menu aberto em Sessões + barra de dicas
+    // shot: menu aberto em Sessões
     key(&mut h, ctrl(), Key::Space);
     frames(&mut h, 3);
     let img = h.render().expect("render");

@@ -81,7 +81,6 @@ fn tree() -> Vec<Item> {
             Run('v', "Trocar visualização", CycleView),
             Run('l', "Foco ⇄ grade", ToggleLayout),
             Run('d', "Lista lateral", ToggleSidebar),
-            Run('h', "Barra de dicas", ToggleHints),
             Run('+', "Aumentar fonte", ZoomIn),
             Run('-', "Diminuir fonte", ZoomOut),
             Run('0', "Fonte padrão", ZoomReset),

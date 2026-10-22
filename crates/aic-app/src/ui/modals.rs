@@ -66,7 +66,7 @@ impl NewSessionForm {
 
     pub fn for_task(app: &App, t: &Task) -> Self {
         let mut f = Self::new(app, SessionKind::Claude);
-        f.name = t.card_key.clone().unwrap_or_else(|| super::statusbar::truncate(&t.title, 24));
+        f.name = t.card_key.clone().unwrap_or_else(|| widgets::truncate(&t.title, 24));
         f.repo_query = t.repo.clone().unwrap_or_default();
         f.worktree = t.repo.is_some();
         f.branch = git::branch_slug(t.card_key.as_deref(), &t.title);
@@ -354,10 +354,10 @@ fn new_session(app: &mut App, ctx: &Context, mut f: NewSessionForm) -> Option<Mo
 
             ui.label("Tarefa");
             let label = f.task.and_then(|id| app.tasks.iter().find(|t| t.id == id)).map(|t| t.title.clone()).unwrap_or_else(|| "nenhuma".into());
-            egui::ComboBox::from_id_salt("ns-task").selected_text(super::statusbar::truncate(&label, 50)).width(420.0).show_ui(ui, |ui| {
+            egui::ComboBox::from_id_salt("ns-task").selected_text(widgets::truncate(&label, 50)).width(420.0).show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.task, None, "nenhuma");
                 for t in app.tasks.iter().filter(|t| !matches!(t.status, TaskStatus::Done | TaskStatus::Archived)) {
-                    ui.selectable_value(&mut f.task, Some(t.id), super::statusbar::truncate(&t.title, 60));
+                    ui.selectable_value(&mut f.task, Some(t.id), widgets::truncate(&t.title, 60));
                 }
             });
             ui.end_row();
