@@ -62,8 +62,14 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             app.run_action(&ctx, a);
         }
         let typing = ctx.egui_wants_keyboard_input();
-        let free = !(app.view == View::Sessions && app.term_focus) && !app.layne.focus && !typing && app.modal.is_none();
-        if free && app.cfg.on(aic_core::Module::Tasks) && ctx.input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::NONE, Key::T)) {
+        let free = !(app.view == View::Sessions && app.term_focus)
+            && !app.layne.focus
+            && !typing
+            && app.modal.is_none();
+        if free
+            && app.cfg.on(aic_core::Module::Tasks)
+            && ctx.input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::NONE, Key::T))
+        {
             app.open_quick_add(None);
         }
     }
@@ -72,7 +78,12 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     ui.painter().rect_filled(rect, 0.0, app.theme.bg);
 
     egui::Panel::top("topbar")
-        .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(6, 4)).stroke(egui::Stroke::new(1.0, app.theme.border)))
+        .frame(
+            Frame::new()
+                .fill(app.theme.bg2)
+                .inner_margin(Margin::symmetric(6, 4))
+                .stroke(egui::Stroke::new(1.0, app.theme.border)),
+        )
         .show(ui, |ui| topbar::show(app, ui));
 
     if app.layne.open && app.cfg.on(aic_core::Module::Layne) {
@@ -94,12 +105,23 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             .resizable(true)
             .default_size(340.0)
             .size_range(240.0..=720.0)
-            .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::same(8)).stroke(egui::Stroke::new(1.0, app.theme.border)))
+            .frame(
+                Frame::new()
+                    .fill(app.theme.bg2)
+                    .inner_margin(Margin::same(8))
+                    .stroke(egui::Stroke::new(1.0, app.theme.border)),
+            )
             .show(ui, |ui| notes::show(app, ui));
     }
 
     egui::CentralPanel::default()
-        .frame(Frame::new().inner_margin(Margin::same(if app.view == View::Sessions { 6 } else { 16 })))
+        .frame(
+            Frame::new().inner_margin(Margin::same(if app.view == View::Sessions {
+                6
+            } else {
+                16
+            })),
+        )
         .show(ui, |ui| match app.view {
             View::Sessions => sessions::show(app, ui),
             View::Worktrees => worktrees::show(app, ui),
@@ -147,8 +169,20 @@ fn toasts(app: &mut App, ctx: &egui::Context) {
                             .show(ui, |ui| {
                                 ui.set_max_width(420.0);
                                 ui.horizontal(|ui| {
-                                    ui.add(egui::Label::new(RichText::new(&t.text).color(app.theme.ink)).selectable(false));
-                                    if widgets::icon_button(ui, widgets::I_CLOSE, "Fechar aviso", "Fechar aviso").clicked() {
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(&t.text).color(app.theme.ink),
+                                        )
+                                        .selectable(false),
+                                    );
+                                    if widgets::icon_button(
+                                        ui,
+                                        widgets::I_CLOSE,
+                                        "Fechar aviso",
+                                        "Fechar aviso",
+                                    )
+                                    .clicked()
+                                    {
                                         dismiss = Some(i);
                                     }
                                 });

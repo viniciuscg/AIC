@@ -39,7 +39,10 @@ impl HookEvent {
     /// Monta a partir do JSON que o Claude Code manda no stdin do hook.
     pub fn from_hook_input(v: &Value, aic_session: Option<Id>, ts_ms: u64) -> Self {
         let s = |k: &str| v.get(k).and_then(Value::as_str).map(String::from);
-        let message = s("message").or_else(|| s("prompt")).or_else(|| s("last_assistant_message")).map(|m| truncate(&m, 500));
+        let message = s("message")
+            .or_else(|| s("prompt"))
+            .or_else(|| s("last_assistant_message"))
+            .map(|m| truncate(&m, 500));
         Self {
             ts_ms,
             aic_session,
@@ -56,7 +59,10 @@ impl HookEvent {
 
     /// Arquivo onde o hook grava: por sessão do AIC, ou do Claude se aberta fora do app.
     pub fn file(&self) -> PathBuf {
-        let name = self.aic_session.map(|i| i.to_string()).unwrap_or_else(|| self.claude_session.clone());
+        let name = self
+            .aic_session
+            .map(|i| i.to_string())
+            .unwrap_or_else(|| self.claude_session.clone());
         paths::events_dir().join(format!("{name}.jsonl"))
     }
 }
@@ -113,7 +119,8 @@ impl Live {
                 self.turns += 1;
                 None
             }
-            "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "PostToolBatch" | "PermissionDenied" => {
+            "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "PostToolBatch"
+            | "PermissionDenied" => {
                 if e.tool.is_some() {
                     self.last_tool = e.tool.clone();
                 }
@@ -122,14 +129,22 @@ impl Live {
             }
             "PermissionRequest" => {
                 self.state = SessionState::Waiting;
-                Some(Effect::NeedsYou(format!("Pedindo permissão: {}", e.tool.clone().unwrap_or_default())))
+                Some(Effect::NeedsYou(format!(
+                    "Pedindo permissão: {}",
+                    e.tool.clone().unwrap_or_default()
+                )))
             }
             "Notification" => match e.notification_type.as_deref() {
                 Some("permission_prompt" | "elicitation_dialog" | "agent_needs_input") => {
                     let was = self.state;
                     self.state = SessionState::Waiting;
-                    (was != SessionState::Waiting)
-                        .then(|| Effect::NeedsYou(e.message.clone().unwrap_or_else(|| "Precisa de você".into())))
+                    (was != SessionState::Waiting).then(|| {
+                        Effect::NeedsYou(
+                            e.message
+                                .clone()
+                                .unwrap_or_else(|| "Precisa de você".into()),
+                        )
+                    })
                 }
                 _ => None,
             },
@@ -178,11 +193,17 @@ pub struct EventTail {
 
 impl EventTail {
     pub fn new() -> Self {
-        Self { offsets: HashMap::new(), dir: None }
+        Self {
+            offsets: HashMap::new(),
+            dir: None,
+        }
     }
 
     pub fn with_dir(dir: PathBuf) -> Self {
-        Self { offsets: HashMap::new(), dir: Some(dir) }
+        Self {
+            offsets: HashMap::new(),
+            dir: Some(dir),
+        }
     }
 
     /// Começa do fim dos arquivos existentes (não reprocessa histórico antigo).
@@ -203,13 +224,17 @@ impl EventTail {
 
     pub fn poll(&mut self) -> Vec<HookEvent> {
         let mut out = Vec::new();
-        let Ok(rd) = std::fs::read_dir(self.dir()) else { return out };
+        let Ok(rd) = std::fs::read_dir(self.dir()) else {
+            return out;
+        };
         for entry in rd.flatten() {
             let path = entry.path();
             if path.extension().is_none_or(|x| x != "jsonl") {
                 continue;
             }
-            let Ok(len) = entry.metadata().map(|m| m.len()) else { continue };
+            let Ok(len) = entry.metadata().map(|m| m.len()) else {
+                continue;
+            };
             let off = self.offsets.get(&path).copied().unwrap_or(0);
             if len < off {
                 // arquivo truncado/recriado
@@ -242,7 +267,10 @@ fn read_from(path: &Path, off: u64) -> Option<(Vec<HookEvent>, u64)> {
     let mut buf = String::new();
     f.read_to_string(&mut buf).ok()?;
     let complete = buf.rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let events = buf[..complete].lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
+    let events = buf[..complete]
+        .lines()
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
     Some((events, complete as u64))
 }
 
@@ -253,7 +281,10 @@ pub fn append(e: &HookEvent) -> std::io::Result<()> {
     if let Some(d) = path.parent() {
         std::fs::create_dir_all(d)?;
     }
-    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
     let mut line = serde_json::to_string(e).map_err(std::io::Error::other)?;
     line.push('\n');
     f.write_all(line.as_bytes())

@@ -4,12 +4,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use chrono::Local;
-use egui::Context;
 use aic_core::claude::{Injection, StatusSnapshot};
 use aic_core::events::{Effect, EventTail};
-use aic_core::{Block, Config, Id, Layout, Module, Session, SessionKind, SessionState, SessionView, Store, Task, TaskStatus, Workspace, git, paths};
+use aic_core::{
+    Block, Config, Id, Layout, Module, Session, SessionKind, SessionState, SessionView, Store,
+    Task, TaskStatus, Workspace, git, paths,
+};
 use aic_term::{BindingsLayout, TerminalFont};
+use chrono::Local;
+use egui::Context;
 
 use crate::actions::{Action, Keymap};
 use crate::injection;
@@ -30,7 +33,14 @@ pub enum View {
 }
 
 impl View {
-    pub const ALL: [View; 6] = [View::Sessions, View::Worktrees, View::Changes, View::Usage, View::Settings, View::Help];
+    pub const ALL: [View; 6] = [
+        View::Sessions,
+        View::Worktrees,
+        View::Changes,
+        View::Usage,
+        View::Settings,
+        View::Help,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -181,7 +191,11 @@ impl App {
             view: View::Sessions,
             modal: None,
             toasts: vec![],
-            phase: if needs_setup { Phase::Setup(Default::default()) } else { Phase::Main },
+            phase: if needs_setup {
+                Phase::Setup(Default::default())
+            } else {
+                Phase::Main
+            },
             term_focus: true,
             maximized: false,
             sidebar: true,
@@ -239,7 +253,10 @@ impl App {
         self.ws = 0;
         let _ = self.store.mark_cache(true);
         let prefix = self.cfg.prefix.clone();
-        self.toast(&format!("Sessão nova. {prefix} c abre um Claude, {prefix} ? mostra os atalhos."), ToastKind::Info);
+        self.toast(
+            &format!("Sessão nova. {prefix} c abre um Claude, {prefix} ? mostra os atalhos."),
+            ToastKind::Info,
+        );
     }
 
     /// Reabre workspaces e sessões do cache (`claude --resume`).
@@ -248,7 +265,13 @@ impl App {
         if self.workspaces.is_empty() {
             return self.start_fresh(ctx);
         }
-        self.blocks = self.store.blocks().unwrap_or_default().into_iter().map(|b| (b.id, b)).collect();
+        self.blocks = self
+            .store
+            .blocks()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|b| (b.id, b))
+            .collect();
         let saved = self.store.sessions().unwrap_or_default();
         let (mut count, mut alive) = (0, 0);
         for s in saved {
@@ -271,7 +294,12 @@ impl App {
         self.ws = 0;
         let _ = self.store.mark_cache(true);
         if alive > 0 {
-            self.toast(&format!("{alive} de {count} sessões continuavam rodando (tmux) e foram reconectadas"), ToastKind::Ok);
+            self.toast(
+                &format!(
+                    "{alive} de {count} sessões continuavam rodando (tmux) e foram reconectadas"
+                ),
+                ToastKind::Ok,
+            );
         } else {
             self.toast(&format!("{count} sessões reabertas"), ToastKind::Ok);
         }
@@ -285,10 +313,20 @@ impl App {
     }
 
     fn spawn(&mut self, ctx: &Context, rt: &mut Runtime) {
-        let task = rt.s.task.and_then(|id| self.tasks.iter().find(|t| t.id == id)).cloned();
+        let task =
+            rt.s.task
+                .and_then(|id| self.tasks.iter().find(|t| t.id == id))
+                .cloned();
         let id = self.next_term_id;
         self.next_term_id += 1;
-        rt.spawn(ctx, id, &self.inj, &self.theme.term, task.as_ref(), self.cfg.on(Module::Tmux));
+        rt.spawn(
+            ctx,
+            id,
+            &self.inj,
+            &self.theme.term,
+            task.as_ref(),
+            self.cfg.on(Module::Tmux),
+        );
         // prompt inicial só vale na criação
         if rt.s.initial_prompt.take().is_some() {
             let _ = self.store.save_session(&rt.s);
@@ -299,7 +337,15 @@ impl App {
 
     /// Blocos do workspace atual, em ordem.
     pub fn ws_blocks(&self) -> Vec<Id> {
-        self.current_ws().map(|w| w.blocks.iter().copied().filter(|b| self.blocks.contains_key(b)).collect()).unwrap_or_default()
+        self.current_ws()
+            .map(|w| {
+                w.blocks
+                    .iter()
+                    .copied()
+                    .filter(|b| self.blocks.contains_key(b))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     pub fn block_of(&self, session: Id) -> Option<Id> {
@@ -317,7 +363,14 @@ impl App {
 
     pub fn new_block(&mut self, name: &str, task: Option<Id>) -> Option<Id> {
         let ws = self.current_ws()?.id;
-        let mut b = Block::new(ws, if name.trim().is_empty() { "Novo bloco" } else { name.trim() });
+        let mut b = Block::new(
+            ws,
+            if name.trim().is_empty() {
+                "Novo bloco"
+            } else {
+                name.trim()
+            },
+        );
         b.task = task;
         b.color = (self.blocks.len() % self.theme.agents.len().max(1)) as u8;
         let id = b.id;
@@ -345,7 +398,11 @@ impl App {
 
     /// Fecha o bloco inteiro (todos os terminais).
     pub fn kill_block(&mut self, id: Id, remove_worktrees: bool) {
-        let panes = self.blocks.get(&id).map(|b| b.panes.clone()).unwrap_or_default();
+        let panes = self
+            .blocks
+            .get(&id)
+            .map(|b| b.panes.clone())
+            .unwrap_or_default();
         for p in panes {
             self.kill_session(p, remove_worktrees);
         }
@@ -361,14 +418,26 @@ impl App {
     pub fn migrate_block_notes(&mut self) {
         let ids: Vec<Id> = self.blocks.keys().copied().collect();
         for bid in ids {
-            let Some(b) = self.blocks.get(&bid) else { continue };
+            let Some(b) = self.blocks.get(&bid) else {
+                continue;
+            };
             if b.notes.trim().is_empty() {
                 continue;
             }
-            let Some(sid) = b.focused.filter(|f| b.panes.contains(f)).or_else(|| b.panes.first().copied()) else { continue };
+            let Some(sid) = b
+                .focused
+                .filter(|f| b.panes.contains(f))
+                .or_else(|| b.panes.first().copied())
+            else {
+                continue;
+            };
             let notes = b.notes.clone();
             if let Some(rt) = self.sessions.get_mut(&sid) {
-                rt.s.notes = if rt.s.notes.trim().is_empty() { notes } else { format!("{}\n\n{notes}", rt.s.notes) };
+                rt.s.notes = if rt.s.notes.trim().is_empty() {
+                    notes
+                } else {
+                    format!("{}\n\n{notes}", rt.s.notes)
+                };
                 let _ = self.store.save_session(&rt.s);
                 self.update_block(bid, |b| b.notes.clear());
             }
@@ -391,12 +460,18 @@ impl App {
                 let r = &self.sessions[&sid];
                 (r.s.workspace, r.s.block)
             };
-            let ok = block.and_then(|b| self.blocks.get(&b)).is_some_and(|b| b.workspace == ws);
+            let ok = block
+                .and_then(|b| self.blocks.get(&b))
+                .is_some_and(|b| b.workspace == ws);
             let bid = if ok {
                 block.unwrap()
             } else {
                 // bloco "Geral" do workspace
-                let existing = self.blocks.values().find(|b| b.workspace == ws && b.name == "Geral").map(|b| b.id);
+                let existing = self
+                    .blocks
+                    .values()
+                    .find(|b| b.workspace == ws && b.name == "Geral")
+                    .map(|b| b.id);
                 existing.unwrap_or_else(|| {
                     let b = Block::new(ws, "Geral");
                     let id = b.id;
@@ -427,7 +502,12 @@ impl App {
         }
         for w in &mut self.workspaces {
             w.blocks.retain(|b| self.blocks.contains_key(b));
-            let mut mine: Vec<_> = self.blocks.values().filter(|b| b.workspace == w.id && !w.blocks.contains(&b.id)).map(|b| (b.created_at, b.id)).collect();
+            let mut mine: Vec<_> = self
+                .blocks
+                .values()
+                .filter(|b| b.workspace == w.id && !w.blocks.contains(&b.id))
+                .map(|b| (b.created_at, b.id))
+                .collect();
             mine.sort();
             w.blocks.extend(mine.into_iter().map(|(_, id)| id));
         }
@@ -445,12 +525,16 @@ impl App {
     }
 
     pub fn ws_sessions(&self) -> Vec<Id> {
-        self.current_ws().map(|w| w.sessions.clone()).unwrap_or_default()
+        self.current_ws()
+            .map(|w| w.sessions.clone())
+            .unwrap_or_default()
     }
 
     pub fn focused(&self) -> Option<Id> {
         let w = self.current_ws()?;
-        w.focused.filter(|f| w.sessions.contains(f)).or_else(|| w.sessions.first().copied())
+        w.focused
+            .filter(|f| w.sessions.contains(f))
+            .or_else(|| w.sessions.first().copied())
     }
 
     pub fn focus(&mut self, id: Id) {
@@ -483,12 +567,19 @@ impl App {
     }
 
     pub fn new_workspace(&mut self, name: &str) {
-        let ws = Workspace::new(if name.trim().is_empty() { "Novo workspace" } else { name.trim() });
+        let ws = Workspace::new(if name.trim().is_empty() {
+            "Novo workspace"
+        } else {
+            name.trim()
+        });
         let _ = self.store.save_workspace(&ws);
         self.last_ws = self.current_ws().map(|w| w.id);
         self.workspaces.push(ws);
         self.ws = self.workspaces.len() - 1;
-        self.toast(&format!("Workspace \"{}\" criado", self.workspaces[self.ws].name), ToastKind::Ok);
+        self.toast(
+            &format!("Workspace \"{}\" criado", self.workspaces[self.ws].name),
+            ToastKind::Ok,
+        );
     }
 
     pub fn switch_ws(&mut self, i: usize) {
@@ -504,7 +595,10 @@ impl App {
 
     /// Volta pro workspace de antes (vai e volta, como o `back_and_forth` do i3).
     pub fn last_workspace(&mut self) {
-        match self.last_ws.and_then(|id| self.workspaces.iter().position(|w| w.id == id)) {
+        match self
+            .last_ws
+            .and_then(|id| self.workspaces.iter().position(|w| w.id == id))
+        {
             Some(i) => self.switch_ws(i),
             None => self.toast("Nenhum workspace anterior ainda", ToastKind::Info),
         }
@@ -524,7 +618,15 @@ impl App {
     /// Workspaces com alguém precisando de você (pra destacar na barra, como o "urgent" do i3).
     pub fn ws_needs_you(&self, i: usize) -> usize {
         self.workspaces.get(i).map_or(0, |w| {
-            w.sessions.iter().filter(|id| self.sessions.get(id).is_some_and(|r| r.state() == SessionState::Waiting || (r.unseen && r.state() == SessionState::Done))).count()
+            w.sessions
+                .iter()
+                .filter(|id| {
+                    self.sessions.get(id).is_some_and(|r| {
+                        r.state() == SessionState::Waiting
+                            || (r.unseen && r.state() == SessionState::Done)
+                    })
+                })
+                .count()
         })
     }
 
@@ -561,7 +663,17 @@ impl App {
         claude_args: Vec<String>,
     ) -> Id {
         let block = self.current_block();
-        self.create_session_in(ctx, block, name, kind, cwd, worktree, task, claude_args, None)
+        self.create_session_in(
+            ctx,
+            block,
+            name,
+            kind,
+            cwd,
+            worktree,
+            task,
+            claude_args,
+            None,
+        )
     }
 
     /// Novo terminal num bloco específico (`None` = bloco novo com o nome da sessão).
@@ -578,7 +690,9 @@ impl App {
         claude_args: Vec<String>,
         initial_prompt: Option<String>,
     ) -> Id {
-        let Some(ws) = self.current_ws().map(|w| w.id) else { return Id::nil() };
+        let Some(ws) = self.current_ws().map(|w| w.id) else {
+            return Id::nil();
+        };
         let block = match block.filter(|b| self.blocks.contains_key(b)) {
             Some(b) => b,
             None => match self.new_block(&name, task) {
@@ -642,8 +756,12 @@ impl App {
                 if let Some(wt) = &rt.s.worktree {
                     let root = git::main_root(wt);
                     match root.map(|r| git::remove_worktree(&r, wt, false)) {
-                        Some(Ok(())) => self.toast("Worktree removido (a branch continua)", ToastKind::Ok),
-                        Some(Err(e)) => self.toast(&format!("Worktree não removido: {e}"), ToastKind::Warn),
+                        Some(Ok(())) => {
+                            self.toast("Worktree removido (a branch continua)", ToastKind::Ok)
+                        }
+                        Some(Err(e)) => {
+                            self.toast(&format!("Worktree não removido: {e}"), ToastKind::Warn)
+                        }
                         None => {}
                     }
                 }
@@ -655,7 +773,12 @@ impl App {
                 w.focused = w.sessions.last().copied();
             }
         }
-        let linked: Vec<Id> = self.tasks.iter().filter(|t| t.session == Some(id)).map(|t| t.id).collect();
+        let linked: Vec<Id> = self
+            .tasks
+            .iter()
+            .filter(|t| t.session == Some(id))
+            .map(|t| t.id)
+            .collect();
         for t in linked {
             self.update_task(t, |t| t.session = None);
         }
@@ -682,11 +805,17 @@ impl App {
     }
 
     pub fn session_label(&self, id: Id) -> String {
-        self.sessions.get(&id).map(|r| r.s.name.clone()).unwrap_or_else(|| "—".into())
+        self.sessions
+            .get(&id)
+            .map(|r| r.s.name.clone())
+            .unwrap_or_else(|| "—".into())
     }
 
     pub fn state_of(&self, id: Id) -> SessionState {
-        self.sessions.get(&id).map(Runtime::state).unwrap_or(SessionState::GameOver)
+        self.sessions
+            .get(&id)
+            .map(Runtime::state)
+            .unwrap_or(SessionState::GameOver)
     }
 
     pub fn move_focus(&mut self, dx: i32, dy: i32) {
@@ -697,7 +826,10 @@ impl App {
         if ids.is_empty() {
             return;
         }
-        let cur = self.focused().and_then(|f| ids.iter().position(|i| *i == f)).unwrap_or(0) as i32;
+        let cur = self
+            .focused()
+            .and_then(|f| ids.iter().position(|i| *i == f))
+            .unwrap_or(0) as i32;
         let n = ids.len() as i32;
         let next = match self.current_ws().map(|w| w.layout) {
             Some(Layout::Grid) => {
@@ -705,7 +837,11 @@ impl App {
                 let (r, c) = (cur / cols, cur % cols);
                 let (r, c) = (r + dy, c + dx);
                 let i = r * cols + c;
-                if (0..n).contains(&i) && (0..cols).contains(&c) { i } else { cur }
+                if (0..n).contains(&i) && (0..cols).contains(&c) {
+                    i
+                } else {
+                    cur
+                }
             }
             _ => (cur + dx + dy).rem_euclid(n),
         };
@@ -715,25 +851,38 @@ impl App {
     /// Blocos/abas: ←/→ andam entre os terminais do bloco, ↑/↓ trocam de bloco.
     fn move_focus_blocks(&mut self, dx: i32, dy: i32) {
         let blocks = self.ws_blocks();
-        let Some(cur_b) = self.current_block() else { return };
+        let Some(cur_b) = self.current_block() else {
+            return;
+        };
         if dy != 0 {
             let i = blocks.iter().position(|b| *b == cur_b).unwrap_or(0) as i32;
             let n = blocks.len() as i32;
             let next = blocks[((i + dy).rem_euclid(n)) as usize];
             return self.focus_block(next);
         }
-        let panes = self.blocks.get(&cur_b).map(|b| b.panes.clone()).unwrap_or_default();
+        let panes = self
+            .blocks
+            .get(&cur_b)
+            .map(|b| b.panes.clone())
+            .unwrap_or_default();
         if panes.is_empty() {
             return;
         }
-        let cur = self.focused().and_then(|f| panes.iter().position(|p| *p == f)).unwrap_or(0) as i32;
+        let cur = self
+            .focused()
+            .and_then(|f| panes.iter().position(|p| *p == f))
+            .unwrap_or(0) as i32;
         let next = panes[((cur + dx).rem_euclid(panes.len() as i32)) as usize];
         self.focus(next);
     }
 
     /// Foca um bloco (o terminal que tinha foco nele, ou o primeiro).
     pub fn focus_block(&mut self, id: Id) {
-        let target = self.blocks.get(&id).and_then(|b| b.focused.filter(|f| b.panes.contains(f)).or_else(|| b.panes.first().copied()));
+        let target = self.blocks.get(&id).and_then(|b| {
+            b.focused
+                .filter(|f| b.panes.contains(f))
+                .or_else(|| b.panes.first().copied())
+        });
         match target {
             Some(s) => self.focus(s),
             None => {
@@ -751,23 +900,36 @@ impl App {
         if ids.is_empty() {
             return;
         }
-        let cur = self.focused().and_then(|f| ids.iter().position(|i| *i == f)).unwrap_or(0) as i32;
+        let cur = self
+            .focused()
+            .and_then(|f| ids.iter().position(|i| *i == f))
+            .unwrap_or(0) as i32;
         let next = (cur + delta).rem_euclid(ids.len() as i32) as usize;
         self.focus(ids[next]);
     }
 
     /// Próxima sessão (em qualquer workspace) que precisa de você.
     pub fn next_waiting(&mut self) {
-        let order: Vec<Id> = self.workspaces.iter().flat_map(|w| w.sessions.clone()).collect();
+        let order: Vec<Id> = self
+            .workspaces
+            .iter()
+            .flat_map(|w| w.sessions.clone())
+            .collect();
         let cur = self.focused();
-        let start = cur.and_then(|c| order.iter().position(|i| *i == c)).map(|i| i + 1).unwrap_or(0);
+        let start = cur
+            .and_then(|c| order.iter().position(|i| *i == c))
+            .map(|i| i + 1)
+            .unwrap_or(0);
         let n = order.len();
         let found = (0..n)
             .map(|k| order[(start + k) % n.max(1)])
             .find(|id| Some(*id) != cur && self.state_of(*id).needs_attention());
         match found {
             Some(id) => self.focus(id),
-            None => self.toast("Ninguém precisando de você. Tudo sob controle (por enquanto)…", ToastKind::Info),
+            None => self.toast(
+                "Ninguém precisando de você. Tudo sob controle (por enquanto)…",
+                ToastKind::Info,
+            ),
         }
     }
 
@@ -802,11 +964,20 @@ impl App {
     }
 
     /// Captura rápida → tarefa salva. `status`: coluna onde entra.
-    pub fn quick_add(&mut self, text: &str, status: TaskStatus, link_session: Option<Id>) -> Option<Id> {
+    pub fn quick_add(
+        &mut self,
+        text: &str,
+        status: TaskStatus,
+        link_session: Option<Id>,
+    ) -> Option<Id> {
         let ws_names: Vec<String> = self.workspaces.iter().map(|w| w.name.clone()).collect();
-        let parsed = aic_core::quickadd::parse(text, Local::now().date_naive(), &self.repos, &ws_names);
+        let parsed =
+            aic_core::quickadd::parse(text, Local::now().date_naive(), &self.repos, &ws_names);
         if parsed.title.trim().is_empty() {
-            self.toast("Escreve alguma coisa além dos marcadores 😉", ToastKind::Warn);
+            self.toast(
+                "Escreve alguma coisa além dos marcadores 😉",
+                ToastKind::Warn,
+            );
             return None;
         }
         let ws_name = parsed.workspace.clone();
@@ -834,22 +1005,29 @@ impl App {
 
     pub fn task_of(&self, session: Id) -> Option<&Task> {
         let rt = self.sessions.get(&session)?;
-        rt.s.task.and_then(|id| self.tasks.iter().find(|t| t.id == id))
+        rt.s.task
+            .and_then(|id| self.tasks.iter().find(|t| t.id == id))
             .or_else(|| self.tasks.iter().find(|t| t.session == Some(session)))
     }
 
     /// Abre (ou foca) a sessão de uma tarefa. Sem sessão: abre o diálogo já preenchido.
     pub fn open_task(&mut self, id: Id) {
-        let Some(t) = self.tasks.iter().find(|t| t.id == id).cloned() else { return };
+        let Some(t) = self.tasks.iter().find(|t| t.id == id).cloned() else {
+            return;
+        };
         if let Some(s) = t.session.filter(|s| self.sessions.contains_key(s)) {
             return self.focus(s);
         }
-        self.modal = Some(ui::modals::Modal::NewSession(ui::modals::NewSessionForm::for_task(self, &t)));
+        self.modal = Some(ui::modals::Modal::NewSession(
+            ui::modals::NewSessionForm::for_task(self, &t),
+        ));
     }
 
     /// Escreve `.aic/context.md` no diretório da sessão com a tarefa e as notas dela.
     pub fn write_context(&mut self, session: Id) {
-        let Some(rt) = self.sessions.get(&session) else { return };
+        let Some(rt) = self.sessions.get(&session) else {
+            return;
+        };
         let Some(t) = self.task_of(session).cloned() else {
             return self.toast("Essa sessão não tem tarefa vinculada", ToastKind::Warn);
         };
@@ -861,18 +1039,27 @@ impl App {
         if let Some(r) = &t.repo {
             md.push_str(&format!("- Repo: {r}\n"));
         }
-        md.push_str(&format!("- Status: {} · prioridade {}\n", t.status.label(), t.priority.label()));
+        md.push_str(&format!(
+            "- Status: {} · prioridade {}\n",
+            t.status.label(),
+            t.priority.label()
+        ));
         if !t.notes.trim().is_empty() {
             md.push_str(&format!("\n## Notas\n\n{}\n", t.notes.trim()));
         }
         if !t.subtasks.is_empty() {
             md.push_str("\n## Subtarefas\n\n");
             for s in &t.subtasks {
-                md.push_str(&format!("- [{}] {}\n", if s.done { "x" } else { " " }, s.text));
+                md.push_str(&format!(
+                    "- [{}] {}\n",
+                    if s.done { "x" } else { " " },
+                    s.text
+                ));
             }
         }
         md.push_str("\n> Gerado pelo AIC.\n");
-        let result = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("context.md"), md));
+        let result =
+            std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("context.md"), md));
         // .aic/ fora do git sem mexer no .gitignore do repo
         let _ = ensure_git_exclude(&rt.s.cwd);
         match result {
@@ -880,16 +1067,26 @@ impl App {
                 if let Some(term) = &self.sessions.get(&session).and_then(|r| r.term.as_ref()) {
                     term.paste("@.aic/context.md ");
                 }
-                self.toast("Contexto escrito em .aic/context.md e citado no prompt", ToastKind::Ok);
+                self.toast(
+                    "Contexto escrito em .aic/context.md e citado no prompt",
+                    ToastKind::Ok,
+                );
             }
-            Err(e) => self.toast(&format!("Não deu pra escrever o contexto: {e}"), ToastKind::Err),
+            Err(e) => self.toast(
+                &format!("Não deu pra escrever o contexto: {e}"),
+                ToastKind::Err,
+            ),
         }
     }
 
     // ───────────────────────── loop ─────────────────────────
 
     pub fn toast(&mut self, text: &str, kind: ToastKind) {
-        self.toasts.push(Toast { text: text.to_string(), kind, until: Instant::now() + Duration::from_secs(4) });
+        self.toasts.push(Toast {
+            text: text.to_string(),
+            kind,
+            until: Instant::now() + Duration::from_secs(4),
+        });
     }
 
     /// Trabalho de fundo de cada frame: banco, eventos, git, sons.
@@ -907,9 +1104,15 @@ impl App {
             self.events_checked = Instant::now();
             let events = self.tail.poll();
             for e in events {
-                let target = e.aic_session.filter(|id| self.sessions.contains_key(id)).or_else(|| {
-                    self.sessions.values().find(|r| r.s.claude_session.to_string() == e.claude_session).map(|r| r.s.id)
-                });
+                let target = e
+                    .aic_session
+                    .filter(|id| self.sessions.contains_key(id))
+                    .or_else(|| {
+                        self.sessions
+                            .values()
+                            .find(|r| r.s.claude_session.to_string() == e.claude_session)
+                            .map(|r| r.s.id)
+                    });
                 let Some(id) = target else {
                     crate::layne::on_event(self, &e);
                     continue;
@@ -939,7 +1142,10 @@ impl App {
             }
         }
 
-        if self.account_at.is_none_or(|t| t.elapsed() > Duration::from_secs(5)) {
+        if self
+            .account_at
+            .is_none_or(|t| t.elapsed() > Duration::from_secs(5))
+        {
             self.account_at = Some(Instant::now());
             if let Some(s) = StatusSnapshot::latest() {
                 self.account = Some(s);
@@ -952,7 +1158,8 @@ impl App {
 
         if self.fonts_dirty {
             self.fonts_dirty = false;
-            self.font = aic_term::fonts::install(ctx, &self.cfg.font_family, None, self.cfg.font_size);
+            self.font =
+                aic_term::fonts::install(ctx, &self.cfg.font_family, None, self.cfg.font_size);
         }
     }
 
@@ -961,7 +1168,9 @@ impl App {
             return HashSet::new();
         }
         match self.current_ws() {
-            Some(w) if w.layout == Layout::Grid && !self.maximized => w.sessions.iter().copied().collect(),
+            Some(w) if w.layout == Layout::Grid && !self.maximized => {
+                w.sessions.iter().copied().collect()
+            }
             _ => self.focused().into_iter().collect(),
         }
     }
@@ -984,7 +1193,13 @@ impl App {
         match effect {
             Effect::Finished => {
                 if self.cfg.sound.enabled && self.cfg.on(aic_core::Module::Sound) {
-                    if let Some(p) = crate::sounds::resolve(self.cfg.sound.done.as_deref().unwrap_or(crate::sounds::DEFAULT_DONE)) {
+                    if let Some(p) = crate::sounds::resolve(
+                        self.cfg
+                            .sound
+                            .done
+                            .as_deref()
+                            .unwrap_or(crate::sounds::DEFAULT_DONE),
+                    ) {
                         notify::play(&p, self.cfg.sound.volume);
                     }
                 }
@@ -993,12 +1208,26 @@ impl App {
                         Some(t) => format!("{name} terminou: {t}"),
                         None => format!("{name} terminou e está te esperando."),
                     };
-                    notify::desktop(&format!("{} — {}", crate::brand::NAME, crate::brand::state_label(SessionState::Done)), &body, icon_path());
+                    notify::desktop(
+                        &format!(
+                            "{} — {}",
+                            crate::brand::NAME,
+                            crate::brand::state_label(SessionState::Done)
+                        ),
+                        &body,
+                        icon_path(),
+                    );
                 }
             }
             Effect::NeedsYou(msg) => {
                 if self.cfg.sound.enabled {
-                    if let Some(p) = self.cfg.sound.attention.as_deref().and_then(crate::sounds::resolve) {
+                    if let Some(p) = self
+                        .cfg
+                        .sound
+                        .attention
+                        .as_deref()
+                        .and_then(crate::sounds::resolve)
+                    {
                         notify::play(&p, self.cfg.sound.volume);
                     }
                 }
@@ -1014,40 +1243,88 @@ impl App {
         // módulo desligado: a ação fica inerte (o atalho é consumido e não vaza pro terminal)
         if let Some(m) = a.module().filter(|m| !self.cfg.on(*m)) {
             let name = aic_core::modules::info(m).name;
-            return self.toast(&format!("\"{}\" está desligado (Config → Módulos)", name), ToastKind::Warn);
+            return self.toast(
+                &format!("\"{}\" está desligado (Config → Módulos)", name),
+                ToastKind::Warn,
+            );
         }
         match a {
             CloseFocused => self.close_focused(),
-            NewSession => self.modal = Some(ui::modals::Modal::NewSession(ui::modals::NewSessionForm::new(self, SessionKind::Claude))),
+            NewSession => {
+                self.modal = Some(ui::modals::Modal::NewSession(
+                    ui::modals::NewSessionForm::new(self, SessionKind::Claude),
+                ))
+            }
             NewShell => {
                 // split rápido: shell na pasta do terminal em foco, no mesmo bloco
-                let cwd = self.focused().and_then(|f| self.sessions.get(&f)).map(|r| r.s.cwd.clone()).unwrap_or_else(paths::home_dir);
+                let cwd = self
+                    .focused()
+                    .and_then(|f| self.sessions.get(&f))
+                    .map(|r| r.s.cwd.clone())
+                    .unwrap_or_else(paths::home_dir);
                 let block = self.current_block();
-                let name = cwd.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "shell".into());
-                self.create_session_in(ctx, block, name, SessionKind::Shell, cwd, None, None, vec![], None);
+                let name = cwd
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "shell".into());
+                self.create_session_in(
+                    ctx,
+                    block,
+                    name,
+                    SessionKind::Shell,
+                    cwd,
+                    None,
+                    None,
+                    vec![],
+                    None,
+                );
             }
             NewBlock => {
                 if let Some(b) = self.new_block("", None) {
                     self.focus_block(b);
-                    self.modal = Some(ui::modals::Modal::RenameBlock { id: b, text: "Novo bloco".into(), first: true });
+                    self.modal = Some(ui::modals::Modal::RenameBlock {
+                        id: b,
+                        text: "Novo bloco".into(),
+                        first: true,
+                    });
                 }
             }
             CloseBlock => {
                 if let Some(b) = self.current_block() {
-                    let has_wt = self.blocks.get(&b).is_some_and(|bl| bl.panes.iter().any(|p| self.sessions.get(p).is_some_and(|r| r.s.worktree.is_some())));
-                    self.modal = Some(ui::modals::Modal::CloseBlock { id: b, remove_worktrees: false, has_worktrees: has_wt });
+                    let has_wt = self.blocks.get(&b).is_some_and(|bl| {
+                        bl.panes
+                            .iter()
+                            .any(|p| self.sessions.get(p).is_some_and(|r| r.s.worktree.is_some()))
+                    });
+                    self.modal = Some(ui::modals::Modal::CloseBlock {
+                        id: b,
+                        remove_worktrees: false,
+                        has_worktrees: has_wt,
+                    });
                 }
             }
             RenameBlock => {
                 if let Some(b) = self.current_block() {
-                    let name = self.blocks.get(&b).map(|x| x.name.clone()).unwrap_or_default();
-                    self.modal = Some(ui::modals::Modal::RenameBlock { id: b, text: name, first: true });
+                    let name = self
+                        .blocks
+                        .get(&b)
+                        .map(|x| x.name.clone())
+                        .unwrap_or_default();
+                    self.modal = Some(ui::modals::Modal::RenameBlock {
+                        id: b,
+                        text: name,
+                        first: true,
+                    });
                 }
             }
             CycleSplit => {
                 if let Some(b) = self.current_block() {
                     self.update_block(b, |x| x.split = x.split.next());
-                    let label = self.blocks.get(&b).map(|x| x.split.label()).unwrap_or_default();
+                    let label = self
+                        .blocks
+                        .get(&b)
+                        .map(|x| x.split.label())
+                        .unwrap_or_default();
                     self.toast(&format!("Arranjo: {label}"), ToastKind::Info);
                 }
             }
@@ -1068,13 +1345,24 @@ impl App {
             }
             CloseSession => {
                 if let Some(id) = self.focused() {
-                    let has_wt = self.sessions.get(&id).is_some_and(|r| r.s.worktree.is_some());
-                    self.modal = Some(ui::modals::Modal::CloseSession { id, remove_worktree: false, has_worktree: has_wt });
+                    let has_wt = self
+                        .sessions
+                        .get(&id)
+                        .is_some_and(|r| r.s.worktree.is_some());
+                    self.modal = Some(ui::modals::Modal::CloseSession {
+                        id,
+                        remove_worktree: false,
+                        has_worktree: has_wt,
+                    });
                 }
             }
             RenameSession => {
                 if let Some(id) = self.focused() {
-                    self.modal = Some(ui::modals::Modal::Rename { id, text: self.session_label(id), first: true });
+                    self.modal = Some(ui::modals::Modal::Rename {
+                        id,
+                        text: self.session_label(id),
+                        first: true,
+                    });
                 }
             }
             RestartSession => {
@@ -1116,7 +1404,11 @@ impl App {
             }
             ToggleLayout => {
                 if let Some(w) = self.current_ws_mut() {
-                    w.layout = if w.layout == Layout::Grid { Layout::Focus } else { Layout::Grid };
+                    w.layout = if w.layout == Layout::Grid {
+                        Layout::Focus
+                    } else {
+                        Layout::Grid
+                    };
                 }
                 self.maximized = false;
                 self.persist_ws();
@@ -1126,7 +1418,14 @@ impl App {
                 let i = all.iter().position(|v| *v == self.cfg.view).unwrap_or(0);
                 self.cfg.view = all[(i + 1) % all.len()];
                 let _ = self.cfg.save();
-                self.toast(&format!("Visualização: {} — {}", self.cfg.view.label(), self.cfg.view.desc()), ToastKind::Info);
+                self.toast(
+                    &format!(
+                        "Visualização: {} — {}",
+                        self.cfg.view.label(),
+                        self.cfg.view.desc()
+                    ),
+                    ToastKind::Info,
+                );
             }
             ToggleMaximize => self.maximized = !self.maximized,
             ReleaseTerminal => {
@@ -1136,22 +1435,46 @@ impl App {
             ToggleLayne => crate::layne::toggle(self, ctx),
             LayneVoice => crate::layne::toggle_voice(self, ctx),
             QuickAdd => self.open_quick_add(None),
-            Workspaces => self.modal = Some(ui::modals::Modal::Workspaces { query: String::new(), selected: self.ws }),
-            NewWorkspace => self.modal = Some(ui::modals::Modal::Workspaces { query: String::new(), selected: usize::MAX }),
+            Workspaces => {
+                self.modal = Some(ui::modals::Modal::Workspaces {
+                    query: String::new(),
+                    selected: self.ws,
+                })
+            }
+            NewWorkspace => {
+                self.modal = Some(ui::modals::Modal::Workspaces {
+                    query: String::new(),
+                    selected: usize::MAX,
+                })
+            }
             NextWorkspace => self.switch_ws((self.ws + 1) % self.workspaces.len().max(1)),
-            PrevWorkspace => self.switch_ws((self.ws + self.workspaces.len().max(1) - 1) % self.workspaces.len().max(1)),
+            PrevWorkspace => self.switch_ws(
+                (self.ws + self.workspaces.len().max(1) - 1) % self.workspaces.len().max(1),
+            ),
             GotoWorkspace(n) => {
                 let i = n as usize - 1;
                 if i < self.workspaces.len() {
                     self.switch_ws(i);
                 } else {
-                    self.toast(&format!("Não existe workspace {n} ({} abertos)", self.workspaces.len()), ToastKind::Info);
+                    self.toast(
+                        &format!(
+                            "Não existe workspace {n} ({} abertos)",
+                            self.workspaces.len()
+                        ),
+                        ToastKind::Info,
+                    );
                 }
             }
             LastWorkspace => self.last_workspace(),
             RenameWorkspace => {
-                let name = self.current_ws().map(|w| w.name.clone()).unwrap_or_default();
-                self.modal = Some(ui::modals::Modal::RenameWorkspace { text: name, first: true });
+                let name = self
+                    .current_ws()
+                    .map(|w| w.name.clone())
+                    .unwrap_or_default();
+                self.modal = Some(ui::modals::Modal::RenameWorkspace {
+                    text: name,
+                    first: true,
+                });
             }
             ViewSessions => {
                 self.view = View::Sessions;
@@ -1169,7 +1492,12 @@ impl App {
                 self.settings.focus_search = true;
             }
             Catalog => self.leader = Some(Default::default()),
-            Palette => self.modal = Some(ui::modals::Modal::Palette { query: String::new(), selected: 0 }),
+            Palette => {
+                self.modal = Some(ui::modals::Modal::Palette {
+                    query: String::new(),
+                    selected: 0,
+                })
+            }
             ZoomIn => self.set_font_size(self.cfg.font_size + 1.0),
             ZoomOut => self.set_font_size(self.cfg.font_size - 1.0),
             ZoomReset => self.set_font_size(14.0),
@@ -1185,7 +1513,10 @@ impl App {
 
     /// Abas visíveis na barra (as de módulos desligados somem; a Ajuda abre pelo F1).
     pub fn tabs(&self) -> Vec<View> {
-        View::ALL.into_iter().filter(|v| *v != View::Help && v.action().enabled(&self.cfg)).collect()
+        View::ALL
+            .into_iter()
+            .filter(|v| *v != View::Help && v.action().enabled(&self.cfg))
+            .collect()
     }
 
     /// Próxima/anterior aba da barra, dando a volta.
@@ -1201,13 +1532,31 @@ impl App {
     pub fn close_focused(&mut self) {
         match self.view {
             View::Sessions => {
-                if let Some(b) = self.empty_block_focus.filter(|b| self.blocks.get(b).is_some_and(|x| x.panes.is_empty())) {
-                    self.modal = Some(ui::modals::Modal::CloseBlock { id: b, remove_worktrees: false, has_worktrees: false });
+                if let Some(b) = self
+                    .empty_block_focus
+                    .filter(|b| self.blocks.get(b).is_some_and(|x| x.panes.is_empty()))
+                {
+                    self.modal = Some(ui::modals::Modal::CloseBlock {
+                        id: b,
+                        remove_worktrees: false,
+                        has_worktrees: false,
+                    });
                 } else if let Some(id) = self.focused() {
-                    let has_wt = self.sessions.get(&id).is_some_and(|r| r.s.worktree.is_some());
-                    self.modal = Some(ui::modals::Modal::CloseSession { id, remove_worktree: false, has_worktree: has_wt });
+                    let has_wt = self
+                        .sessions
+                        .get(&id)
+                        .is_some_and(|r| r.s.worktree.is_some());
+                    self.modal = Some(ui::modals::Modal::CloseSession {
+                        id,
+                        remove_worktree: false,
+                        has_worktree: has_wt,
+                    });
                 } else if let Some(b) = self.current_block() {
-                    self.modal = Some(ui::modals::Modal::CloseBlock { id: b, remove_worktrees: false, has_worktrees: false });
+                    self.modal = Some(ui::modals::Modal::CloseBlock {
+                        id: b,
+                        remove_worktrees: false,
+                        has_worktrees: false,
+                    });
                 } else {
                     self.toast("Nada em foco pra fechar", ToastKind::Info);
                 }
@@ -1217,8 +1566,15 @@ impl App {
     }
 
     pub fn open_quick_add(&mut self, status: Option<TaskStatus>) {
-        let link = (self.view == View::Sessions).then(|| self.focused()).flatten();
-        self.modal = Some(ui::modals::Modal::QuickAdd { text: String::new(), status: status.unwrap_or_default(), link, link_enabled: false });
+        let link = (self.view == View::Sessions)
+            .then(|| self.focused())
+            .flatten();
+        self.modal = Some(ui::modals::Modal::QuickAdd {
+            text: String::new(),
+            status: status.unwrap_or_default(),
+            link,
+            link_enabled: false,
+        });
     }
 
     pub fn set_font_size(&mut self, size: f32) {
@@ -1271,31 +1627,58 @@ impl App {
 pub fn repo_name(cwd: &Path, repos_dir: &Path) -> Option<String> {
     // dentro de repos/ → primeiro componente; worktree `<repo>.worktrees/x` → `<repo>`
     let rel = cwd.strip_prefix(repos_dir).ok()?;
-    let first = rel.components().next()?.as_os_str().to_string_lossy().to_string();
+    let first = rel
+        .components()
+        .next()?
+        .as_os_str()
+        .to_string_lossy()
+        .to_string();
     Some(first.trim_end_matches(".worktrees").to_string())
 }
 
 pub(crate) fn ensure_git_exclude(cwd: &Path) -> std::io::Result<()> {
-    let Some(top) = git::toplevel(cwd) else { return Ok(()) };
-    let out = std::process::Command::new("git").arg("-C").arg(&top).args(["rev-parse", "--git-path", "info/exclude"]).output()?;
+    let Some(top) = git::toplevel(cwd) else {
+        return Ok(());
+    };
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&top)
+        .args(["rev-parse", "--git-path", "info/exclude"])
+        .output()?;
     let rel = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if rel.is_empty() {
         return Ok(());
     }
-    let path = if Path::new(&rel).is_absolute() { PathBuf::from(rel) } else { top.join(rel) };
+    let path = if Path::new(&rel).is_absolute() {
+        PathBuf::from(rel)
+    } else {
+        top.join(rel)
+    };
     let current = std::fs::read_to_string(&path).unwrap_or_default();
     if !current.lines().any(|l| l.trim() == ".aic/") {
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d)?;
         }
-        std::fs::write(&path, format!("{current}{}.aic/\n", if current.ends_with('\n') || current.is_empty() { "" } else { "\n" }))?;
+        std::fs::write(
+            &path,
+            format!(
+                "{current}{}.aic/\n",
+                if current.ends_with('\n') || current.is_empty() {
+                    ""
+                } else {
+                    "\n"
+                }
+            ),
+        )?;
     }
     Ok(())
 }
 
 /// Ícone instalado pelo `install.sh` (pra notificação do sistema).
 pub fn icon_path() -> Option<PathBuf> {
-    let p = paths::data_dir().parent()?.join("icons/hicolor/128x128/apps/aic.png");
+    let p = paths::data_dir()
+        .parent()?
+        .join("icons/hicolor/128x128/apps/aic.png");
     p.exists().then_some(p)
 }
 
@@ -1306,8 +1689,14 @@ mod tests {
     #[test]
     fn nome_do_repo_e_do_worktree() {
         let base = Path::new("/h/dev");
-        assert_eq!(repo_name(Path::new("/h/dev/api-pagamentos/src"), base).as_deref(), Some("api-pagamentos"));
-        assert_eq!(repo_name(Path::new("/h/dev/notificador.worktrees/DEV-1"), base).as_deref(), Some("notificador"));
+        assert_eq!(
+            repo_name(Path::new("/h/dev/api-pagamentos/src"), base).as_deref(),
+            Some("api-pagamentos")
+        );
+        assert_eq!(
+            repo_name(Path::new("/h/dev/notificador.worktrees/DEV-1"), base).as_deref(),
+            Some("notificador")
+        );
         assert_eq!(repo_name(Path::new("/tmp"), base), None);
     }
 }

@@ -1,8 +1,8 @@
 //! Tokens visuais do AIC e a conversão pro `Visuals` do egui. As cores ficam em `brand`.
 
-use egui::{Color32, CornerRadius, FontFamily, FontId, Shadow, Stroke, Style, TextStyle, Visuals};
 use aic_core::SessionState;
 use aic_term::{TerminalTheme, hex};
+use egui::{Color32, CornerRadius, FontFamily, FontId, Shadow, Stroke, Style, TextStyle, Visuals};
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -35,7 +35,10 @@ pub struct Theme {
 
 impl Theme {
     pub fn agent(&self, i: u8) -> Color32 {
-        self.agents.get(i as usize % self.agents.len().max(1)).copied().unwrap_or(self.accent)
+        self.agents
+            .get(i as usize % self.agents.len().max(1))
+            .copied()
+            .unwrap_or(self.accent)
     }
 
     pub fn state_color(&self, s: SessionState) -> Color32 {
@@ -65,7 +68,11 @@ impl Theme {
     }
 
     pub fn apply(&self, ctx: &egui::Context, ui_scale: f32) {
-        let mut v = if self.dark { Visuals::dark() } else { Visuals::light() };
+        let mut v = if self.dark {
+            Visuals::dark()
+        } else {
+            Visuals::light()
+        };
         v.override_text_color = Some(self.ink);
         v.panel_fill = self.bg;
         v.window_fill = self.bg2;
@@ -81,8 +88,18 @@ impl Theme {
         v.selection.bg_fill = self.accent_lo;
         v.selection.stroke = Stroke::new(1.0, self.ink);
         v.window_shadow = match self.hard_shadow {
-            Some(o) => Shadow { offset: [o as i8, o as i8], blur: 0, spread: 0, color: Color32::from_black_alpha(200) },
-            None => Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(if self.dark { 140 } else { 50 }) },
+            Some(o) => Shadow {
+                offset: [o as i8, o as i8],
+                blur: 0,
+                spread: 0,
+                color: Color32::from_black_alpha(200),
+            },
+            None => Shadow {
+                offset: [0, 8],
+                blur: 24,
+                spread: 0,
+                color: Color32::from_black_alpha(if self.dark { 140 } else { 50 }),
+            },
         };
         v.popup_shadow = v.window_shadow;
 
@@ -110,7 +127,10 @@ impl Theme {
         w.active.corner_radius = r;
         w.open = w.active;
 
-        let mut style = Style { visuals: v, ..Style::default() };
+        let mut style = Style {
+            visuals: v,
+            ..Style::default()
+        };
         style.spacing.item_spacing = egui::vec2(8.0, 6.0);
         style.spacing.button_padding = egui::vec2(10.0, 5.0);
         style.spacing.window_margin = egui::Margin::same(14);
@@ -119,11 +139,23 @@ impl Theme {
         // arrasto. Texto pra copiar fica no terminal e nos campos.
         style.interaction.selectable_labels = false;
         style.text_styles = [
-            (TextStyle::Small, FontId::new(11.0, FontFamily::Proportional)),
+            (
+                TextStyle::Small,
+                FontId::new(11.0, FontFamily::Proportional),
+            ),
             (TextStyle::Body, FontId::new(13.5, FontFamily::Proportional)),
-            (TextStyle::Button, FontId::new(13.5, FontFamily::Proportional)),
-            (TextStyle::Heading, FontId::new(20.0, FontFamily::Proportional)),
-            (TextStyle::Monospace, FontId::new(13.0, FontFamily::Monospace)),
+            (
+                TextStyle::Button,
+                FontId::new(13.5, FontFamily::Proportional),
+            ),
+            (
+                TextStyle::Heading,
+                FontId::new(20.0, FontFamily::Proportional),
+            ),
+            (
+                TextStyle::Monospace,
+                FontId::new(13.0, FontFamily::Monospace),
+            ),
         ]
         .into();
         ctx.set_global_style(style);

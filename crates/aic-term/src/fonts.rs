@@ -32,7 +32,10 @@ pub fn find_font(pattern: &str) -> Option<(String, u32)> {
     let mut parts = line.split('\t');
     let families = parts.next()?;
     let file = parts.next()?.to_string();
-    let index = parts.next().and_then(|i| i.trim().parse().ok()).unwrap_or(0);
+    let index = parts
+        .next()
+        .and_then(|i| i.trim().parse().ok())
+        .unwrap_or(0);
     let wanted = pattern.split(':').next()?.to_lowercase();
     let ok = families.split(',').any(|f| {
         let f = f.to_lowercase();
@@ -77,7 +80,11 @@ pub fn install(ctx: &egui::Context, mono: &str, ui: Option<&str>, size: f32) -> 
     }
 
     // Monospace = principal + fallbacks + padrão do egui no fim.
-    let defaults = defs.families.get(&FontFamily::Monospace).cloned().unwrap_or_default();
+    let defaults = defs
+        .families
+        .get(&FontFamily::Monospace)
+        .cloned()
+        .unwrap_or_default();
     let mut chain = mono_chain.clone();
     chain.extend(defaults);
     defs.families.insert(FontFamily::Monospace, chain.clone());
@@ -85,7 +92,8 @@ pub fn install(ctx: &egui::Context, mono: &str, ui: Option<&str>, size: f32) -> 
     let has_bold = !bold_chain.is_empty();
     if has_bold {
         bold_chain.extend(chain.iter().skip(1).cloned());
-        defs.families.insert(FontFamily::Name(BOLD_FAMILY.into()), bold_chain);
+        defs.families
+            .insert(FontFamily::Name(BOLD_FAMILY.into()), bold_chain);
     }
 
     // Interface: fonte escolhida (se houver) + os mesmos fallbacks, pra ícones Nerd na UI.

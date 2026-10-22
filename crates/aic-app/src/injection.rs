@@ -38,7 +38,10 @@ pub fn exe() -> String {
 
 pub fn settings_json(exe: &str) -> serde_json::Value {
     let hook = |_: &str| json!([{ "hooks": [{ "type": "command", "command": format!("'{exe}' hook"), "timeout": 10, "async": true }] }]);
-    let hooks: serde_json::Map<String, serde_json::Value> = HOOK_EVENTS.iter().map(|e| (e.to_string(), hook(e))).collect();
+    let hooks: serde_json::Map<String, serde_json::Value> = HOOK_EVENTS
+        .iter()
+        .map(|e| (e.to_string(), hook(e)))
+        .collect();
     json!({
         "hooks": hooks,
         "statusLine": { "type": "command", "command": format!("'{exe}' statusline"), "refreshInterval": 15 }
@@ -55,7 +58,9 @@ pub fn plugin_dir() -> Option<PathBuf> {
         return Some(installed);
     }
     let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../claude");
-    dev.join(".claude-plugin/plugin.json").exists().then(|| dev.canonicalize().unwrap_or(dev))
+    dev.join(".claude-plugin/plugin.json")
+        .exists()
+        .then(|| dev.canonicalize().unwrap_or(dev))
 }
 
 /// Escreve o settings gerado e devolve o que passar pro `claude`.
@@ -70,7 +75,10 @@ pub fn prepare() -> Injection {
             None
         }
     };
-    Injection { settings, plugin_dir: plugin_dir() }
+    Injection {
+        settings,
+        plugin_dir: plugin_dir(),
+    }
 }
 
 #[cfg(test)]

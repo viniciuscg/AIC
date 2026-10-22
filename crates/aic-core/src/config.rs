@@ -103,7 +103,12 @@ pub struct LayneConfig {
 
 impl Default for LayneConfig {
     fn default() -> Self {
-        Self { auto_start: true, model: None, width: 480.0, voice: VoiceConfig::default() }
+        Self {
+            auto_start: true,
+            model: None,
+            width: 480.0,
+            voice: VoiceConfig::default(),
+        }
     }
 }
 
@@ -177,7 +182,9 @@ impl Default for VoiceConfig {
 
 impl VoiceConfig {
     pub fn model_path(&self) -> PathBuf {
-        self.whisper_model.clone().unwrap_or_else(|| paths::data_dir().join("whisper/ggml-small.bin"))
+        self.whisper_model
+            .clone()
+            .unwrap_or_else(|| paths::data_dir().join("whisper/ggml-small.bin"))
     }
 }
 
@@ -202,13 +209,21 @@ impl Default for Config {
 
 impl Default for SoundConfig {
     fn default() -> Self {
-        Self { enabled: true, done: None, attention: None, volume: 1.0 }
+        Self {
+            enabled: true,
+            done: None,
+            attention: None,
+            volume: 1.0,
+        }
     }
 }
 
 impl Default for NotifyConfig {
     fn default() -> Self {
-        Self { desktop: true, only_when_unfocused: true }
+        Self {
+            desktop: true,
+            only_when_unfocused: true,
+        }
     }
 }
 
@@ -234,7 +249,12 @@ impl Config {
     /// Overrides do ambiente (e do `~/.config/aic/.env`, já carregado por `paths::load_dotenv`).
     /// Vazio = ignora. Veja `.env.example`.
     pub fn with_env(mut self) -> Self {
-        let env = |k: &str| std::env::var(k).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+        let env = |k: &str| {
+            std::env::var(k)
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+        };
         if let Some(v) = env("AIC_REPOS_DIRS") {
             let home = paths::home_dir();
             self.repos_dirs = v
@@ -273,7 +293,10 @@ impl Config {
         for dir in &self.repos_dirs {
             for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
                 let name = e.file_name().to_string_lossy().to_string();
-                if name.starts_with('.') || name.ends_with(".worktrees") || !e.path().join(".git").exists() {
+                if name.starts_with('.')
+                    || name.ends_with(".worktrees")
+                    || !e.path().join(".git").exists()
+                {
                     continue;
                 }
                 if !v.iter().any(|(n, _)| *n == name) {
@@ -291,14 +314,22 @@ impl Config {
     }
 
     pub fn repo_path(&self, name: &str) -> Option<PathBuf> {
-        self.repo_paths().into_iter().find(|(n, _)| n == name).map(|(_, p)| p)
+        self.repo_paths()
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, p)| p)
     }
 
     /// Nome do repo de um caminho (dentro de uma das `repos_dirs`; worktree → repo de origem).
     pub fn repo_of(&self, cwd: &Path) -> Option<String> {
         self.repos_dirs.iter().find_map(|d| {
             let rel = cwd.strip_prefix(d).ok()?;
-            let first = rel.components().next()?.as_os_str().to_string_lossy().to_string();
+            let first = rel
+                .components()
+                .next()?
+                .as_os_str()
+                .to_string_lossy()
+                .to_string();
             let name = first.trim_end_matches(".worktrees").to_string();
             (!name.is_empty()).then_some(name)
         })

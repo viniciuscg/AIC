@@ -262,7 +262,9 @@ impl SessionState {
 
 // ───────────────────────────── Tarefa ─────────────────────────────
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default, PartialOrd, Ord,
+)]
 pub enum TaskStatus {
     #[default]
     Todo,
@@ -305,7 +307,9 @@ impl TaskStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default, PartialOrd, Ord,
+)]
 pub enum Priority {
     Low,
     #[default]
@@ -391,11 +395,16 @@ impl Task {
     }
 
     pub fn subtasks_progress(&self) -> Option<(usize, usize)> {
-        (!self.subtasks.is_empty())
-            .then(|| (self.subtasks.iter().filter(|s| s.done).count(), self.subtasks.len()))
+        (!self.subtasks.is_empty()).then(|| {
+            (
+                self.subtasks.iter().filter(|s| s.done).count(),
+                self.subtasks.len(),
+            )
+        })
     }
 
     pub fn is_overdue(&self, today: NaiveDate) -> bool {
-        self.due.is_some_and(|d| d < today) && !matches!(self.status, TaskStatus::Done | TaskStatus::Archived)
+        self.due.is_some_and(|d| d < today)
+            && !matches!(self.status, TaskStatus::Done | TaskStatus::Archived)
     }
 }

@@ -1,8 +1,11 @@
 //! Peças visuais reutilizadas em todas as telas.
 
-use egui::text::LayoutJob;
-use egui::{Align2, Color32, CornerRadius, FontFamily, FontId, Frame, Margin, Rect, Response, RichText, Sense, Stroke, TextFormat, Ui, Vec2};
 use aic_core::SessionState;
+use egui::text::LayoutJob;
+use egui::{
+    Align2, Color32, CornerRadius, FontFamily, FontId, Frame, Margin, Rect, Response, RichText,
+    Sense, Stroke, TextFormat, Ui, Vec2,
+};
 
 use crate::theme::Theme;
 
@@ -40,13 +43,29 @@ pub fn mono(size: f32) -> FontId {
 pub fn bar_job(job: &mut LayoutJob, pct: f32, cells: usize, theme: &Theme, size: f32) {
     let filled = ((pct.clamp(0.0, 100.0) / 100.0) * cells as f32).floor() as usize;
     let color = theme.usage_color(pct);
-    let fmt = |c: Color32| TextFormat { font_id: mono(size), color: c, ..Default::default() };
+    let fmt = |c: Color32| TextFormat {
+        font_id: mono(size),
+        color: c,
+        ..Default::default()
+    };
     job.append(&"█".repeat(filled), 0.0, fmt(color));
-    job.append(&"░".repeat(cells - filled.min(cells)), 0.0, fmt(theme.faint));
+    job.append(
+        &"░".repeat(cells - filled.min(cells)),
+        0.0,
+        fmt(theme.faint),
+    );
 }
 
 pub fn push(job: &mut LayoutJob, text: &str, color: Color32, size: f32) {
-    job.append(text, 0.0, TextFormat { font_id: mono(size), color, ..Default::default() });
+    job.append(
+        text,
+        0.0,
+        TextFormat {
+            font_id: mono(size),
+            color,
+            ..Default::default()
+        },
+    );
 }
 
 /// "3h13m", "6d11h", "42m" até o epoch.
@@ -69,19 +88,30 @@ pub fn chip(ui: &mut Ui, text: impl Into<String>, color: Color32, theme: &Theme)
     let size = galley.size() + Vec2::new(12.0, 4.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let r = CornerRadius::same(if theme.radius == 0 { 0 } else { 99 });
-    ui.painter().rect(rect, r, color.gamma_multiply(0.14), Stroke::new(1.0, color.gamma_multiply(0.45)), egui::StrokeKind::Inside);
-    ui.painter().galley(rect.min + Vec2::new(6.0, 2.0), galley, color);
+    ui.painter().rect(
+        rect,
+        r,
+        color.gamma_multiply(0.14),
+        Stroke::new(1.0, color.gamma_multiply(0.45)),
+        egui::StrokeKind::Inside,
+    );
+    ui.painter()
+        .galley(rect.min + Vec2::new(6.0, 2.0), galley, color);
     resp
 }
 
 pub fn state_badge(ui: &mut Ui, label: &str, state: SessionState, theme: &Theme) -> Response {
     let color = theme.state_color(state);
     let font = FontId::new(10.5, FontFamily::Monospace);
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font, theme.bg);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(label.to_string(), font, theme.bg);
     let size = galley.size() + Vec2::new(10.0, 4.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
-    ui.painter().rect_filled(rect, CornerRadius::same(theme.radius.min(4)), color);
-    ui.painter().galley(rect.min + Vec2::new(5.0, 2.0), galley, theme.bg);
+    ui.painter()
+        .rect_filled(rect, CornerRadius::same(theme.radius.min(4)), color);
+    ui.painter()
+        .galley(rect.min + Vec2::new(5.0, 2.0), galley, theme.bg);
     resp
 }
 
@@ -89,19 +119,37 @@ pub fn state_badge(ui: &mut Ui, label: &str, state: SessionState, theme: &Theme)
 pub fn state_dot(ui: &Ui, center: egui::Pos2, r: f32, state: SessionState, theme: &Theme) {
     let color = theme.state_color(state);
     if state.needs_attention() {
-        ui.painter().circle_stroke(center, r + 2.5, Stroke::new(1.0, color));
+        ui.painter()
+            .circle_stroke(center, r + 2.5, Stroke::new(1.0, color));
     }
     ui.painter().circle_filled(center, r, color);
 }
 
 /// Frame de card. Com `hard_shadow` desenha a sombra deslocada sólida.
-pub fn card(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, add: impl FnOnce(&mut Ui)) -> Response {
+pub fn card(
+    ui: &mut Ui,
+    theme: &Theme,
+    active: bool,
+    accent: Color32,
+    add: impl FnOnce(&mut Ui),
+) -> Response {
     card_sense(ui, theme, active, accent, Sense::click(), add)
 }
 
 /// `card` com outro sentido.
-pub fn card_sense(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, sense: Sense, add: impl FnOnce(&mut Ui)) -> Response {
-    let stroke = if active { Stroke::new(1.5, accent) } else { Stroke::new(1.0, theme.border) };
+pub fn card_sense(
+    ui: &mut Ui,
+    theme: &Theme,
+    active: bool,
+    accent: Color32,
+    sense: Sense,
+    add: impl FnOnce(&mut Ui),
+) -> Response {
+    let stroke = if active {
+        Stroke::new(1.5, accent)
+    } else {
+        Stroke::new(1.0, theme.border)
+    };
     let frame = Frame::new()
         .fill(if active { theme.bg3 } else { theme.bg2 })
         .stroke(stroke)
@@ -117,7 +165,11 @@ pub fn card_sense(ui: &mut Ui, theme: &Theme, active: bool, accent: Color32, sen
     if let Some(o) = theme.hard_shadow {
         ui.painter().set(
             shadow_at,
-            egui::Shape::rect_filled(rect.translate(Vec2::splat(o)), theme.radius(), Color32::from_black_alpha(if theme.dark { 230 } else { 70 })),
+            egui::Shape::rect_filled(
+                rect.translate(Vec2::splat(o)),
+                theme.radius(),
+                Color32::from_black_alpha(if theme.dark { 230 } else { 70 }),
+            ),
         );
     }
     // faixa colorida à esquerda (cor da sessão)
@@ -133,21 +185,45 @@ pub fn kbd(ui: &mut Ui, text: &str, theme: &Theme) {
         return;
     }
     let font = FontId::new(11.0, FontFamily::Monospace);
-    let galley = ui.painter().layout_no_wrap(text.to_string(), font, theme.ink);
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.to_string(), font, theme.ink);
     let size = galley.size() + Vec2::new(10.0, 6.0);
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     let r = CornerRadius::same(theme.radius.min(4));
-    ui.painter().rect(rect.translate(Vec2::new(0.0, 1.5)), r, theme.border, Stroke::NONE, egui::StrokeKind::Inside);
-    ui.painter().rect(rect, r, theme.bg3, Stroke::new(1.0, theme.border), egui::StrokeKind::Inside);
-    ui.painter().galley(rect.min + Vec2::new(5.0, 3.0), galley, theme.ink);
+    ui.painter().rect(
+        rect.translate(Vec2::new(0.0, 1.5)),
+        r,
+        theme.border,
+        Stroke::NONE,
+        egui::StrokeKind::Inside,
+    );
+    ui.painter().rect(
+        rect,
+        r,
+        theme.bg3,
+        Stroke::new(1.0, theme.border),
+        egui::StrokeKind::Inside,
+    );
+    ui.painter()
+        .galley(rect.min + Vec2::new(5.0, 3.0), galley, theme.ink);
 }
 
 pub fn heading(ui: &mut Ui, text: &str, theme: &Theme) {
-    ui.label(RichText::new(text).font(FontId::new(18.0, FontFamily::Monospace)).color(theme.accent_hi).strong());
+    ui.label(
+        RichText::new(text)
+            .font(FontId::new(18.0, FontFamily::Monospace))
+            .color(theme.accent_hi)
+            .strong(),
+    );
 }
 
 pub fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { s.to_string() } else { format!("{}…", s.chars().take(n - 1).collect::<String>()) }
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
+        format!("{}…", s.chars().take(n - 1).collect::<String>())
+    }
 }
 
 pub fn subtle(text: impl Into<String>, theme: &Theme) -> RichText {
@@ -164,7 +240,14 @@ pub fn empty_state(ui: &mut Ui, title: &str, hint: &str, theme: &Theme) {
     });
 }
 
-pub fn paint_text(ui: &Ui, pos: egui::Pos2, align: Align2, text: &str, size: f32, color: Color32) -> Rect {
+pub fn paint_text(
+    ui: &Ui,
+    pos: egui::Pos2,
+    align: Align2,
+    text: &str,
+    size: f32,
+    color: Color32,
+) -> Rect {
     ui.painter().text(pos, align, text, mono(size), color)
 }
 

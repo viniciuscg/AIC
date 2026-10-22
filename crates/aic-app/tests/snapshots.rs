@@ -7,10 +7,10 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use egui_kittest::Harness;
 use aic_app::app::{App, View};
 use aic_core::events::{self, HookEvent};
 use aic_core::{Priority, SessionKind, Subtask, Task, TaskStatus};
+use egui_kittest::Harness;
 
 /// Os testes mexem em variáveis de ambiente: um de cada vez.
 static LOCK: Mutex<()> = Mutex::new(());
@@ -30,7 +30,11 @@ fn sandbox(name: &str) -> PathBuf {
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
     }
     std::fs::create_dir_all(dir.join("claude/projects")).unwrap();
-    std::fs::write(dir.join("config/config.toml"), "setup_done = true\n\n[modules]\ntmux = false\nlayne = false\n").unwrap();
+    std::fs::write(
+        dir.join("config/config.toml"),
+        "setup_done = true\n\n[modules]\ntmux = false\nlayne = false\n",
+    )
+    .unwrap();
     dir
 }
 
@@ -48,9 +52,18 @@ fn tasks(app: &mut App) {
     a.status = TaskStatus::Doing;
     a.due = Some(chrono::Local::now().date_naive());
     a.subtasks = vec![
-        Subtask { text: "reproduzir com pedido 9912".into(), done: true },
-        Subtask { text: "ajustar arredondamento".into(), done: false },
-        Subtask { text: "teste de regressão".into(), done: false },
+        Subtask {
+            text: "reproduzir com pedido 9912".into(),
+            done: true,
+        },
+        Subtask {
+            text: "ajustar arredondamento".into(),
+            done: false,
+        },
+        Subtask {
+            text: "teste de regressão".into(),
+            done: false,
+        },
     ];
     a.notes = "Diferença de centavos no juros diário quando o pedido cruza o mês.".into();
     let mut b = Task::new("Tela de pedidos: filtro por data");
@@ -80,13 +93,15 @@ fn hook(session: aic_core::Id, name: &str, extra: &[(&str, &str)]) {
 }
 
 fn harness(size: [f32; 2]) -> Harness<'static, Option<App>> {
-    Harness::builder().with_size(egui::vec2(size[0], size[1])).build_ui_state(
-        move |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
-            aic_app::ui::draw(a, ui);
-        },
-        None,
-    )
+    Harness::builder()
+        .with_size(egui::vec2(size[0], size[1]))
+        .build_ui_state(
+            move |ui, app: &mut Option<App>| {
+                let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
+                aic_app::ui::draw(a, ui);
+            },
+            None,
+        )
 }
 
 fn settle(h: &mut Harness<'static, Option<App>>, ms: u64) {
@@ -107,11 +122,19 @@ fn shot(h: &mut Harness<'static, Option<App>>, name: &str) {
 fn usage_fixtures(sessions: &[(String, String)]) {
     let root = aic_core::paths::claude_dir().join("projects");
     let _ = std::fs::remove_dir_all(&root);
-    let models = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-opus-5"];
+    let models = [
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-fable-5-1",
+        "claude-opus-5",
+    ];
     let today = chrono::Local::now().date_naive();
     let mut seed: u64 = 0x5eed;
     let mut rnd = |n: u64| {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (seed >> 33) % n.max(1)
     };
     for (si, (sid, cwd)) in sessions.iter().enumerate() {
@@ -121,8 +144,15 @@ fn usage_fixtures(sessions: &[(String, String)]) {
         for back in 0..30i64 {
             // semana de trabalho: menos uso no fim de semana, sessões com ritmos diferentes
             let day = today - chrono::Duration::days(back);
-            let weekend = matches!(chrono::Datelike::weekday(&day), chrono::Weekday::Sat | chrono::Weekday::Sun);
-            let calls = if weekend { rnd(2) } else { 2 + rnd(6 - si as u64 % 3) };
+            let weekend = matches!(
+                chrono::Datelike::weekday(&day),
+                chrono::Weekday::Sat | chrono::Weekday::Sun
+            );
+            let calls = if weekend {
+                rnd(2)
+            } else {
+                2 + rnd(6 - si as u64 % 3)
+            };
             for c in 0..calls {
                 let model = match (si, rnd(10)) {
                     (_, 0) => models[2],
@@ -134,7 +164,12 @@ fn usage_fixtures(sessions: &[(String, String)]) {
                     _ if back > 18 => models[4],
                     _ => models[0],
                 };
-                let ts = day.and_hms_opt(9 + (c as u32 % 9), (rnd(60)) as u32, 0).unwrap().and_local_timezone(chrono::Local).single().unwrap();
+                let ts = day
+                    .and_hms_opt(9 + (c as u32 % 9), (rnd(60)) as u32, 0)
+                    .unwrap()
+                    .and_local_timezone(chrono::Local)
+                    .single()
+                    .unwrap();
                 if ts > chrono::Local::now() {
                     continue;
                 }
@@ -166,7 +201,12 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     let script = r#"printf '\e[38;2;215;119;87m✻\e[0m Welcome to \e[1mClaude Code\e[0m!\n\n> corrige o cálculo do juros quando cruza o mês\n\n\e[38;2;215;119;87m⏺\e[0m Vou olhar o serviço de juros primeiro.\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mRead\e[0m(src/checkout/interest.ts)\n  ⎿  Read 214 lines\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mUpdate\e[0m(src/checkout/interest.ts)\n  ⎿  Updated with \e[32m6 additions\e[0m and \e[31m2 removals\e[0m\n\n╭──────────────────────────────────────────────╮\n│ > \e[2mTry \"write a test for interest.ts\"\e[0m          │\n╰──────────────────────────────────────────────╯\n  \e[2m⏵⏵ accept edits on (shift+tab to cycle)\e[0m\n'; sleep 60"#;
     // 3 blocos: um card com 2 terminais, uma revisão, infra
     let plan = [
-        ("api juros", "api-pagamentos", "DEV-142 · juros no checkout", true),
+        (
+            "api juros",
+            "api-pagamentos",
+            "DEV-142 · juros no checkout",
+            true,
+        ),
         ("web filtros", "web-app", "", false),
         ("review", "notificador", "Revisão do notificador", true),
         ("infra", "infra", "infra", true),
@@ -178,30 +218,74 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
         if new_block {
             block = app.new_block(block_name, None);
         }
-        let id = app.create_session_in(&ctx, block, name.into(), SessionKind::Command(script.into()), cwd, None, None, vec![], None);
+        let id = app.create_session_in(
+            &ctx,
+            block,
+            name.into(),
+            SessionKind::Command(script.into()),
+            cwd,
+            None,
+            None,
+            vec![],
+            None,
+        );
         ids.push(id);
     }
     let b0 = app.block_of(ids[0]).unwrap();
     app.set_notes(ids[0], "## Plano\n- reproduzir com a pedido 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
-    let t0 = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id).unwrap();
+    let t0 = app
+        .tasks
+        .iter()
+        .find(|t| t.card_key.as_deref() == Some("DEV-142"))
+        .map(|t| t.id)
+        .unwrap();
     app.update_task(t0, |t| t.session = Some(ids[0]));
     app.update_block(b0, |b| b.task = Some(t0));
     // estados via hooks
     hook(ids[0], "SessionStart", &[]);
-    hook(ids[0], "UserPromptSubmit", &[("prompt", "corrige o juros"), ("permission_mode", "acceptEdits")]);
+    hook(
+        ids[0],
+        "UserPromptSubmit",
+        &[
+            ("prompt", "corrige o juros"),
+            ("permission_mode", "acceptEdits"),
+        ],
+    );
     hook(ids[0], "SubagentStart", &[("agent_id", "a1")]);
     hook(ids[0], "SubagentStart", &[("agent_id", "a2")]);
     hook(ids[1], "SessionStart", &[]);
     hook(ids[1], "UserPromptSubmit", &[]);
-    hook(ids[1], "Notification", &[("notification_type", "permission_prompt"), ("message", "Claude precisa de permissão para rodar npm test")]);
+    hook(
+        ids[1],
+        "Notification",
+        &[
+            ("notification_type", "permission_prompt"),
+            ("message", "Claude precisa de permissão para rodar npm test"),
+        ],
+    );
     hook(ids[2], "SessionStart", &[]);
     hook(ids[2], "UserPromptSubmit", &[]);
     hook(ids[2], "Stop", &[]);
     app.focus(ids[0]);
     // histórico de uso: duas sessões abertas no AIC + duas de fora (só projeto)
-    let mut usage_sessions: Vec<(String, String)> = ids[..2].iter().zip(["api-pagamentos", "web-app"]).map(|(id, repo)| (app.sessions[id].s.claude_session.to_string(), format!("/home/dev/projetos/{repo}"))).collect();
-    usage_sessions.push(("7c1e9a52-0000-4000-8000-000000000001".into(), "/home/dev/projetos/notificador".into()));
-    usage_sessions.push(("9d2f0b63-0000-4000-8000-000000000002".into(), "/home/dev/dotfiles".into()));
+    let mut usage_sessions: Vec<(String, String)> = ids[..2]
+        .iter()
+        .zip(["api-pagamentos", "web-app"])
+        .map(|(id, repo)| {
+            (
+                app.sessions[id].s.claude_session.to_string(),
+                format!("/home/dev/projetos/{repo}"),
+            )
+        })
+        .collect();
+    usage_sessions.push((
+        "7c1e9a52-0000-4000-8000-000000000001".into(),
+        "/home/dev/projetos/notificador".into(),
+    ));
+    usage_sessions.push((
+        "9d2f0b63-0000-4000-8000-000000000002".into(),
+        "/home/dev/dotfiles".into(),
+    ));
     usage_fixtures(&usage_sessions);
     app.usage_history.ensure_started(&ctx);
     // snapshot de statusline falso pra sessão em foco
@@ -214,7 +298,11 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
                         "seven_day": {"used_percentage": 2, "resets_at": chrono::Utc::now().timestamp() + 561600}}
     });
     let s = aic_core::claude::StatusSnapshot::from_json(&snap);
-    std::fs::write(aic_core::claude::StatusSnapshot::path_for(&s.session_id), serde_json::to_vec(&s).unwrap()).unwrap();
+    std::fs::write(
+        aic_core::claude::StatusSnapshot::path_for(&s.session_id),
+        serde_json::to_vec(&s).unwrap(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -225,7 +313,11 @@ fn telas() {
     demo_sessions(&mut h);
     settle(&mut h, 2500);
     shot(&mut h, "blocos");
-    for (v, name) in [(aic_core::SessionView::Tabs, "abas"), (aic_core::SessionView::Focus, "foco"), (aic_core::SessionView::Grid, "grade")] {
+    for (v, name) in [
+        (aic_core::SessionView::Tabs, "abas"),
+        (aic_core::SessionView::Focus, "foco"),
+        (aic_core::SessionView::Grid, "grade"),
+    ] {
         h.state_mut().as_mut().unwrap().cfg.view = v;
         settle(&mut h, 300);
         shot(&mut h, name);
@@ -250,7 +342,12 @@ fn telas() {
     }
     settle(&mut h, 200);
     shot(&mut h, "workspaces");
-    for (view, name) in [(View::Worktrees, "worktrees"), (View::Usage, "tokens"), (View::Settings, "config"), (View::Help, "ajuda")] {
+    for (view, name) in [
+        (View::Worktrees, "worktrees"),
+        (View::Usage, "tokens"),
+        (View::Settings, "config"),
+        (View::Help, "ajuda"),
+    ] {
         let app = h.state_mut().as_mut().unwrap();
         app.set_view(view);
         settle(&mut h, 300);
@@ -261,12 +358,36 @@ fn telas() {
         let repo = std::env::temp_dir().join(format!("aic-snap-repo-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&repo);
         std::fs::create_dir_all(repo.join("src")).unwrap();
-        let git = |args: &[&str]| assert!(std::process::Command::new("git").arg("-C").arg(&repo).args(args).output().unwrap().status.success(), "git {args:?}");
+        let git = |args: &[&str]| {
+            assert!(
+                std::process::Command::new("git")
+                    .arg("-C")
+                    .arg(&repo)
+                    .args(args)
+                    .output()
+                    .unwrap()
+                    .status
+                    .success(),
+                "git {args:?}"
+            )
+        };
         git(&["init", "-q"]);
-        std::fs::write(repo.join("src/juros.rs"), "pub fn juros(v: f64) -> f64 {\n    v * 0.01\n}\n").unwrap();
+        std::fs::write(
+            repo.join("src/juros.rs"),
+            "pub fn juros(v: f64) -> f64 {\n    v * 0.01\n}\n",
+        )
+        .unwrap();
         std::fs::write(repo.join("README.md"), "# api\n").unwrap();
         git(&["add", "."]);
-        git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"]);
+        git(&[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "init",
+        ]);
         std::fs::write(repo.join("src/juros.rs"), "pub fn juros(v: f64, dias: u32) -> f64 {\n    (v * 0.01 * dias as f64 * 100.0).round() / 100.0\n}\n").unwrap();
         std::fs::write(repo.join("README.md"), "# api\n\nPagamentos.\n").unwrap();
         git(&["add", "README.md"]);
@@ -281,7 +402,12 @@ fn telas() {
         app.changes.message = "fix: juros por dia".into();
         settle(&mut h, 200);
         shot(&mut h, "changes");
-        h.state_mut().as_mut().unwrap().cfg.modules.insert("layne".into(), false);
+        h.state_mut()
+            .as_mut()
+            .unwrap()
+            .cfg
+            .modules
+            .insert("layne".into(), false);
     }
     let app = h.state_mut().as_mut().unwrap();
     app.set_view(View::Settings);
@@ -320,7 +446,11 @@ fn historico_de_uso() {
     settle(&mut h, 600);
     shot(&mut h, "historico");
     let app = h.state_mut().as_mut().unwrap();
-    let report = app.usage_history.report.clone().expect("relatório do histórico");
+    let report = app
+        .usage_history
+        .report
+        .clone()
+        .expect("relatório do histórico");
     assert_eq!(report.by_session(30).len(), 4);
     assert!(report.totals(30).cost > 0.0);
     let ids: Vec<_> = app.sessions.keys().copied().collect();
@@ -333,14 +463,20 @@ fn historico_de_uso() {
 fn splash() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _dir = sandbox("splash");
-    std::fs::write(std::env::var("AIC_CONFIG_DIR").unwrap() + "/config.toml", "setup_done = false\n").unwrap();
-    let mut h: Harness<'static, Option<App>> = Harness::builder().with_size(egui::vec2(1400.0, 860.0)).build_ui_state(
-        |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
-            aic_app::ui::draw(a, ui);
-        },
-        None,
-    );
+    std::fs::write(
+        std::env::var("AIC_CONFIG_DIR").unwrap() + "/config.toml",
+        "setup_done = false\n",
+    )
+    .unwrap();
+    let mut h: Harness<'static, Option<App>> = Harness::builder()
+        .with_size(egui::vec2(1400.0, 860.0))
+        .build_ui_state(
+            |ui, app: &mut Option<App>| {
+                let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
+                aic_app::ui::draw(a, ui);
+            },
+            None,
+        );
     settle(&mut h, 1200);
     if let Some(app) = h.state_mut().as_mut() {
         let _ = &mut app.phase;
@@ -348,4 +484,3 @@ fn splash() {
     settle(&mut h, 300);
     shot(&mut h, "assistente");
 }
-

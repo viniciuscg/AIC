@@ -24,7 +24,10 @@ pub struct SettingsState {
 
 impl SettingsState {
     pub fn is_capturing(&self) -> bool {
-        self.capturing.is_some() || self.capturing_prefix.is_some() || self.capturing_leader || self.capturing_prefix_key
+        self.capturing.is_some()
+            || self.capturing_prefix.is_some()
+            || self.capturing_leader
+            || self.capturing_prefix_key
     }
 
     fn stop_capture(&mut self) {
@@ -57,7 +60,9 @@ fn fold(s: &str) -> String {
 
 impl Find {
     fn new(q: &str) -> Self {
-        Self { words: fold(q).split_whitespace().map(str::to_string).collect() }
+        Self {
+            words: fold(q).split_whitespace().map(str::to_string).collect(),
+        }
     }
 
     fn empty(&self) -> bool {
@@ -94,9 +99,18 @@ const SOM: &[(&str, &str)] = &[
 ];
 const CLAUDE: &[(&str, &str)] = &[("Injeção por sessão", "settings plugin hooks statusline")];
 const LAYNE: &[(&str, &str)] = &[
-    ("Sessão do Layne", "assistente agente iniciar modelo conversa"),
-    ("Microfone", "mic áudio voz gravar entrada pulseaudio pipewire"),
-    ("Transcrição", "whisper api openai groq comando idioma voz texto"),
+    (
+        "Sessão do Layne",
+        "assistente agente iniciar modelo conversa",
+    ),
+    (
+        "Microfone",
+        "mic áudio voz gravar entrada pulseaudio pipewire",
+    ),
+    (
+        "Transcrição",
+        "whisper api openai groq comando idioma voz texto",
+    ),
 ];
 const CACHE: &[(&str, &str)] = &[("Limpar cache", "tmux sessões salvar layout restaurar")];
 const SOBRE: &[(&str, &str)] = &[("Versão e pastas", "versão config dados eventos caminho")];
@@ -107,9 +121,16 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
     // ── busca (fora da rolagem, sempre à mão) ──
     let typing = ui.ctx().egui_wants_keyboard_input();
-    if !typing && app.modal.is_none() && !app.settings.is_capturing() && ui.input_mut(|i| actions::consume_exact(i, egui::Modifiers::NONE, Key::Slash)) {
+    if !typing
+        && app.modal.is_none()
+        && !app.settings.is_capturing()
+        && ui.input_mut(|i| actions::consume_exact(i, egui::Modifiers::NONE, Key::Slash))
+    {
         app.settings.focus_search = true;
-        ui.input_mut(|i| i.events.retain(|e| !matches!(e, egui::Event::Text(t) if t == "/")));
+        ui.input_mut(|i| {
+            i.events
+                .retain(|e| !matches!(e, egui::Event::Text(t) if t == "/"))
+        });
     }
     ui.horizontal(|ui| {
         widgets::heading(ui, &format!("{}  Configurações", widgets::I_GEAR), &theme);
@@ -127,11 +148,23 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             app.settings.search.clear();
             r.surrender_focus();
         }
-        if !app.settings.search.is_empty() && widgets::icon_button(ui, widgets::I_CLOSE, "Limpar busca", "Limpar busca (Esc)").clicked() {
+        if !app.settings.search.is_empty()
+            && widgets::icon_button(ui, widgets::I_CLOSE, "Limpar busca", "Limpar busca (Esc)")
+                .clicked()
+        {
             app.settings.search.clear();
         }
     });
-    ui.label(widgets::subtle(format!("salvas em {}", aic_core::paths::pretty(&aic_core::Config::path())), &theme).small());
+    ui.label(
+        widgets::subtle(
+            format!(
+                "salvas em {}",
+                aic_core::paths::pretty(&aic_core::Config::path())
+            ),
+            &theme,
+        )
+        .small(),
+    );
     ui.add_space(4.0);
 
     let f = Find::new(&app.settings.search);
@@ -334,10 +367,24 @@ fn binds(app: &mut App, ui: &mut Ui, f: &Find) -> bool {
     let pfx = super::prefix::label(app);
     let rows: Vec<(String, String)> = Action::all()
         .into_iter()
-        .map(|a| (a.meta().name.to_string(), format!("{} {} {} {pfx} {}", a.meta().group, a.meta().id, app.keymap.label(a), app.keymap.prefix_label(a))))
+        .map(|a| {
+            (
+                a.meta().name.to_string(),
+                format!(
+                    "{} {} {} {pfx} {}",
+                    a.meta().group,
+                    a.meta().id,
+                    app.keymap.label(a),
+                    app.keymap.prefix_label(a)
+                ),
+            )
+        })
         .collect();
-    let ctx_hit = CONTEXT_KEYS.iter().any(|(g, k, d)| f.row(sec, d, &format!("{g} {k}")));
-    let fixed_hit = f.row(sec, "Prefixo", "tmux ctrl+b tecla") || f.row(sec, "Tecla líder", "catálogo menu which-key");
+    let ctx_hit = CONTEXT_KEYS
+        .iter()
+        .any(|(g, k, d)| f.row(sec, d, &format!("{g} {k}")));
+    let fixed_hit = f.row(sec, "Prefixo", "tmux ctrl+b tecla")
+        || f.row(sec, "Tecla líder", "catálogo menu which-key");
     if !f.empty() && !ctx_hit && !fixed_hit && !rows.iter().any(|(n, e)| f.row(sec, n, e)) {
         return false;
     }
@@ -347,134 +394,206 @@ fn binds(app: &mut App, ui: &mut Ui, f: &Find) -> bool {
             app.keymap.reset();
             let _ = app.keymap.save();
         }
-        ui.label(widgets::subtle(format!("editáveis · salvos em {}", aic_core::paths::pretty(&actions::Keymap::path())), &theme).small());
+        ui.label(
+            widgets::subtle(
+                format!(
+                    "editáveis · salvos em {}",
+                    aic_core::paths::pretty(&actions::Keymap::path())
+                ),
+                &theme,
+            )
+            .small(),
+        );
     });
     ui.add_space(6.0);
     let mut group = "";
-    egui::Grid::new("binds").num_columns(3).striped(true).spacing([20.0, 6.0]).show(ui, |ui| {
-        ui.label("");
-        ui.label(RichText::new("Atalho direto").small().color(theme.dim));
-        ui.label(RichText::new(format!("Depois do prefixo ({pfx})")).small().color(theme.dim));
-        ui.end_row();
-
-        // prefixo e tecla líder (ficam no config.toml, não no keybinds.toml)
-        if f.row(sec, "Prefixo", "tmux ctrl+b tecla") || f.row(sec, "Tecla líder", "catálogo menu which-key") {
-            ui.label(RichText::new("PREFIXO E CATÁLOGO").font(FontId::monospace(11.0)).color(theme.accent));
-            ui.end_row();
-        }
-        if f.row(sec, "Prefixo", "tmux ctrl+b tecla") {
-            ui.label("Prefixo (aperte, solte e aperte a tecla da ação)");
-            ui.horizontal(|ui| {
-                if app.settings.capturing_prefix_key {
-                    ui.label(RichText::new("aperte a combinação… (Esc cancela)").color(theme.warn));
-                } else {
-                    widgets::kbd(ui, &pfx, &theme);
-                }
-                if labeled(ui.small_button("alterar"), "Alterar o prefixo").clicked() {
-                    app.settings.stop_capture();
-                    app.settings.capturing_prefix_key = true;
-                }
-                let default = aic_core::Config::default().prefix;
-                if app.cfg.prefix != default && labeled(ui.small_button("padrão"), "Prefixo padrão").clicked() {
-                    app.cfg.prefix = default;
-                    let _ = app.cfg.save();
-                }
-            });
+    egui::Grid::new("binds")
+        .num_columns(3)
+        .striped(true)
+        .spacing([20.0, 6.0])
+        .show(ui, |ui| {
             ui.label("");
+            ui.label(RichText::new("Atalho direto").small().color(theme.dim));
+            ui.label(
+                RichText::new(format!("Depois do prefixo ({pfx})"))
+                    .small()
+                    .color(theme.dim),
+            );
             ui.end_row();
-        }
-        if f.row(sec, "Tecla líder", "catálogo menu which-key") {
-            ui.label("Catálogo de atalhos (tecla líder)");
-            ui.horizontal(|ui| {
-                if app.settings.capturing_leader {
-                    ui.label(RichText::new("aperte a combinação… (Esc cancela)").color(theme.warn));
-                } else {
-                    widgets::kbd(ui, &super::leader::label(app), &theme);
-                }
-                if labeled(ui.small_button("alterar"), "Alterar a tecla líder").clicked() {
-                    app.settings.stop_capture();
-                    app.settings.capturing_leader = true;
-                }
-                let default = aic_core::Config::default().leader;
-                if app.cfg.leader != default && labeled(ui.small_button("padrão"), "Tecla líder padrão").clicked() {
-                    app.cfg.leader = default;
-                    let _ = app.cfg.save();
-                }
-                if !app.cfg.on(aic_core::Module::Hints) {
-                    ui.label(widgets::subtle("(módulo Catálogo desligado)", &theme).small());
-                }
-            });
-            ui.label("");
-            ui.end_row();
-        }
 
-        for (a, (name, extra)) in Action::all().into_iter().zip(rows.iter()) {
-            if !f.row(sec, name, extra) {
-                continue;
-            }
-            let m = a.meta();
-            if m.group != group {
-                group = m.group;
-                ui.label(RichText::new(group.to_uppercase()).font(FontId::monospace(11.0)).color(theme.accent));
+            // prefixo e tecla líder (ficam no config.toml, não no keybinds.toml)
+            if f.row(sec, "Prefixo", "tmux ctrl+b tecla")
+                || f.row(sec, "Tecla líder", "catálogo menu which-key")
+            {
+                ui.label(
+                    RichText::new("PREFIXO E CATÁLOGO")
+                        .font(FontId::monospace(11.0))
+                        .color(theme.accent),
+                );
                 ui.end_row();
             }
-            let off = !a.enabled(&app.cfg);
-            ui.label(if off { RichText::new(format!("{}  (módulo desligado)", m.name)).color(theme.faint) } else { RichText::new(m.name) });
-            ui.horizontal(|ui| {
-                if app.settings.capturing == Some(a) {
-                    ui.label(RichText::new("aperte a combinação… (Esc cancela, Backspace limpa)").color(theme.warn));
-                } else {
-                    widgets::kbd(ui, &app.keymap.label(a), &theme);
-                }
-                if labeled(ui.small_button("alterar"), &format!("Alterar atalho: {}", m.name)).clicked() {
-                    app.settings.stop_capture();
-                    app.settings.capturing = Some(a);
-                }
-                if app.keymap.get(a) != m.default && labeled(ui.small_button("padrão"), &format!("Atalho padrão: {}", m.name)).clicked() {
-                    app.keymap.set(a, m.default);
-                    let _ = app.keymap.save();
-                }
-            });
-            ui.horizontal(|ui| {
-                if app.settings.capturing_prefix == Some(a) {
-                    ui.label(RichText::new("aperte a tecla… (Esc cancela, Backspace limpa)").color(theme.warn));
-                } else {
-                    let keys = app.keymap.prefix_keys(a);
-                    if keys.is_empty() {
-                        widgets::kbd(ui, "", &theme);
+            if f.row(sec, "Prefixo", "tmux ctrl+b tecla") {
+                ui.label("Prefixo (aperte, solte e aperte a tecla da ação)");
+                ui.horizontal(|ui| {
+                    if app.settings.capturing_prefix_key {
+                        ui.label(
+                            RichText::new("aperte a combinação… (Esc cancela)").color(theme.warn),
+                        );
+                    } else {
+                        widgets::kbd(ui, &pfx, &theme);
                     }
-                    for k in keys.to_vec() {
-                        widgets::kbd(ui, &k, &theme);
+                    if labeled(ui.small_button("alterar"), "Alterar o prefixo").clicked() {
+                        app.settings.stop_capture();
+                        app.settings.capturing_prefix_key = true;
                     }
-                }
-                if labeled(ui.small_button("alterar"), &format!("Alterar tecla de prefixo: {}", m.name)).clicked() {
-                    app.settings.stop_capture();
-                    app.settings.capturing_prefix = Some(a);
-                }
-                let default: Vec<String> = a.prefix_default().iter().map(|s| s.to_string()).collect();
-                if app.keymap.prefix_keys(a) != default.as_slice() && labeled(ui.small_button("padrão"), &format!("Tecla de prefixo padrão: {}", m.name)).clicked() {
-                    app.keymap.set_prefix(a, default);
-                    let _ = app.keymap.save();
-                }
-            });
-            ui.end_row();
-        }
-        let mut ctx_group = "";
-        for (g, keys, desc) in CONTEXT_KEYS {
-            if !f.row(sec, desc, &format!("{g} {keys}")) {
-                continue;
-            }
-            if *g != ctx_group {
-                ctx_group = g;
-                ui.label(RichText::new(format!("{} (contexto)", g.to_uppercase())).font(FontId::monospace(11.0)).color(theme.accent));
+                    let default = aic_core::Config::default().prefix;
+                    if app.cfg.prefix != default
+                        && labeled(ui.small_button("padrão"), "Prefixo padrão").clicked()
+                    {
+                        app.cfg.prefix = default;
+                        let _ = app.cfg.save();
+                    }
+                });
+                ui.label("");
                 ui.end_row();
             }
-            ui.label(*desc);
-            widgets::kbd(ui, keys, &theme);
-            ui.label("");
-            ui.end_row();
-        }
-    });
+            if f.row(sec, "Tecla líder", "catálogo menu which-key") {
+                ui.label("Catálogo de atalhos (tecla líder)");
+                ui.horizontal(|ui| {
+                    if app.settings.capturing_leader {
+                        ui.label(
+                            RichText::new("aperte a combinação… (Esc cancela)").color(theme.warn),
+                        );
+                    } else {
+                        widgets::kbd(ui, &super::leader::label(app), &theme);
+                    }
+                    if labeled(ui.small_button("alterar"), "Alterar a tecla líder").clicked() {
+                        app.settings.stop_capture();
+                        app.settings.capturing_leader = true;
+                    }
+                    let default = aic_core::Config::default().leader;
+                    if app.cfg.leader != default
+                        && labeled(ui.small_button("padrão"), "Tecla líder padrão").clicked()
+                    {
+                        app.cfg.leader = default;
+                        let _ = app.cfg.save();
+                    }
+                    if !app.cfg.on(aic_core::Module::Hints) {
+                        ui.label(widgets::subtle("(módulo Catálogo desligado)", &theme).small());
+                    }
+                });
+                ui.label("");
+                ui.end_row();
+            }
+
+            for (a, (name, extra)) in Action::all().into_iter().zip(rows.iter()) {
+                if !f.row(sec, name, extra) {
+                    continue;
+                }
+                let m = a.meta();
+                if m.group != group {
+                    group = m.group;
+                    ui.label(
+                        RichText::new(group.to_uppercase())
+                            .font(FontId::monospace(11.0))
+                            .color(theme.accent),
+                    );
+                    ui.end_row();
+                }
+                let off = !a.enabled(&app.cfg);
+                ui.label(if off {
+                    RichText::new(format!("{}  (módulo desligado)", m.name)).color(theme.faint)
+                } else {
+                    RichText::new(m.name)
+                });
+                ui.horizontal(|ui| {
+                    if app.settings.capturing == Some(a) {
+                        ui.label(
+                            RichText::new("aperte a combinação… (Esc cancela, Backspace limpa)")
+                                .color(theme.warn),
+                        );
+                    } else {
+                        widgets::kbd(ui, &app.keymap.label(a), &theme);
+                    }
+                    if labeled(
+                        ui.small_button("alterar"),
+                        &format!("Alterar atalho: {}", m.name),
+                    )
+                    .clicked()
+                    {
+                        app.settings.stop_capture();
+                        app.settings.capturing = Some(a);
+                    }
+                    if app.keymap.get(a) != m.default
+                        && labeled(
+                            ui.small_button("padrão"),
+                            &format!("Atalho padrão: {}", m.name),
+                        )
+                        .clicked()
+                    {
+                        app.keymap.set(a, m.default);
+                        let _ = app.keymap.save();
+                    }
+                });
+                ui.horizontal(|ui| {
+                    if app.settings.capturing_prefix == Some(a) {
+                        ui.label(
+                            RichText::new("aperte a tecla… (Esc cancela, Backspace limpa)")
+                                .color(theme.warn),
+                        );
+                    } else {
+                        let keys = app.keymap.prefix_keys(a);
+                        if keys.is_empty() {
+                            widgets::kbd(ui, "", &theme);
+                        }
+                        for k in keys.to_vec() {
+                            widgets::kbd(ui, &k, &theme);
+                        }
+                    }
+                    if labeled(
+                        ui.small_button("alterar"),
+                        &format!("Alterar tecla de prefixo: {}", m.name),
+                    )
+                    .clicked()
+                    {
+                        app.settings.stop_capture();
+                        app.settings.capturing_prefix = Some(a);
+                    }
+                    let default: Vec<String> =
+                        a.prefix_default().iter().map(|s| s.to_string()).collect();
+                    if app.keymap.prefix_keys(a) != default.as_slice()
+                        && labeled(
+                            ui.small_button("padrão"),
+                            &format!("Tecla de prefixo padrão: {}", m.name),
+                        )
+                        .clicked()
+                    {
+                        app.keymap.set_prefix(a, default);
+                        let _ = app.keymap.save();
+                    }
+                });
+                ui.end_row();
+            }
+            let mut ctx_group = "";
+            for (g, keys, desc) in CONTEXT_KEYS {
+                if !f.row(sec, desc, &format!("{g} {keys}")) {
+                    continue;
+                }
+                if *g != ctx_group {
+                    ctx_group = g;
+                    ui.label(
+                        RichText::new(format!("{} (contexto)", g.to_uppercase()))
+                            .font(FontId::monospace(11.0))
+                            .color(theme.accent),
+                    );
+                    ui.end_row();
+                }
+                ui.label(*desc);
+                widgets::kbd(ui, keys, &theme);
+                ui.label("");
+                ui.end_row();
+            }
+        });
     true
 }
 
@@ -482,31 +601,49 @@ fn binds(app: &mut App, ui: &mut Ui, f: &Find) -> bool {
 fn modules_panel(app: &mut App, ui: &mut Ui, f: &Find) {
     use aic_core::modules::ALL;
     let theme = app.theme.clone();
-    ui.label(widgets::subtle("Desligar um módulo some com a aba, os atalhos e as ações dele.", &theme).small());
+    ui.label(
+        widgets::subtle(
+            "Desligar um módulo some com a aba, os atalhos e as ações dele.",
+            &theme,
+        )
+        .small(),
+    );
     ui.add_space(4.0);
     let mut group = "";
     let mut changed = false;
-    egui::Grid::new("mods").num_columns(3).striped(true).spacing([14.0, 6.0]).show(ui, |ui| {
-        for m in ALL {
-            if !f.row("Módulos", m.name, &format!("{} {}", m.desc, m.group)) {
-                continue;
-            }
-            if m.group != group {
-                group = m.group;
-                ui.label(RichText::new(group.to_uppercase()).font(FontId::monospace(11.0)).color(theme.accent));
+    egui::Grid::new("mods")
+        .num_columns(3)
+        .striped(true)
+        .spacing([14.0, 6.0])
+        .show(ui, |ui| {
+            for m in ALL {
+                if !f.row("Módulos", m.name, &format!("{} {}", m.desc, m.group)) {
+                    continue;
+                }
+                if m.group != group {
+                    group = m.group;
+                    ui.label(
+                        RichText::new(group.to_uppercase())
+                            .font(FontId::monospace(11.0))
+                            .color(theme.accent),
+                    );
+                    ui.end_row();
+                }
+                let mut on = aic_core::modules::enabled(m.module, &app.cfg.modules);
+                if ui.checkbox(&mut on, RichText::new(m.name)).changed() {
+                    app.cfg.modules.insert(m.id.to_string(), on);
+                    changed = true;
+                }
+                ui.label(widgets::subtle(m.desc, &theme).small());
+                let on = app.cfg.on(m.module);
+                ui.label(
+                    RichText::new(if on { "● ativo" } else { "○ desligado" })
+                        .small()
+                        .color(if on { theme.ok } else { theme.faint }),
+                );
                 ui.end_row();
             }
-            let mut on = aic_core::modules::enabled(m.module, &app.cfg.modules);
-            if ui.checkbox(&mut on, RichText::new(m.name)).changed() {
-                app.cfg.modules.insert(m.id.to_string(), on);
-                changed = true;
-            }
-            ui.label(widgets::subtle(m.desc, &theme).small());
-            let on = app.cfg.on(m.module);
-            ui.label(RichText::new(if on { "● ativo" } else { "○ desligado" }).small().color(if on { theme.ok } else { theme.faint }));
-            ui.end_row();
-        }
-    });
+        });
     if changed {
         let _ = app.cfg.save();
     }
@@ -514,13 +651,22 @@ fn modules_panel(app: &mut App, ui: &mut Ui, f: &Find) {
 
 fn section(ui: &mut Ui, theme: &crate::theme::Theme, title: &str) {
     ui.add_space(16.0);
-    ui.label(RichText::new(title.to_uppercase()).font(FontId::monospace(13.0)).color(theme.accent_hi).strong());
+    ui.label(
+        RichText::new(title.to_uppercase())
+            .font(FontId::monospace(13.0))
+            .color(theme.accent_hi)
+            .strong(),
+    );
     ui.separator();
 }
 
 /// Lista de sons com ▶ pra ouvir cada um. `attention` = campo "precisa de você" (aceita "nenhum").
 fn sound_picker(app: &mut App, ui: &mut Ui, id: &str, attention: bool, default_done: &str) {
-    let current = if attention { app.cfg.sound.attention.clone() } else { app.cfg.sound.done.clone() };
+    let current = if attention {
+        app.cfg.sound.attention.clone()
+    } else {
+        app.cfg.sound.done.clone()
+    };
     let label = match &current {
         Some(id) => crate::sounds::name_of(id),
         None if attention => "nenhum".into(),
@@ -528,26 +674,38 @@ fn sound_picker(app: &mut App, ui: &mut Ui, id: &str, attention: bool, default_d
     };
     ui.horizontal(|ui| {
         let mut pick: Option<Option<String>> = None;
-        egui::ComboBox::from_id_salt(id).selected_text(label).width(300.0).show_ui(ui, |ui| {
-            if attention {
-                if ui.selectable_label(current.is_none(), "nenhum").clicked() {
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(label)
+            .width(300.0)
+            .show_ui(ui, |ui| {
+                if attention {
+                    if ui.selectable_label(current.is_none(), "nenhum").clicked() {
+                        pick = Some(None);
+                    }
+                } else if ui
+                    .selectable_label(
+                        current.is_none(),
+                        format!("padrão ({})", crate::sounds::name_of(default_done)),
+                    )
+                    .clicked()
+                {
                     pick = Some(None);
                 }
-            } else if ui.selectable_label(current.is_none(), format!("padrão ({})", crate::sounds::name_of(default_done))).clicked() {
-                pick = Some(None);
-            }
-            for s in crate::sounds::catalog() {
-                let r = ui.selectable_label(current.as_deref() == Some(&s.id), format!("{}  ·  {}", s.name, s.desc));
-                if r.clicked() {
-                    pick = Some(Some(s.id.clone()));
-                }
-                if r.hovered() && ui.input(|i| i.key_pressed(egui::Key::Space)) {
-                    if let Some(p) = crate::sounds::resolve(&s.id) {
-                        crate::notify::play(&p, app.cfg.sound.volume);
+                for s in crate::sounds::catalog() {
+                    let r = ui.selectable_label(
+                        current.as_deref() == Some(&s.id),
+                        format!("{}  ·  {}", s.name, s.desc),
+                    );
+                    if r.clicked() {
+                        pick = Some(Some(s.id.clone()));
+                    }
+                    if r.hovered() && ui.input(|i| i.key_pressed(egui::Key::Space)) {
+                        if let Some(p) = crate::sounds::resolve(&s.id) {
+                            crate::notify::play(&p, app.cfg.sound.volume);
+                        }
                     }
                 }
-            }
-        });
+            });
         if let Some(v) = pick {
             if attention {
                 app.cfg.sound.attention = v;
@@ -556,14 +714,26 @@ fn sound_picker(app: &mut App, ui: &mut Ui, id: &str, attention: bool, default_d
             }
             let _ = app.cfg.save();
         }
-        let play = current.clone().or_else(|| (!attention).then(|| default_done.to_string()));
-        if ui.add_enabled(play.is_some(), egui::Button::new("▶ ouvir")).clicked() {
+        let play = current
+            .clone()
+            .or_else(|| (!attention).then(|| default_done.to_string()));
+        if ui
+            .add_enabled(play.is_some(), egui::Button::new("▶ ouvir"))
+            .clicked()
+        {
             match play.as_deref().and_then(crate::sounds::resolve) {
                 Some(p) => crate::notify::play(&p, app.cfg.sound.volume),
-                None => app.toast("Esse som não foi encontrado na pasta de sons", ToastKind::Warn),
+                None => app.toast(
+                    "Esse som não foi encontrado na pasta de sons",
+                    ToastKind::Warn,
+                ),
             }
         }
-        if ui.button("📁 pasta").on_hover_text("Coloque .mp3/.ogg/.wav aqui e eles aparecem na lista").clicked() {
+        if ui
+            .button("📁 pasta")
+            .on_hover_text("Coloque .mp3/.ogg/.wav aqui e eles aparecem na lista")
+            .clicked()
+        {
             let _ = open::that_detached(aic_core::paths::sounds_dir());
         }
     });
@@ -571,8 +741,18 @@ fn sound_picker(app: &mut App, ui: &mut Ui, id: &str, attention: bool, default_d
 
 #[allow(dead_code)]
 fn path_field(ui: &mut Ui, value: &mut Option<std::path::PathBuf>, hint: &str) {
-    let mut s = value.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
-    if ui.add(TextEdit::singleline(&mut s).hint_text(hint).desired_width(360.0)).changed() {
+    let mut s = value
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if ui
+        .add(
+            TextEdit::singleline(&mut s)
+                .hint_text(hint)
+                .desired_width(360.0),
+        )
+        .changed()
+    {
         *value = (!s.trim().is_empty()).then(|| s.trim().into());
     }
 }
@@ -601,7 +781,16 @@ fn capture(app: &mut App, ui: &Ui) {
             });
             out
         });
-        if events.iter().any(|e| matches!(e, egui::Event::Key { key: Key::Backspace, pressed: true, .. })) {
+        if events.iter().any(|e| {
+            matches!(
+                e,
+                egui::Event::Key {
+                    key: Key::Backspace,
+                    pressed: true,
+                    ..
+                }
+            )
+        }) {
             app.settings.capturing_prefix = None;
             app.keymap.set_prefix(a, vec![]);
             let _ = app.keymap.save();
@@ -617,7 +806,14 @@ fn capture(app: &mut App, ui: &Ui) {
                 let _ = app.keymap.save();
                 let pfx = super::prefix::label(app);
                 match before {
-                    Some(b) => app.toast(&format!("{pfx} {k} → {} (saiu de \"{}\")", a.meta().name, b.meta().name), ToastKind::Ok),
+                    Some(b) => app.toast(
+                        &format!(
+                            "{pfx} {k} → {} (saiu de \"{}\")",
+                            a.meta().name,
+                            b.meta().name
+                        ),
+                        ToastKind::Ok,
+                    ),
                     None => app.toast(&format!("{pfx} {k} → {}", a.meta().name), ToastKind::Ok),
                 }
             }
@@ -627,7 +823,13 @@ fn capture(app: &mut App, ui: &Ui) {
     let got = ui.input_mut(|i| {
         let mut out = None;
         i.events.retain(|e| {
-            if let egui::Event::Key { key, pressed: true, modifiers, .. } = e {
+            if let egui::Event::Key {
+                key,
+                pressed: true,
+                modifiers,
+                ..
+            } = e
+            {
                 if out.is_none() {
                     out = Some((*key, *modifiers));
                 }
@@ -639,19 +841,51 @@ fn capture(app: &mut App, ui: &Ui) {
     });
     let Some((key, mods)) = got else { return };
     let s = KeyboardShortcut::new(mods, key);
-    let is = |cfg: &str| actions::parse_shortcut(cfg).is_some_and(|l| l.logical_key == key && actions::same_mods(l.modifiers, mods));
-    let clash = Action::all().into_iter().find(|a| app.keymap.get(*a).is_some_and(|k| k.logical_key == key && actions::same_mods(k.modifiers, mods)));
+    let is = |cfg: &str| {
+        actions::parse_shortcut(cfg)
+            .is_some_and(|l| l.logical_key == key && actions::same_mods(l.modifiers, mods))
+    };
+    let clash = Action::all().into_iter().find(|a| {
+        app.keymap
+            .get(*a)
+            .is_some_and(|k| k.logical_key == key && actions::same_mods(k.modifiers, mods))
+    });
     if app.settings.capturing_leader || app.settings.capturing_prefix_key {
         let leader = app.settings.capturing_leader;
         app.settings.stop_capture();
         if key == Key::Escape && mods.is_none() {
             return;
         }
-        let other_taken = if leader { is(&app.cfg.prefix) } else { is(&app.cfg.leader) };
+        let other_taken = if leader {
+            is(&app.cfg.prefix)
+        } else {
+            is(&app.cfg.leader)
+        };
         match clash {
-            _ if other_taken => app.toast(&format!("{} já é {}", actions::format_shortcut(&s), if leader { "o prefixo" } else { "a tecla líder" }), ToastKind::Warn),
-            _ if mods.is_none() => app.toast("Use uma combinação com Ctrl ou Alt (senão a tecla some do terminal)", ToastKind::Warn),
-            Some(a) => app.toast(&format!("{} já é de \"{}\"", actions::format_shortcut(&s), a.meta().name), ToastKind::Warn),
+            _ if other_taken => app.toast(
+                &format!(
+                    "{} já é {}",
+                    actions::format_shortcut(&s),
+                    if leader {
+                        "o prefixo"
+                    } else {
+                        "a tecla líder"
+                    }
+                ),
+                ToastKind::Warn,
+            ),
+            _ if mods.is_none() => app.toast(
+                "Use uma combinação com Ctrl ou Alt (senão a tecla some do terminal)",
+                ToastKind::Warn,
+            ),
+            Some(a) => app.toast(
+                &format!(
+                    "{} já é de \"{}\"",
+                    actions::format_shortcut(&s),
+                    a.meta().name
+                ),
+                ToastKind::Warn,
+            ),
             None if leader => {
                 app.cfg.leader = actions::format_shortcut(&s);
                 let _ = app.cfg.save();
@@ -665,7 +899,9 @@ fn capture(app: &mut App, ui: &Ui) {
         }
         return;
     }
-    let Some(a) = app.settings.capturing else { return };
+    let Some(a) = app.settings.capturing else {
+        return;
+    };
     app.settings.capturing = None;
     match key {
         Key::Escape if mods.is_none() => {}
@@ -678,7 +914,10 @@ fn capture(app: &mut App, ui: &Ui) {
         _ => {
             app.keymap.set(a, Some(s));
             let _ = app.keymap.save();
-            app.toast(&format!("{} → {}", a.meta().name, app.keymap.label(a)), ToastKind::Ok);
+            app.toast(
+                &format!("{} → {}", a.meta().name, app.keymap.label(a)),
+                ToastKind::Ok,
+            );
         }
     }
 }

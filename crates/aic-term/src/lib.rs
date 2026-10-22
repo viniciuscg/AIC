@@ -2,8 +2,8 @@
 //! Base derivada do egui_term (MIT), reescrita para egui 0.36.
 
 mod backend;
-pub mod fonts;
 mod bindings;
+pub mod fonts;
 mod theme;
 mod view;
 

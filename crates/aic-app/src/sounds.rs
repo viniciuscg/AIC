@@ -35,10 +35,38 @@ struct Builtin {
 const RATE: u32 = 44_100;
 
 const BUILTINS: &[Builtin] = &[
-    Builtin { id: "aic-acorde", name: "Acorde grunge", desc: "Power chord distorcido em Mi, afinado meio tom abaixo (sintetizado)", origin: Origin::Synth, synth: Some(grunge_chord), file: "aic-acorde.wav" },
-    Builtin { id: "aic-feedback", name: "Microfonia", desc: "Nota longa com microfonia subindo, estilo fim de música (sintetizado)", origin: Origin::Synth, synth: Some(feedback), file: "aic-feedback.wav" },
-    Builtin { id: "sino", name: "Sino", desc: "Sino curto e limpo (sintetizado)", origin: Origin::Synth, synth: Some(bell), file: "sino.wav" },
-    Builtin { id: "pop", name: "Pop", desc: "Estalo discreto (sintetizado)", origin: Origin::Synth, synth: Some(pop), file: "pop.wav" },
+    Builtin {
+        id: "aic-acorde",
+        name: "Acorde grunge",
+        desc: "Power chord distorcido em Mi, afinado meio tom abaixo (sintetizado)",
+        origin: Origin::Synth,
+        synth: Some(grunge_chord),
+        file: "aic-acorde.wav",
+    },
+    Builtin {
+        id: "aic-feedback",
+        name: "Microfonia",
+        desc: "Nota longa com microfonia subindo, estilo fim de música (sintetizado)",
+        origin: Origin::Synth,
+        synth: Some(feedback),
+        file: "aic-feedback.wav",
+    },
+    Builtin {
+        id: "sino",
+        name: "Sino",
+        desc: "Sino curto e limpo (sintetizado)",
+        origin: Origin::Synth,
+        synth: Some(bell),
+        file: "sino.wav",
+    },
+    Builtin {
+        id: "pop",
+        name: "Pop",
+        desc: "Estalo discreto (sintetizado)",
+        origin: Origin::Synth,
+        synth: Some(pop),
+        file: "pop.wav",
+    },
 ];
 
 /// Som padrão de "terminou".
@@ -50,7 +78,12 @@ pub fn catalog() -> Vec<Sound> {
     let mut v: Vec<Sound> = BUILTINS
         .iter()
         .filter(|b| b.origin == Origin::Synth || dir.join(b.file).exists())
-        .map(|b| Sound { id: b.id.into(), name: b.name.into(), desc: b.desc.into(), origin: b.origin })
+        .map(|b| Sound {
+            id: b.id.into(),
+            name: b.name.into(),
+            desc: b.desc.into(),
+            origin: b.origin,
+        })
         .collect();
     let known: Vec<&str> = BUILTINS.iter().map(|b| b.file).collect();
     let mut user: Vec<Sound> = std::fs::read_dir(&dir)
@@ -59,10 +92,18 @@ pub fn catalog() -> Vec<Sound> {
         .flatten()
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().to_string();
-            let ext = Path::new(&name).extension()?.to_string_lossy().to_lowercase();
-            (["mp3", "ogg", "oga", "wav", "flac"].contains(&ext.as_str()) && !known.contains(&name.as_str())).then(|| Sound {
+            let ext = Path::new(&name)
+                .extension()?
+                .to_string_lossy()
+                .to_lowercase();
+            (["mp3", "ogg", "oga", "wav", "flac"].contains(&ext.as_str())
+                && !known.contains(&name.as_str()))
+            .then(|| Sound {
                 id: format!("arquivo:{name}"),
-                name: Path::new(&name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or(name.clone()),
+                name: Path::new(&name)
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or(name.clone()),
                 desc: "seu arquivo".into(),
                 origin: Origin::User,
             })
@@ -95,7 +136,11 @@ pub fn resolve(id: &str) -> Option<PathBuf> {
 }
 
 pub fn name_of(id: &str) -> String {
-    catalog().into_iter().find(|s| s.id == id).map(|s| s.name).unwrap_or_else(|| id.to_string())
+    catalog()
+        .into_iter()
+        .find(|s| s.id == id)
+        .map(|s| s.name)
+        .unwrap_or_else(|| id.to_string())
 }
 
 fn write_wav(path: &Path, samples: &[f32]) -> std::io::Result<()> {
@@ -175,8 +220,16 @@ fn bell() -> Vec<f32> {
     (0..n)
         .map(|i| {
             let t = i as f32 / RATE as f32;
-            let partials = [(880.0, 1.0, 3.0), (880.0 * 2.76, 0.5, 5.0), (880.0 * 5.4, 0.25, 8.0)];
-            partials.iter().map(|(f, a, d)| (2.0 * PI * f * t).sin() * a * (-t * d).exp()).sum::<f32>() * (t / 0.002).min(1.0)
+            let partials = [
+                (880.0, 1.0, 3.0),
+                (880.0 * 2.76, 0.5, 5.0),
+                (880.0 * 5.4, 0.25, 8.0),
+            ];
+            partials
+                .iter()
+                .map(|(f, a, d)| (2.0 * PI * f * t).sin() * a * (-t * d).exp())
+                .sum::<f32>()
+                * (t / 0.002).min(1.0)
         })
         .collect()
 }

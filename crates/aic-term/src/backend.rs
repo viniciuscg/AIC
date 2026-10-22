@@ -133,7 +133,8 @@ impl EventListener for EventProxy {
                 }
             }
             Event::ChildExit(status) => {
-                s.exit_code.store(status.code().unwrap_or(-1), Ordering::Relaxed);
+                s.exit_code
+                    .store(status.code().unwrap_or(-1), Ordering::Relaxed);
                 s.exited.store(true, Ordering::Relaxed);
                 self.ctx.request_repaint();
             }
@@ -195,10 +196,17 @@ impl TerminalBackend {
         settings: TermSettings,
         theme: TerminalTheme,
     ) -> anyhow::Result<Self> {
-        let size = GridSize { cols: 100, lines: 30, cell_w: 8.0, cell_h: 16.0 };
+        let size = GridSize {
+            cols: 100,
+            lines: 30,
+            cell_w: 8.0,
+            cell_h: 16.0,
+        };
         let mut env = settings.env.clone();
-        env.entry("TERM".into()).or_insert_with(|| "xterm-256color".into());
-        env.entry("COLORTERM".into()).or_insert_with(|| "truecolor".into());
+        env.entry("TERM".into())
+            .or_insert_with(|| "xterm-256color".into());
+        env.entry("COLORTERM".into())
+            .or_insert_with(|| "truecolor".into());
         env.insert("AIC_TERM_ID".into(), id.to_string());
 
         let opts = tty::Options {
@@ -213,8 +221,14 @@ impl TerminalBackend {
         *shared.size.lock().unwrap() = Some(size.window_size());
         shared.last_output_ms.store(now_ms(), Ordering::Relaxed);
 
-        let proxy = EventProxy { shared: shared.clone(), ctx };
-        let config = term::Config { scrolling_history: settings.scrollback, ..Default::default() };
+        let proxy = EventProxy {
+            shared: shared.clone(),
+            ctx,
+        };
+        let config = term::Config {
+            scrolling_history: settings.scrollback,
+            ..Default::default()
+        };
         let term = Arc::new(FairMutex::new(Term::new(config, &size, proxy.clone())));
 
         let pty = tty::new(&opts, size.window_size(), id)?;
@@ -277,7 +291,12 @@ impl TerminalBackend {
     }
 
     pub(crate) fn resize(&mut self, cols: usize, lines: usize, cell_w: f32, cell_h: f32) {
-        let new = GridSize { cols: cols.max(2), lines: lines.max(1), cell_w, cell_h };
+        let new = GridSize {
+            cols: cols.max(2),
+            lines: lines.max(1),
+            cell_w,
+            cell_h,
+        };
         if new == self.size {
             return;
         }
@@ -292,7 +311,10 @@ impl TerminalBackend {
             return;
         }
         let mut term = self.term.lock();
-        if term.mode().contains(TermMode::ALT_SCREEN | TermMode::ALTERNATE_SCROLL) {
+        if term
+            .mode()
+            .contains(TermMode::ALT_SCREEN | TermMode::ALTERNATE_SCROLL)
+        {
             let key = if delta > 0 { b'A' } else { b'B' };
             let seq: Vec<u8> = (0..delta.abs()).flat_map(|_| [0x1b, b'O', key]).collect();
             drop(term);
@@ -314,7 +336,11 @@ impl TerminalBackend {
     }
 
     fn side_at(&self, x: f32) -> Side {
-        if x % self.size.cell_w > self.size.cell_w / 2.0 { Side::Right } else { Side::Left }
+        if x % self.size.cell_w > self.size.cell_w / 2.0 {
+            Side::Right
+        } else {
+            Side::Left
+        }
     }
 
     pub(crate) fn select_start(&self, ty: SelectionType, x: f32, y: f32) {
@@ -337,7 +363,10 @@ impl TerminalBackend {
     }
 
     pub fn selection_text(&self) -> Option<String> {
-        self.term.lock().selection_to_string().filter(|s| !s.is_empty())
+        self.term
+            .lock()
+            .selection_to_string()
+            .filter(|s| !s.is_empty())
     }
 
     /// Últimas `n` linhas não vazias do que está na tela (prévia nos cards).
@@ -381,7 +410,8 @@ impl TerminalBackend {
 
     pub(crate) fn hover_link(&mut self, point: Point) {
         let term = self.term.lock();
-        let found = visible_matches(&term, &mut self.url_regex.clone()).find(|m| m.contains(&point));
+        let found =
+            visible_matches(&term, &mut self.url_regex.clone()).find(|m| m.contains(&point));
         drop(term);
         self.hovered_link = found;
     }
@@ -408,7 +438,13 @@ impl TerminalBackend {
         let mode = self.mode();
         if mode.contains(TermMode::SGR_MOUSE) {
             let c = if pressed { 'M' } else { 'm' };
-            let msg = format!("\x1b[<{};{};{}{}", button, point.column.0 + 1, point.line.0 + 1, c);
+            let msg = format!(
+                "\x1b[<{};{};{}{}",
+                button,
+                point.column.0 + 1,
+                point.line.0 + 1,
+                c
+            );
             self.write(msg.into_bytes());
         } else {
             let b = if pressed { button } else { 3 };

@@ -44,7 +44,14 @@ pub fn conf_path() -> PathBuf {
 /// tmux instalado? (cacheado)
 pub fn available() -> bool {
     static OK: OnceLock<bool> = OnceLock::new();
-    *OK.get_or_init(|| Command::new("tmux").arg("-V").stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success()))
+    *OK.get_or_init(|| {
+        Command::new("tmux")
+            .arg("-V")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    })
 }
 
 /// Grava a config e recarrega no servidor, se ele já estiver de pé.
@@ -60,8 +67,16 @@ pub fn session_name(id: Id) -> String {
 }
 
 fn tmux(args: &[&str]) -> Option<String> {
-    let out = Command::new("tmux").args(["-L", SOCKET, "-f"]).arg(conf_path()).args(args).stderr(Stdio::null()).output().ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).to_string())
+    let out = Command::new("tmux")
+        .args(["-L", SOCKET, "-f"])
+        .arg(conf_path())
+        .args(args)
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).to_string())
 }
 
 /// A sessão ainda está rodando no servidor?
@@ -71,7 +86,9 @@ pub fn alive(id: Id) -> bool {
 
 /// Todas as sessões do AIC vivas no servidor.
 pub fn list() -> Vec<String> {
-    tmux(&["list-sessions", "-F", "#{session_name}"]).map(|s| s.lines().map(String::from).collect()).unwrap_or_default()
+    tmux(&["list-sessions", "-F", "#{session_name}"])
+        .map(|s| s.lines().map(String::from).collect())
+        .unwrap_or_default()
 }
 
 pub fn kill(id: Id) {
@@ -85,9 +102,27 @@ pub fn kill_all() {
 
 /// Monta `program` + `args` que conectam (ou criam) a sessão tmux rodando `inner`.
 /// `env` vai pra sessão via `-e` (só vale na criação).
-pub fn wrap(id: Id, cwd: &std::path::Path, env: &[(String, String)], inner_program: &str, inner_args: &[String]) -> (String, Vec<String>) {
-    let mut args: Vec<String> = vec!["-L".into(), SOCKET.into(), "-f".into(), conf_path().to_string_lossy().into(), "new-session".into(), "-A".into()];
-    args.extend(["-s".into(), session_name(id), "-c".into(), cwd.to_string_lossy().into()]);
+pub fn wrap(
+    id: Id,
+    cwd: &std::path::Path,
+    env: &[(String, String)],
+    inner_program: &str,
+    inner_args: &[String],
+) -> (String, Vec<String>) {
+    let mut args: Vec<String> = vec![
+        "-L".into(),
+        SOCKET.into(),
+        "-f".into(),
+        conf_path().to_string_lossy().into(),
+        "new-session".into(),
+        "-A".into(),
+    ];
+    args.extend([
+        "-s".into(),
+        session_name(id),
+        "-c".into(),
+        cwd.to_string_lossy().into(),
+    ]);
     for (k, v) in env {
         args.push("-e".into());
         args.push(format!("{k}={v}"));
@@ -105,7 +140,13 @@ mod tests {
     #[test]
     fn wrap_monta_new_session_attach() {
         let id = aic_core::new_id();
-        let (p, a) = wrap(id, std::path::Path::new("/tmp"), &[("AIC_SESSION".into(), "x".into())], "claude", &["--resume".into(), "abc".into()]);
+        let (p, a) = wrap(
+            id,
+            std::path::Path::new("/tmp"),
+            &[("AIC_SESSION".into(), "x".into())],
+            "claude",
+            &["--resume".into(), "abc".into()],
+        );
         assert_eq!(p, "tmux");
         let s = a.join(" ");
         assert!(s.contains("-L aic"));

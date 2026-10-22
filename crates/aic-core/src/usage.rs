@@ -79,8 +79,20 @@ pub struct Price {
 }
 
 impl Price {
-    const fn new(input: f64, cache_write_5m: f64, cache_write_1h: f64, cache_read: f64, output: f64) -> Self {
-        Self { input, output, cache_write_5m, cache_write_1h, cache_read }
+    const fn new(
+        input: f64,
+        cache_write_5m: f64,
+        cache_write_1h: f64,
+        cache_read: f64,
+        output: f64,
+    ) -> Self {
+        Self {
+            input,
+            output,
+            cache_write_5m,
+            cache_write_1h,
+            cache_read,
+        }
     }
 
     fn scaled(&self, k: f64) -> Self {
@@ -105,7 +117,11 @@ pub struct ModelPrice {
 
 impl ModelPrice {
     fn flat(price: Price) -> Self {
-        Self { price, long: None, fast: None }
+        Self {
+            price,
+            long: None,
+            fast: None,
+        }
     }
 
     pub fn cost(&self, u: &MsgUsage) -> f64 {
@@ -170,22 +186,64 @@ impl PriceTable {
         // entrada, escrita 5m, escrita 1h, leitura de cache, saída
         let fable51 = Price::new(10.0, 12.5, 20.0, 0.25, 50.0);
         let fable5 = Price::new(10.0, 12.5, 20.0, 1.0, 50.0);
-        put(&["claude-fable-5-1", "claude-mythos-5-1"], ModelPrice::flat(fable51));
-        put(&["claude-fable-5", "claude-mythos-5", "claude-mythos-preview"], ModelPrice::flat(fable5));
-        put(&["claude-opus-5-5"], ModelPrice { fast: Some(2.0), ..ModelPrice::flat(Price::new(4.0, 5.0, 8.0, 0.20, 20.0)) });
+        put(
+            &["claude-fable-5-1", "claude-mythos-5-1"],
+            ModelPrice::flat(fable51),
+        );
+        put(
+            &["claude-fable-5", "claude-mythos-5", "claude-mythos-preview"],
+            ModelPrice::flat(fable5),
+        );
+        put(
+            &["claude-opus-5-5"],
+            ModelPrice {
+                fast: Some(2.0),
+                ..ModelPrice::flat(Price::new(4.0, 5.0, 8.0, 0.20, 20.0))
+            },
+        );
         let opus = Price::new(5.0, 6.25, 10.0, 0.50, 25.0);
-        put(&["claude-opus-5", "claude-opus-4-8"], ModelPrice { fast: Some(2.0), ..ModelPrice::flat(opus) });
-        put(&["claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5"], ModelPrice::flat(opus));
-        put(&["claude-opus-4-1", "claude-opus-4"], ModelPrice::flat(Price::new(15.0, 18.75, 30.0, 1.50, 75.0)));
-        put(&["claude-sonnet-5-5"], ModelPrice::flat(Price::new(2.0, 2.5, 4.0, 0.10, 10.0)));
-        put(&["claude-sonnet-5"], ModelPrice::flat(Price::new(2.0, 2.5, 4.0, 0.20, 10.0)));
-        put(&["claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4"], ModelPrice::flat(Price::new(3.0, 3.75, 6.0, 0.30, 15.0)));
+        put(
+            &["claude-opus-5", "claude-opus-4-8"],
+            ModelPrice {
+                fast: Some(2.0),
+                ..ModelPrice::flat(opus)
+            },
+        );
+        put(
+            &["claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5"],
+            ModelPrice::flat(opus),
+        );
+        put(
+            &["claude-opus-4-1", "claude-opus-4"],
+            ModelPrice::flat(Price::new(15.0, 18.75, 30.0, 1.50, 75.0)),
+        );
+        put(
+            &["claude-sonnet-5-5"],
+            ModelPrice::flat(Price::new(2.0, 2.5, 4.0, 0.10, 10.0)),
+        );
+        put(
+            &["claude-sonnet-5"],
+            ModelPrice::flat(Price::new(2.0, 2.5, 4.0, 0.20, 10.0)),
+        );
+        put(
+            &["claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4"],
+            ModelPrice::flat(Price::new(3.0, 3.75, 6.0, 0.30, 15.0)),
+        );
         put(
             &["claude-haiku-5-5"],
-            ModelPrice { long: Some((100_000, Price::new(0.50, 0.625, 1.0, 0.05, 2.50))), ..ModelPrice::flat(Price::new(0.10, 0.125, 0.20, 0.01, 0.50)) },
+            ModelPrice {
+                long: Some((100_000, Price::new(0.50, 0.625, 1.0, 0.05, 2.50))),
+                ..ModelPrice::flat(Price::new(0.10, 0.125, 0.20, 0.01, 0.50))
+            },
         );
-        put(&["claude-haiku-4-5"], ModelPrice::flat(Price::new(1.0, 1.25, 2.0, 0.10, 5.0)));
-        put(&["claude-3-5-haiku"], ModelPrice::flat(Price::new(0.80, 1.0, 1.6, 0.08, 4.0)));
+        put(
+            &["claude-haiku-4-5"],
+            ModelPrice::flat(Price::new(1.0, 1.25, 2.0, 0.10, 5.0)),
+        );
+        put(
+            &["claude-3-5-haiku"],
+            ModelPrice::flat(Price::new(0.80, 1.0, 1.6, 0.08, 4.0)),
+        );
         Self { models: m }
     }
 
@@ -204,7 +262,11 @@ impl PriceTable {
                 let id = normalize_model(&id);
                 let entry = self.models.entry(id).or_insert_with(|| ModelPrice::flat(p));
                 // sobrescrever cancela a faixa de contexto longo embutida
-                *entry = ModelPrice { price: p, long: None, fast: entry.fast };
+                *entry = ModelPrice {
+                    price: p,
+                    long: None,
+                    fast: entry.fast,
+                };
             }
         }
     }
@@ -248,11 +310,21 @@ pub fn model_label(id: &str) -> String {
     let n = normalize_model(id);
     let rest = n.strip_prefix("claude-").unwrap_or(&n);
     let mut parts = rest.split('-');
-    let Some(first) = parts.next() else { return id.to_string() };
+    let Some(first) = parts.next() else {
+        return id.to_string();
+    };
     let (family, version): (String, Vec<&str>) = if first.chars().all(|c| c.is_ascii_digit()) {
         // ids antigos: claude-3-5-haiku
-        let nums: Vec<&str> = std::iter::once(first).chain(parts.clone().take_while(|p| p.chars().all(|c| c.is_ascii_digit()))).collect();
-        let fam = parts.find(|p| !p.chars().all(|c| c.is_ascii_digit())).unwrap_or("");
+        let nums: Vec<&str> = std::iter::once(first)
+            .chain(
+                parts
+                    .clone()
+                    .take_while(|p| p.chars().all(|c| c.is_ascii_digit())),
+            )
+            .collect();
+        let fam = parts
+            .find(|p| !p.chars().all(|c| c.is_ascii_digit()))
+            .unwrap_or("");
         (fam.to_string(), nums)
     } else {
         (first.to_string(), parts.collect())
@@ -261,7 +333,11 @@ pub fn model_label(id: &str) -> String {
     if let Some(c) = fam.get_mut(0..1) {
         c.make_ascii_uppercase();
     }
-    if version.is_empty() { fam } else { format!("{fam} {}", version.join(".")) }
+    if version.is_empty() {
+        fam
+    } else {
+        format!("{fam} {}", version.join("."))
+    }
 }
 
 /// Família do modelo, pra ordenar e escolher cor (fable > opus > sonnet > haiku > outros).
@@ -389,7 +465,15 @@ impl Aggregator {
     }
 
     pub fn with_root(root: PathBuf, prices: PriceTable) -> Self {
-        Self { root, days: WINDOW_DAYS, prices, offsets: HashMap::new(), entries: HashMap::new(), strings: Interner::default(), last_scan: ScanStats::default() }
+        Self {
+            root,
+            days: WINDOW_DAYS,
+            prices,
+            offsets: HashMap::new(),
+            entries: HashMap::new(),
+            strings: Interner::default(),
+            last_scan: ScanStats::default(),
+        }
     }
 
     pub fn root(&self) -> &Path {
@@ -399,7 +483,8 @@ impl Aggregator {
     /// Lê o que há de novo nos transcripts modificados dentro da janela.
     pub fn scan(&mut self) -> ScanStats {
         let mut stats = ScanStats::default();
-        let cutoff = SystemTime::now() - Duration::from_secs((self.days.max(1) as u64 + 1) * 86_400);
+        let cutoff =
+            SystemTime::now() - Duration::from_secs((self.days.max(1) as u64 + 1) * 86_400);
         let mut files = Vec::new();
         collect_jsonl(&self.root, 0, &mut files);
         for (path, len, mtime) in files {
@@ -424,7 +509,9 @@ impl Aggregator {
 
     /// Lê linhas completas a partir de `off`. Devolve (bytes consumidos, linhas lidas).
     fn read_file(&mut self, path: &Path, off: u64) -> (u64, u64) {
-        let Ok(mut f) = std::fs::File::open(path) else { return (0, 0) };
+        let Ok(mut f) = std::fs::File::open(path) else {
+            return (0, 0);
+        };
         if f.seek(SeekFrom::Start(off)).is_err() {
             return (0, 0);
         }
@@ -441,7 +528,9 @@ impl Aggregator {
         let (mut consumed, mut lines) = (0u64, 0u64);
         loop {
             buf.clear();
-            let Ok(n) = reader.read_until(b'\n', &mut buf) else { break };
+            let Ok(n) = reader.read_until(b'\n', &mut buf) else {
+                break;
+            };
             if n == 0 || buf.last() != Some(&b'\n') {
                 break; // fim, ou linha ainda sendo escrita
             }
@@ -451,7 +540,9 @@ impl Aggregator {
             if !contains(&buf, b"\"usage\"") {
                 continue;
             }
-            let Ok(line) = serde_json::from_slice::<Line>(&buf) else { continue };
+            let Ok(line) = serde_json::from_slice::<Line>(&buf) else {
+                continue;
+            };
             self.ingest(line, &file_session, &file_project, path, off + consumed);
         }
         (consumed, lines)
@@ -464,10 +555,21 @@ impl Aggregator {
         if model.is_empty() || model.starts_with('<') {
             return; // `<synthetic>`: mensagens geradas localmente, sem chamada à API
         }
-        let Some(ts) = line.timestamp.as_deref().and_then(|t| DateTime::parse_from_rfc3339(t).ok()) else { return };
+        let Some(ts) = line
+            .timestamp
+            .as_deref()
+            .and_then(|t| DateTime::parse_from_rfc3339(t).ok())
+        else {
+            return;
+        };
         let cc = raw.cache_creation.unwrap_or_default();
         let usage = MsgUsage {
-            tokens: Tokens { input: raw.input_tokens, output: raw.output_tokens, cache_write: raw.cache_creation_input_tokens, cache_read: raw.cache_read_input_tokens },
+            tokens: Tokens {
+                input: raw.input_tokens,
+                output: raw.output_tokens,
+                cache_write: raw.cache_creation_input_tokens,
+                cache_read: raw.cache_read_input_tokens,
+            },
             write_5m: cc.ephemeral_5m_input_tokens,
             write_1h: cc.ephemeral_1h_input_tokens,
             fast: raw.speed.as_deref() == Some("fast"),
@@ -480,7 +582,10 @@ impl Aggregator {
         let key = match (&msg.id, &line.request_id) {
             (Some(id), Some(req)) => format!("{id}:{req}"),
             (Some(id), None) => id.clone(),
-            _ => line.uuid.clone().unwrap_or_else(|| format!("{}#{at}", path.display())),
+            _ => line
+                .uuid
+                .clone()
+                .unwrap_or_else(|| format!("{}#{at}", path.display())),
         };
         if let Some(e) = self.entries.get_mut(&key) {
             // mesma resposta em outra linha: fica o maior uso (o streaming só cresce)
@@ -517,37 +622,61 @@ impl Aggregator {
         let min = today - chrono::Duration::days(self.days - 1);
         let mut rows: HashMap<(NaiveDate, u32, u32, u32), Row> = HashMap::new();
         let mut unpriced: BTreeMap<String, u64> = BTreeMap::new();
-        for e in self.entries.values().filter(|e| e.day >= min && e.day <= today) {
-            let r = rows.entry((e.day, e.model, e.session, e.project)).or_insert_with(|| Row {
-                day: e.day,
-                model: self.strings.name(e.model).to_string(),
-                session: self.strings.name(e.session).to_string(),
-                project: self.strings.name(e.project).to_string(),
-                ..Default::default()
-            });
+        for e in self
+            .entries
+            .values()
+            .filter(|e| e.day >= min && e.day <= today)
+        {
+            let r = rows
+                .entry((e.day, e.model, e.session, e.project))
+                .or_insert_with(|| Row {
+                    day: e.day,
+                    model: self.strings.name(e.model).to_string(),
+                    session: self.strings.name(e.session).to_string(),
+                    project: self.strings.name(e.project).to_string(),
+                    ..Default::default()
+                });
             r.tokens.add(&e.tokens);
             r.cost += e.cost;
             r.messages += 1;
             r.last_ts_ms = r.last_ts_ms.max(e.ts_ms);
             if !e.priced {
-                *unpriced.entry(self.strings.name(e.model).to_string()).or_default() += e.tokens.total();
+                *unpriced
+                    .entry(self.strings.name(e.model).to_string())
+                    .or_default() += e.tokens.total();
             }
         }
         let mut rows: Vec<Row> = rows.into_values().collect();
-        rows.sort_by(|a, b| a.day.cmp(&b.day).then_with(|| a.model.cmp(&b.model)).then_with(|| a.session.cmp(&b.session)));
-        Report { today, window_days: self.days, rows, unpriced: unpriced.into_iter().collect(), scan: self.last_scan, generated_ms: chrono::Utc::now().timestamp_millis() }
+        rows.sort_by(|a, b| {
+            a.day
+                .cmp(&b.day)
+                .then_with(|| a.model.cmp(&b.model))
+                .then_with(|| a.session.cmp(&b.session))
+        });
+        Report {
+            today,
+            window_days: self.days,
+            rows,
+            unpriced: unpriced.into_iter().collect(),
+            scan: self.last_scan,
+            generated_ms: chrono::Utc::now().timestamp_millis(),
+        }
     }
 }
 
 /// `.../<sessão>.jsonl` → sessão; `.../<sessão>/subagents/agent-x.jsonl` → sessão.
 fn fallback_session(path: &Path) -> String {
     let parent = path.parent();
-    if parent.and_then(|p| p.file_name()).is_some_and(|n| n == "subagents")
+    if parent
+        .and_then(|p| p.file_name())
+        .is_some_and(|n| n == "subagents")
         && let Some(s) = parent.and_then(Path::parent).and_then(Path::file_name)
     {
         return s.to_string_lossy().into_owned();
     }
-    path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+    path.file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// `projects/<proj>/*.jsonl` e `projects/<proj>/<sessão>/subagents/*.jsonl`.
@@ -555,7 +684,9 @@ fn collect_jsonl(dir: &Path, depth: u8, out: &mut Vec<(PathBuf, u64, SystemTime)
     if depth > 3 {
         return;
     }
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
     for e in rd.flatten() {
         let Ok(ft) = e.file_type() else { continue };
         let path = e.path();
@@ -564,7 +695,11 @@ fn collect_jsonl(dir: &Path, depth: u8, out: &mut Vec<(PathBuf, u64, SystemTime)
         } else if path.extension().is_some_and(|x| x == "jsonl")
             && let Ok(m) = e.metadata()
         {
-            out.push((path, m.len(), m.modified().unwrap_or(SystemTime::UNIX_EPOCH)));
+            out.push((
+                path,
+                m.len(),
+                m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+            ));
         }
     }
 }
@@ -668,10 +803,20 @@ impl Report {
         let mut map: HashMap<&str, Bucket> = HashMap::new();
         for r in self.rows_in(days) {
             let k = key(r);
-            map.entry(k).or_insert_with(|| Bucket { key: k.to_string(), ..Default::default() }).add(r);
+            map.entry(k)
+                .or_insert_with(|| Bucket {
+                    key: k.to_string(),
+                    ..Default::default()
+                })
+                .add(r);
         }
         let mut v: Vec<Bucket> = map.into_values().collect();
-        v.sort_by(|a, b| b.cost.total_cmp(&a.cost).then_with(|| b.tokens.total().cmp(&a.tokens.total())).then_with(|| a.key.cmp(&b.key)));
+        v.sort_by(|a, b| {
+            b.cost
+                .total_cmp(&a.cost)
+                .then_with(|| b.tokens.total().cmp(&a.tokens.total()))
+                .then_with(|| a.key.cmp(&b.key))
+        });
         v
     }
 
@@ -690,14 +835,22 @@ impl Report {
     /// Os últimos `days` dias, em ordem, incluindo dias sem uso.
     pub fn daily(&self, days: i64) -> Vec<Day> {
         let since = self.since(days);
-        let mut out: Vec<Day> = (0..days.max(1)).map(|i| Day { day: since + chrono::Duration::days(i), models: vec![] }).collect();
+        let mut out: Vec<Day> = (0..days.max(1))
+            .map(|i| Day {
+                day: since + chrono::Duration::days(i),
+                models: vec![],
+            })
+            .collect();
         for r in self.rows_in(days) {
             let i = (r.day - since).num_days() as usize;
             let Some(d) = out.get_mut(i) else { continue };
             match d.models.iter_mut().find(|m| m.key == r.model) {
                 Some(m) => m.add(r),
                 None => {
-                    let mut b = Bucket { key: r.model.clone(), ..Default::default() };
+                    let mut b = Bucket {
+                        key: r.model.clone(),
+                        ..Default::default()
+                    };
                     b.add(r);
                     d.models.push(b);
                 }
@@ -713,7 +866,15 @@ mod tests {
     use serde_json::json;
 
     /// Linha sintética de transcript, só com os campos de uso.
-    fn line(id: &str, req: &str, model: &str, ts: &str, session: &str, cwd: &str, usage: serde_json::Value) -> String {
+    fn line(
+        id: &str,
+        req: &str,
+        model: &str,
+        ts: &str,
+        session: &str,
+        cwd: &str,
+        usage: serde_json::Value,
+    ) -> String {
         let v = json!({
             "type": "assistant", "timestamp": ts, "sessionId": session, "cwd": cwd, "requestId": req,
             "uuid": format!("u-{id}-{req}-{}", usage["output_tokens"]),
@@ -746,23 +907,53 @@ mod tests {
     fn precos_e_custo() {
         let t = PriceTable::builtin();
         // Opus 5.5: 1M de cada tipo
-        let u = MsgUsage { tokens: Tokens { input: 1_000_000, output: 1_000_000, cache_write: 2_000_000, cache_read: 1_000_000 }, write_5m: 1_000_000, write_1h: 1_000_000, fast: false };
+        let u = MsgUsage {
+            tokens: Tokens {
+                input: 1_000_000,
+                output: 1_000_000,
+                cache_write: 2_000_000,
+                cache_read: 1_000_000,
+            },
+            write_5m: 1_000_000,
+            write_1h: 1_000_000,
+            fast: false,
+        };
         let c = t.cost("claude-opus-5-5", &u).unwrap();
         assert!((c - (4.0 + 20.0 + 5.0 + 8.0 + 0.2)).abs() < 1e-9, "{c}");
         // modo rápido = 2x
-        let fast = t.cost("claude-opus-5-5", &MsgUsage { fast: true, ..u }).unwrap();
+        let fast = t
+            .cost("claude-opus-5-5", &MsgUsage { fast: true, ..u })
+            .unwrap();
         assert!((fast - 2.0 * c).abs() < 1e-9);
         // data no id e [1m]
         assert!(t.get("claude-haiku-4-5-20251001").is_some());
         assert!(t.get("claude-sonnet-5[1m]").is_some());
         assert!(t.get("claude-desconhecido-9").is_none());
         // Haiku 5.5 acima de 100K de prompt muda de faixa
-        let small = MsgUsage { tokens: Tokens { input: 50_000, ..Default::default() }, ..Default::default() };
-        let big = MsgUsage { tokens: Tokens { input: 200_000, ..Default::default() }, ..Default::default() };
+        let small = MsgUsage {
+            tokens: Tokens {
+                input: 50_000,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let big = MsgUsage {
+            tokens: Tokens {
+                input: 200_000,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         assert!((t.cost("claude-haiku-5-5", &small).unwrap() - 0.005).abs() < 1e-12);
         assert!((t.cost("claude-haiku-5-5", &big).unwrap() - 0.1).abs() < 1e-12);
         // escrita sem detalhe de TTL conta como 5 min
-        let legacy = MsgUsage { tokens: Tokens { cache_write: 1_000_000, ..Default::default() }, ..Default::default() };
+        let legacy = MsgUsage {
+            tokens: Tokens {
+                cache_write: 1_000_000,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         assert!((t.cost("claude-sonnet-5", &legacy).unwrap() - 2.5).abs() < 1e-9);
     }
 
@@ -770,7 +961,14 @@ mod tests {
     fn sobrescrita_de_precos() {
         let mut t = PriceTable::builtin();
         t.apply_overrides("[modelos.\"claude-novo-1\"]\ninput = 1.0\noutput = 2.0\ncache_write_5m = 0\ncache_write_1h = 0\ncache_read = 0\n");
-        let u = MsgUsage { tokens: Tokens { input: 1_000_000, output: 1_000_000, ..Default::default() }, ..Default::default() };
+        let u = MsgUsage {
+            tokens: Tokens {
+                input: 1_000_000,
+                output: 1_000_000,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         assert!((t.cost("claude-novo-1", &u).unwrap() - 3.0).abs() < 1e-9);
     }
 
@@ -795,11 +993,43 @@ mod tests {
         // mesma resposta em 3 linhas (blocos), output crescendo; + uma linha sem uso
         let mut text = String::new();
         text += "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"oi\"}}\n";
-        text += &line("msg_a", "req_a", "claude-opus-5-5", &ts, "s1", "/home/x/repo", usage(10, 1000, 0, 0, 5));
-        text += &line("msg_a", "req_a", "claude-opus-5-5", &ts, "s1", "/home/x/repo", usage(10, 1000, 0, 0, 50));
-        text += &line("msg_a", "req_a", "claude-opus-5-5", &ts, "s1", "/home/x/repo", usage(10, 1000, 0, 0, 50));
+        text += &line(
+            "msg_a",
+            "req_a",
+            "claude-opus-5-5",
+            &ts,
+            "s1",
+            "/home/x/repo",
+            usage(10, 1000, 0, 0, 5),
+        );
+        text += &line(
+            "msg_a",
+            "req_a",
+            "claude-opus-5-5",
+            &ts,
+            "s1",
+            "/home/x/repo",
+            usage(10, 1000, 0, 0, 50),
+        );
+        text += &line(
+            "msg_a",
+            "req_a",
+            "claude-opus-5-5",
+            &ts,
+            "s1",
+            "/home/x/repo",
+            usage(10, 1000, 0, 0, 50),
+        );
         // linha incompleta (ainda sendo escrita) fica pra depois
-        let partial = line("msg_b", "req_b", "claude-sonnet-5", &ts, "s1", "/home/x/repo", usage(1, 0, 0, 500, 7));
+        let partial = line(
+            "msg_b",
+            "req_b",
+            "claude-sonnet-5",
+            &ts,
+            "s1",
+            "/home/x/repo",
+            usage(1, 0, 0, 500, 7),
+        );
         std::fs::write(&file, format!("{text}{}", partial.trim_end())).unwrap();
 
         let mut agg = Aggregator::with_root(root.clone(), PriceTable::builtin());
@@ -807,14 +1037,46 @@ mod tests {
         let r = agg.report(today);
         let tot = r.totals(1);
         assert_eq!(tot.messages, 1);
-        assert_eq!(tot.tokens, Tokens { input: 10, output: 50, cache_write: 1000, cache_read: 0 });
+        assert_eq!(
+            tot.tokens,
+            Tokens {
+                input: 10,
+                output: 50,
+                cache_write: 1000,
+                cache_read: 0
+            }
+        );
         let expected = (10.0 * 4.0 + 50.0 * 20.0 + 1000.0 * 5.0) / 1e6;
         assert!((tot.cost - expected).abs() < 1e-12);
 
         // completa a linha + subagente (sessionId do pai) + sessão ramificada copiando msg_a
         std::fs::write(&file, format!("{text}{partial}")).unwrap();
-        std::fs::write(proj.join("s1/subagents/agent-1.jsonl"), line("msg_c", "req_c", "claude-haiku-5-5", &ts, "s1", "/home/x/repo", usage(100, 0, 0, 0, 10))).unwrap();
-        std::fs::write(proj.join("s2.jsonl"), line("msg_a", "req_a", "claude-opus-5-5", &ts, "s2", "/home/x/repo", usage(10, 1000, 0, 0, 50))).unwrap();
+        std::fs::write(
+            proj.join("s1/subagents/agent-1.jsonl"),
+            line(
+                "msg_c",
+                "req_c",
+                "claude-haiku-5-5",
+                &ts,
+                "s1",
+                "/home/x/repo",
+                usage(100, 0, 0, 0, 10),
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            proj.join("s2.jsonl"),
+            line(
+                "msg_a",
+                "req_a",
+                "claude-opus-5-5",
+                &ts,
+                "s2",
+                "/home/x/repo",
+                usage(10, 1000, 0, 0, 50),
+            ),
+        )
+        .unwrap();
         let before = agg.last_scan;
         let stats = agg.scan();
         assert!(stats.bytes_read > 0 && stats.bytes_read < before.bytes_read + 2000);
@@ -838,15 +1100,72 @@ mod tests {
         let proj = root.join("p");
         std::fs::create_dir_all(&proj).unwrap();
         let today = Local::now().date_naive();
-        let at = |d: i64| (today - chrono::Duration::days(d)).and_hms_opt(12, 0, 0).unwrap().and_local_timezone(Local).single().unwrap().to_rfc3339();
+        let at = |d: i64| {
+            (today - chrono::Duration::days(d))
+                .and_hms_opt(12, 0, 0)
+                .unwrap()
+                .and_local_timezone(Local)
+                .single()
+                .unwrap()
+                .to_rfc3339()
+        };
         let mut text = String::new();
-        text += &line("m1", "r1", "claude-sonnet-5", &at(0), "s", "/p", usage(1000, 0, 0, 0, 0));
-        text += &line("m2", "r2", "claude-sonnet-5", &at(3), "s", "/p", usage(1000, 0, 0, 0, 0));
-        text += &line("m3", "r3", "claude-opus-5", &at(3), "s", "/p", usage(1000, 0, 0, 0, 0));
-        text += &line("m4", "r4", "claude-opus-5", &at(45), "s", "/p", usage(1000, 0, 0, 0, 0)); // fora da janela
-        text += &line("m5", "r5", "modelo-x", &at(1), "s", "/p", usage(7, 0, 0, 0, 0)); // sem preço
+        text += &line(
+            "m1",
+            "r1",
+            "claude-sonnet-5",
+            &at(0),
+            "s",
+            "/p",
+            usage(1000, 0, 0, 0, 0),
+        );
+        text += &line(
+            "m2",
+            "r2",
+            "claude-sonnet-5",
+            &at(3),
+            "s",
+            "/p",
+            usage(1000, 0, 0, 0, 0),
+        );
+        text += &line(
+            "m3",
+            "r3",
+            "claude-opus-5",
+            &at(3),
+            "s",
+            "/p",
+            usage(1000, 0, 0, 0, 0),
+        );
+        text += &line(
+            "m4",
+            "r4",
+            "claude-opus-5",
+            &at(45),
+            "s",
+            "/p",
+            usage(1000, 0, 0, 0, 0),
+        ); // fora da janela
+        text += &line(
+            "m5",
+            "r5",
+            "modelo-x",
+            &at(1),
+            "s",
+            "/p",
+            usage(7, 0, 0, 0, 0),
+        ); // sem preço
         // custo informado na linha (formato antigo) tem prioridade
-        let mut legacy: serde_json::Value = serde_json::from_str(&line("m6", "r6", "claude-sonnet-5", &at(2), "s", "/p", usage(1, 0, 0, 0, 0))).unwrap();
+        let mut legacy: serde_json::Value = serde_json::from_str(&line(
+            "m6",
+            "r6",
+            "claude-sonnet-5",
+            &at(2),
+            "s",
+            "/p",
+            usage(1, 0, 0, 0, 0),
+        ))
+        .unwrap();
         legacy["costUSD"] = json!(1.5);
         text += &format!("{legacy}\n");
         std::fs::write(proj.join("s.jsonl"), text).unwrap();
@@ -877,6 +1196,12 @@ mod tests {
         let again = agg.scan();
         let r = agg.report(Local::now().date_naive());
         let tot = r.totals(30);
-        eprintln!("1ª: {first:?} {s:?} | incremental: {:?} {again:?} | 30d: {} respostas ${:.2} | sem preço: {:?}", t.elapsed(), tot.messages, tot.cost, r.unpriced);
+        eprintln!(
+            "1ª: {first:?} {s:?} | incremental: {:?} {again:?} | 30d: {} respostas ${:.2} | sem preço: {:?}",
+            t.elapsed(),
+            tot.messages,
+            tot.cost,
+            r.unpriced
+        );
     }
 }

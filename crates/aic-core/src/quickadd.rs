@@ -72,24 +72,36 @@ pub fn parse(input: &str, today: NaiveDate, repos: &[String], workspaces: &[Stri
         let handled = match sigil {
             "#" if !rest.is_empty() => {
                 let repo = match_name(rest, repos).unwrap_or_else(|| rest.to_string());
-                p.chips.push(Chip { kind: ChipKind::Repo, label: repo.clone() });
+                p.chips.push(Chip {
+                    kind: ChipKind::Repo,
+                    label: repo.clone(),
+                });
                 p.repo = Some(repo);
                 true
             }
             "@" if !rest.is_empty() => match parse_date(rest, today) {
                 Some(d) => {
-                    p.chips.push(Chip { kind: ChipKind::Due, label: due_label(d, today) });
+                    p.chips.push(Chip {
+                        kind: ChipKind::Due,
+                        label: due_label(d, today),
+                    });
                     p.due = Some(d);
                     true
                 }
                 None => {
-                    p.chips.push(Chip { kind: ChipKind::Unknown, label: word.to_string() });
+                    p.chips.push(Chip {
+                        kind: ChipKind::Unknown,
+                        label: word.to_string(),
+                    });
                     false
                 }
             },
             "!" => match parse_priority(rest) {
                 Some(pr) => {
-                    p.chips.push(Chip { kind: ChipKind::Priority, label: pr.label().to_string() });
+                    p.chips.push(Chip {
+                        kind: ChipKind::Priority,
+                        label: pr.label().to_string(),
+                    });
                     p.priority = Some(pr);
                     true
                 }
@@ -97,18 +109,27 @@ pub fn parse(input: &str, today: NaiveDate, repos: &[String], workspaces: &[Stri
             },
             "+" if !rest.is_empty() => {
                 let ws = match_name(rest, workspaces).unwrap_or_else(|| rest.to_string());
-                p.chips.push(Chip { kind: ChipKind::Workspace, label: ws.clone() });
+                p.chips.push(Chip {
+                    kind: ChipKind::Workspace,
+                    label: ws.clone(),
+                });
                 p.workspace = Some(ws);
                 true
             }
             "^" if !rest.is_empty() => {
                 let key = rest.to_uppercase();
-                p.chips.push(Chip { kind: ChipKind::Card, label: key.clone() });
+                p.chips.push(Chip {
+                    kind: ChipKind::Card,
+                    label: key.clone(),
+                });
                 p.card_key = Some(key);
                 true
             }
             "~" if !rest.is_empty() => {
-                p.chips.push(Chip { kind: ChipKind::Tag, label: rest.to_string() });
+                p.chips.push(Chip {
+                    kind: ChipKind::Tag,
+                    label: rest.to_string(),
+                });
                 p.tags.push(rest.to_string());
                 true
             }
@@ -189,7 +210,11 @@ pub fn parse_date(s: &str, today: NaiveDate) -> Option<NaiveDate> {
         return Some(next_weekday(today, wd, false));
     }
     // +3 / 3d = daqui a 3 dias
-    if let Some(n) = k.strip_suffix('d').or_else(|| k.strip_prefix('+')).and_then(|n| n.parse::<i64>().ok()) {
+    if let Some(n) = k
+        .strip_suffix('d')
+        .or_else(|| k.strip_prefix('+'))
+        .and_then(|n| n.parse::<i64>().ok())
+    {
         return Some(today + Duration::days(n));
     }
     if let Ok(d) = NaiveDate::parse_from_str(&k, "%Y-%m-%d") {
@@ -201,7 +226,11 @@ pub fn parse_date(s: &str, today: NaiveDate) -> Option<NaiveDate> {
             let (d, m) = (d.parse().ok()?, m.parse().ok()?);
             let this_year = NaiveDate::from_ymd_opt(today.year(), m, d)?;
             // 05/01 em dezembro = janeiro do ano que vem
-            Some(if this_year < today { NaiveDate::from_ymd_opt(today.year() + 1, m, d)? } else { this_year })
+            Some(if this_year < today {
+                NaiveDate::from_ymd_opt(today.year() + 1, m, d)?
+            } else {
+                this_year
+            })
         }
         [d, m, y] => {
             let mut y: i32 = y.parse().ok()?;
@@ -230,7 +259,8 @@ pub fn due_label(d: NaiveDate, today: NaiveDate) -> String {
         1 => "amanhã".into(),
         -1 => "ontem".into(),
         2..=6 => {
-            let wd = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"][d.weekday().num_days_from_monday() as usize];
+            let wd = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
+                [d.weekday().num_days_from_monday() as usize];
             wd.to_string()
         }
         n if n < 0 => format!("{} dias atrás", -n),
@@ -248,12 +278,19 @@ mod tests {
     }
 
     fn repos() -> Vec<String> {
-        ["api-pagamentos", "api-core", "web-canvas", "infra"].map(String::from).to_vec()
+        ["api-pagamentos", "api-core", "web-canvas", "infra"]
+            .map(String::from)
+            .to_vec()
     }
 
     #[test]
     fn exemplo_completo() {
-        let p = parse("corrigir cálculo de juros #api !alta @hoje ^dev-142", today(), &repos(), &[]);
+        let p = parse(
+            "corrigir cálculo de juros #api !alta @hoje ^dev-142",
+            today(),
+            &repos(),
+            &[],
+        );
         assert_eq!(p.title, "corrigir cálculo de juros");
         assert_eq!(p.repo.as_deref(), Some("api-pagamentos"));
         assert_eq!(p.priority, Some(Priority::High));
@@ -271,7 +308,12 @@ mod tests {
 
     #[test]
     fn marcadores_em_qualquer_posicao() {
-        let p = parse("!! #web-c ajustar canvas @sexta ~front", today(), &repos(), &[]);
+        let p = parse(
+            "!! #web-c ajustar canvas @sexta ~front",
+            today(),
+            &repos(),
+            &[],
+        );
         assert_eq!(p.title, "ajustar canvas");
         assert_eq!(p.priority, Some(Priority::Urgent));
         assert_eq!(p.repo.as_deref(), Some("web-canvas"));
@@ -282,14 +324,29 @@ mod tests {
     #[test]
     fn datas() {
         let t = today();
-        assert_eq!(parse_date("amanhã", t), NaiveDate::from_ymd_opt(2026, 10, 9));
-        assert_eq!(parse_date("segunda", t), NaiveDate::from_ymd_opt(2026, 10, 12));
+        assert_eq!(
+            parse_date("amanhã", t),
+            NaiveDate::from_ymd_opt(2026, 10, 9)
+        );
+        assert_eq!(
+            parse_date("segunda", t),
+            NaiveDate::from_ymd_opt(2026, 10, 12)
+        );
         assert_eq!(parse_date("qui", t), NaiveDate::from_ymd_opt(2026, 10, 15)); // próxima, não hoje
-        assert_eq!(parse_date("semana", t), NaiveDate::from_ymd_opt(2026, 10, 9));
+        assert_eq!(
+            parse_date("semana", t),
+            NaiveDate::from_ymd_opt(2026, 10, 9)
+        );
         assert_eq!(parse_date("3d", t), NaiveDate::from_ymd_opt(2026, 10, 11));
-        assert_eq!(parse_date("20/10", t), NaiveDate::from_ymd_opt(2026, 10, 20));
+        assert_eq!(
+            parse_date("20/10", t),
+            NaiveDate::from_ymd_opt(2026, 10, 20)
+        );
         assert_eq!(parse_date("05/01", t), NaiveDate::from_ymd_opt(2027, 1, 5));
-        assert_eq!(parse_date("2026-12-24", t), NaiveDate::from_ymd_opt(2026, 12, 24));
+        assert_eq!(
+            parse_date("2026-12-24", t),
+            NaiveDate::from_ymd_opt(2026, 12, 24)
+        );
         assert_eq!(parse_date("xyz", t), None);
     }
 

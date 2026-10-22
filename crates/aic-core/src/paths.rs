@@ -21,15 +21,21 @@ fn xdg(var: &str, fallback: &str) -> PathBuf {
 }
 
 pub fn config_dir() -> PathBuf {
-    std::env::var_os("AIC_CONFIG_DIR").map(PathBuf::from).unwrap_or_else(|| xdg("XDG_CONFIG_HOME", ".config"))
+    std::env::var_os("AIC_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| xdg("XDG_CONFIG_HOME", ".config"))
 }
 
 pub fn data_dir() -> PathBuf {
-    std::env::var_os("AIC_DATA_DIR").map(PathBuf::from).unwrap_or_else(|| xdg("XDG_DATA_HOME", ".local/share"))
+    std::env::var_os("AIC_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| xdg("XDG_DATA_HOME", ".local/share"))
 }
 
 pub fn state_dir() -> PathBuf {
-    std::env::var_os("AIC_STATE_DIR").map(PathBuf::from).unwrap_or_else(|| xdg("XDG_STATE_HOME", ".local/state"))
+    std::env::var_os("AIC_STATE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| xdg("XDG_STATE_HOME", ".local/state"))
 }
 
 pub fn db_path() -> PathBuf {
@@ -49,7 +55,9 @@ pub fn sounds_dir() -> PathBuf {
 }
 
 pub fn claude_dir() -> PathBuf {
-    std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from).unwrap_or_else(|| home().join(".claude"))
+    std::env::var_os("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home().join(".claude"))
 }
 
 pub fn home_dir() -> PathBuf {
@@ -58,7 +66,13 @@ pub fn home_dir() -> PathBuf {
 
 /// Cria os diretórios que o app e os hooks escrevem.
 pub fn ensure_dirs() -> std::io::Result<()> {
-    for d in [config_dir(), data_dir(), events_dir(), statusline_dir(), sounds_dir()] {
+    for d in [
+        config_dir(),
+        data_dir(),
+        events_dir(),
+        statusline_dir(),
+        sounds_dir(),
+    ] {
         std::fs::create_dir_all(d)?;
     }
     Ok(())
@@ -71,7 +85,9 @@ pub fn dotenv_path() -> PathBuf {
 /// Carrega `~/.config/aic/.env` no ambiente do processo. Não sobrescreve o que já
 /// estiver definido. Chame no início do `main`, antes de abrir threads.
 pub fn load_dotenv() {
-    let Ok(text) = std::fs::read_to_string(dotenv_path()) else { return };
+    let Ok(text) = std::fs::read_to_string(dotenv_path()) else {
+        return;
+    };
     for (k, v) in parse_dotenv(&text) {
         if std::env::var_os(&k).is_none() {
             // SAFETY: chamado no início do main, ainda com uma thread só.

@@ -9,20 +9,40 @@ use crate::actions::Action;
 use crate::app::App;
 
 pub fn visible(app: &App) -> bool {
-    app.notes_open && app.view == crate::app::View::Sessions && app.cfg.on(aic_core::Module::Notes) && app.focused().is_some()
+    app.notes_open
+        && app.view == crate::app::View::Sessions
+        && app.cfg.on(aic_core::Module::Notes)
+        && app.focused().is_some()
 }
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let theme = app.theme.clone();
     let Some(id) = app.focused() else { return };
-    let Some(rt) = app.sessions.get(&id) else { return };
+    let Some(rt) = app.sessions.get(&id) else {
+        return;
+    };
     let name = rt.s.name.clone();
     let mut notes = rt.s.notes.clone();
     ui.horizontal(|ui| {
-        ui.label(RichText::new("NOTAS").font(FontId::monospace(11.0)).color(theme.dim));
-        ui.label(RichText::new(widgets::truncate(&name, 30)).font(FontId::monospace(11.0)).color(theme.accent_hi));
+        ui.label(
+            RichText::new("NOTAS")
+                .font(FontId::monospace(11.0))
+                .color(theme.dim),
+        );
+        ui.label(
+            RichText::new(widgets::truncate(&name, 30))
+                .font(FontId::monospace(11.0))
+                .color(theme.accent_hi),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if widgets::icon_button(ui, widgets::I_CLOSE, "Fechar notas", &app.keymap.tip(Action::ToggleNotes, "Fechar as notas")).clicked() {
+            if widgets::icon_button(
+                ui,
+                widgets::I_CLOSE,
+                "Fechar notas",
+                &app.keymap.tip(Action::ToggleNotes, "Fechar as notas"),
+            )
+            .clicked()
+            {
                 app.run_action(ui.ctx(), Action::ToggleNotes);
             }
         });
@@ -36,7 +56,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 ui.available_size(),
                 TextEdit::multiline(&mut notes)
                     .id(egui::Id::new(("notes", id)))
-                    .hint_text("Notas desta sessão (Markdown). Salvas sozinhas.\nEsc volta pro terminal.")
+                    .hint_text(
+                        "Notas desta sessão (Markdown). Salvas sozinhas.\nEsc volta pro terminal.",
+                    )
                     .font(FontId::monospace(12.5))
                     .frame(egui::Frame::NONE),
             )

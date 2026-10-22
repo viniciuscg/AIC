@@ -47,21 +47,111 @@ pub struct ModuleInfo {
 use Module::*;
 
 pub const ALL: &[ModuleInfo] = &[
-    ModuleInfo { module: Tmux, id: "tmux", name: "Persistência (tmux)", desc: "Terminais rodam num servidor tmux próprio do AIC: fechar a janela não mata nada, e ao abrir ele reconecta.", group: "Sessões", default: true, requires: &[] },
-    ModuleInfo { module: Workspaces, id: "workspaces", name: "Workspaces", desc: "Vários contextos de trabalho, cada um com seus blocos e layout.", group: "Sessões", default: true, requires: &[] },
-    ModuleInfo { module: Layne, id: "layne", name: "Layne (assistente)", desc: "Um Claude sempre aberto no painel lateral: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.", group: "Sessões", default: true, requires: &[] },
-    ModuleInfo { module: Tasks, id: "tasks", name: "Tarefas", desc: "Tarefas locais: captura rápida com marcadores (#repo @hoje !alta) e o painel Tarefas do bloco.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Notes, id: "notes", name: "Notas", desc: "Anotações em Markdown por sessão, num painel lateral (Ctrl+B e), salvas sozinhas.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Worktrees, id: "worktrees", name: "Worktrees", desc: "Aba de worktrees e opção de isolar cada sessão num worktree.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Changes, id: "changes", name: "Changes", desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Usage, id: "usage", name: "Tokens e custo", desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Hints, id: "hints", name: "Catálogo de atalhos", desc: "Tecla líder (Ctrl+Space) com todos os atalhos agrupados.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Sound, id: "sound", name: "Som", desc: "Toca um som quando uma sessão termina ou pede permissão.", group: "Avisos", default: true, requires: &[] },
-    ModuleInfo { module: Notifications, id: "notifications", name: "Notificações", desc: "Notificação do sistema quando uma sessão termina ou precisa de você.", group: "Avisos", default: true, requires: &[] },
+    ModuleInfo {
+        module: Tmux,
+        id: "tmux",
+        name: "Persistência (tmux)",
+        desc: "Terminais rodam num servidor tmux próprio do AIC: fechar a janela não mata nada, e ao abrir ele reconecta.",
+        group: "Sessões",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Workspaces,
+        id: "workspaces",
+        name: "Workspaces",
+        desc: "Vários contextos de trabalho, cada um com seus blocos e layout.",
+        group: "Sessões",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Layne,
+        id: "layne",
+        name: "Layne (assistente)",
+        desc: "Um Claude sempre aberto no painel lateral: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.",
+        group: "Sessões",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Tasks,
+        id: "tasks",
+        name: "Tarefas",
+        desc: "Tarefas locais: captura rápida com marcadores (#repo @hoje !alta) e o painel Tarefas do bloco.",
+        group: "Organização",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Notes,
+        id: "notes",
+        name: "Notas",
+        desc: "Anotações em Markdown por sessão, num painel lateral (Ctrl+B e), salvas sozinhas.",
+        group: "Organização",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Worktrees,
+        id: "worktrees",
+        name: "Worktrees",
+        desc: "Aba de worktrees e opção de isolar cada sessão num worktree.",
+        group: "Organização",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Changes,
+        id: "changes",
+        name: "Changes",
+        desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.",
+        group: "Organização",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Usage,
+        id: "usage",
+        name: "Tokens e custo",
+        desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.",
+        group: "Organização",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Hints,
+        id: "hints",
+        name: "Catálogo de atalhos",
+        desc: "Tecla líder (Ctrl+Space) com todos os atalhos agrupados.",
+        group: "Interface",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Sound,
+        id: "sound",
+        name: "Som",
+        desc: "Toca um som quando uma sessão termina ou pede permissão.",
+        group: "Avisos",
+        default: true,
+        requires: &[],
+    },
+    ModuleInfo {
+        module: Notifications,
+        id: "notifications",
+        name: "Notificações",
+        desc: "Notificação do sistema quando uma sessão termina ou precisa de você.",
+        group: "Avisos",
+        default: true,
+        requires: &[],
+    },
 ];
 
 pub fn info(m: Module) -> &'static ModuleInfo {
-    ALL.iter().find(|i| i.module == m).expect("módulo registrado")
+    ALL.iter()
+        .find(|i| i.module == m)
+        .expect("módulo registrado")
 }
 
 pub fn by_id(id: &str) -> Option<Module> {

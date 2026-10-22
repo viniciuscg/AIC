@@ -17,7 +17,11 @@ fn git(dir: &Path, args: &[&str]) -> Result<String> {
         .output()
         .context("rodando git")?;
     if !out.status.success() {
-        bail!("git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
+        bail!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim_end().to_string())
 }
@@ -32,7 +36,16 @@ pub struct GitStatus {
 }
 
 pub fn status(dir: &Path) -> Option<GitStatus> {
-    let out = git(dir, &["--no-optional-locks", "status", "--porcelain=v2", "--branch"]).ok()?;
+    let out = git(
+        dir,
+        &[
+            "--no-optional-locks",
+            "status",
+            "--porcelain=v2",
+            "--branch",
+        ],
+    )
+    .ok()?;
     let mut st = GitStatus::default();
     for line in out.lines() {
         if let Some(b) = line.strip_prefix("# branch.head ") {
@@ -70,7 +83,10 @@ impl Change {
         self.index == '?'
     }
     pub fn conflict(&self) -> bool {
-        matches!((self.index, self.worktree), ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D'))
+        matches!(
+            (self.index, self.worktree),
+            ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D')
+        )
     }
     /// Tem algo no índice.
     pub fn staged(&self) -> bool {
@@ -84,7 +100,16 @@ impl Change {
 
 /// Arquivos mudados (`git status --porcelain -z`), na ordem do git.
 pub fn changes(dir: &Path) -> Result<Vec<Change>> {
-    let out = git(dir, &["--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all"])?;
+    let out = git(
+        dir,
+        &[
+            "--no-optional-locks",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+        ],
+    )?;
     Ok(parse_changes(&out))
 }
 
@@ -93,11 +118,20 @@ fn parse_changes(out: &str) -> Vec<Change> {
     let mut parts = out.split('\0').filter(|p| !p.is_empty());
     while let Some(p) = parts.next() {
         let mut c = p.chars();
-        let (Some(index), Some(worktree)) = (c.next(), c.next()) else { continue };
+        let (Some(index), Some(worktree)) = (c.next(), c.next()) else {
+            continue;
+        };
         let path = p.get(3..).unwrap_or_default().to_string();
         // rename/cópia: o caminho antigo vem no campo seguinte
-        let orig = matches!(index, 'R' | 'C').then(|| parts.next().map(str::to_string)).flatten();
-        v.push(Change { path, orig, index, worktree });
+        let orig = matches!(index, 'R' | 'C')
+            .then(|| parts.next().map(str::to_string))
+            .flatten();
+        v.push(Change {
+            path,
+            orig,
+            index,
+            worktree,
+        });
     }
     v
 }
@@ -165,7 +199,11 @@ pub fn commit(dir: &Path, message: &str) -> Result<String> {
 
 /// Raiz do repositório principal (mesmo de dentro de um worktree).
 pub fn main_root(dir: &Path) -> Option<PathBuf> {
-    let common = git(dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"]).ok()?;
+    let common = git(
+        dir,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )
+    .ok()?;
     let common = PathBuf::from(common);
     if common.file_name().is_some_and(|n| n == ".git") {
         common.parent().map(Path::to_path_buf)
@@ -175,7 +213,9 @@ pub fn main_root(dir: &Path) -> Option<PathBuf> {
 }
 
 pub fn toplevel(dir: &Path) -> Option<PathBuf> {
-    git(dir, &["rev-parse", "--show-toplevel"]).ok().map(PathBuf::from)
+    git(dir, &["rev-parse", "--show-toplevel"])
+        .ok()
+        .map(PathBuf::from)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -221,7 +261,10 @@ pub fn worktrees(repo: &Path) -> Result<Vec<Worktree>> {
 
 /// Branch padrão do repo, pela branch do origin, senão `main`/`master`.
 pub fn default_branch(repo: &Path) -> String {
-    if let Ok(r) = git(repo, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]) {
+    if let Ok(r) = git(
+        repo,
+        &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    ) {
         if let Some(b) = r.strip_prefix("origin/") {
             return b.to_string();
         }
@@ -235,7 +278,10 @@ pub fn default_branch(repo: &Path) -> String {
 }
 
 pub fn worktree_path(repo: &Path, branch: &str) -> PathBuf {
-    let name = repo.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let name = repo
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
     let safe = branch.replace('/', "-");
     repo.with_file_name(format!("{name}.worktrees")).join(safe)
 }
@@ -250,11 +296,22 @@ pub fn add_worktree(repo: &Path, branch: &str, base: Option<&str>) -> Result<Pat
         std::fs::create_dir_all(dir)?;
     }
     let p = path.to_string_lossy().to_string();
-    let exists = git(repo, &["rev-parse", "--verify", "--quiet", &format!("refs/heads/{branch}")]).is_ok();
+    let exists = git(
+        repo,
+        &[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("refs/heads/{branch}"),
+        ],
+    )
+    .is_ok();
     if exists {
         git(repo, &["worktree", "add", &p, branch])?;
     } else {
-        let base = base.map(String::from).unwrap_or_else(|| default_branch(repo));
+        let base = base
+            .map(String::from)
+            .unwrap_or_else(|| default_branch(repo));
         git(repo, &["worktree", "add", "-b", branch, &p, &base])?;
     }
     Ok(path)
@@ -314,21 +371,30 @@ mod tests {
         assert_eq!(v.len(), 5);
         assert!(v[0].unstaged() && !v[0].staged());
         assert!(v[1].staged() && !v[1].unstaged());
-        assert_eq!((v[2].path.as_str(), v[2].orig.as_deref()), ("novo.rs", Some("velho.rs")));
+        assert_eq!(
+            (v[2].path.as_str(), v[2].orig.as_deref()),
+            ("novo.rs", Some("velho.rs"))
+        );
         assert!(v[3].untracked() && v[3].unstaged() && !v[3].staged());
         assert!(v[4].conflict() && !v[4].staged());
     }
 
     #[test]
     fn slug() {
-        assert_eq!(branch_slug(Some("DEV-142"), "Corrigir cálculo de juros!"), "DEV-142-corrigir-calculo-de-juros");
+        assert_eq!(
+            branch_slug(Some("DEV-142"), "Corrigir cálculo de juros!"),
+            "DEV-142-corrigir-calculo-de-juros"
+        );
         assert_eq!(branch_slug(None, "  ajuste / canvas  "), "ajuste-canvas");
     }
 
     #[test]
     fn caminho_do_worktree() {
         let p = worktree_path(Path::new("/x/repos/api-pagamentos"), "feat/abc");
-        assert_eq!(p, PathBuf::from("/x/repos/api-pagamentos.worktrees/feat-abc"));
+        assert_eq!(
+            p,
+            PathBuf::from("/x/repos/api-pagamentos.worktrees/feat-abc")
+        );
     }
 
     #[test]
@@ -338,13 +404,28 @@ mod tests {
         std::fs::create_dir_all(&repo).unwrap();
         let run = |args: &[&str]| git(&repo, args).unwrap();
         run(&["init", "-q", "-b", "main"]);
-        run(&["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init"]);
+        run(&[
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "init",
+        ]);
         let wt = add_worktree(&repo, "DEV-1-teste", None).unwrap();
         assert!(wt.exists());
         let list = worktrees(&repo).unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(list[1].branch.as_deref(), Some("DEV-1-teste"));
-        assert_eq!(main_root(&wt).unwrap().canonicalize().unwrap(), repo.canonicalize().unwrap());
+        assert_eq!(
+            main_root(&wt).unwrap().canonicalize().unwrap(),
+            repo.canonicalize().unwrap()
+        );
         std::fs::write(wt.join("a.txt"), "x").unwrap();
         assert_eq!(status(&wt).unwrap().dirty, 1);
         remove_worktree(&repo, &wt, true).unwrap();

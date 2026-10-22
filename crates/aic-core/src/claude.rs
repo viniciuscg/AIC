@@ -40,12 +40,20 @@ pub struct Limit {
 
 fn limit(v: &Value) -> Option<Limit> {
     let pct = v.get("used_percentage")?.as_f64()? as f32;
-    let resets_at = v.get("resets_at").and_then(|r| r.as_i64().or_else(|| r.as_str().and_then(parse_ts)));
-    Some(Limit { used_pct: pct, resets_at })
+    let resets_at = v
+        .get("resets_at")
+        .and_then(|r| r.as_i64().or_else(|| r.as_str().and_then(parse_ts)));
+    Some(Limit {
+        used_pct: pct,
+        resets_at,
+    })
 }
 
 fn parse_ts(s: &str) -> Option<i64> {
-    chrono::DateTime::parse_from_rfc3339(s).ok().map(|d| d.timestamp()).or_else(|| s.parse().ok())
+    chrono::DateTime::parse_from_rfc3339(s)
+        .ok()
+        .map(|d| d.timestamp())
+        .or_else(|| s.parse().ok())
 }
 
 impl StatusSnapshot {
@@ -55,15 +63,30 @@ impl StatusSnapshot {
         let rl = v.get("rate_limits");
         Self {
             session_id: s("/session_id").unwrap_or_default(),
-            model: s("/model/display_name").or_else(|| s("/model/id")).unwrap_or_else(|| "?".into()),
+            model: s("/model/display_name")
+                .or_else(|| s("/model/id"))
+                .unwrap_or_else(|| "?".into()),
             effort: s("/effort/level"),
-            cwd: s("/workspace/current_dir").or_else(|| s("/cwd")).map(PathBuf::from),
+            cwd: s("/workspace/current_dir")
+                .or_else(|| s("/cwd"))
+                .map(PathBuf::from),
             context_pct: f("/context_window/used_percentage").map(|x| x as f32),
-            context_size: v.pointer("/context_window/context_window_size").and_then(Value::as_u64),
+            context_size: v
+                .pointer("/context_window/context_window_size")
+                .and_then(Value::as_u64),
             cost_usd: f("/cost/total_cost_usd").unwrap_or(0.0),
-            duration_ms: v.pointer("/cost/total_duration_ms").and_then(Value::as_u64).unwrap_or(0),
-            lines_added: v.pointer("/cost/total_lines_added").and_then(Value::as_u64).unwrap_or(0),
-            lines_removed: v.pointer("/cost/total_lines_removed").and_then(Value::as_u64).unwrap_or(0),
+            duration_ms: v
+                .pointer("/cost/total_duration_ms")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+            lines_added: v
+                .pointer("/cost/total_lines_added")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+            lines_removed: v
+                .pointer("/cost/total_lines_removed")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
             five_hour: rl.and_then(|r| r.get("five_hour")).and_then(limit),
             seven_day: rl.and_then(|r| r.get("seven_day")).and_then(limit),
             spend: rl.and_then(|r| r.get("spend_limit")).and_then(limit),
@@ -86,7 +109,9 @@ impl StatusSnapshot {
         let dir = std::fs::read_dir(paths::statusline_dir()).ok()?;
         dir.flatten()
             .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
-            .filter_map(|e| serde_json::from_str::<Self>(&std::fs::read_to_string(e.path()).ok()?).ok())
+            .filter_map(|e| {
+                serde_json::from_str::<Self>(&std::fs::read_to_string(e.path()).ok()?).ok()
+            })
             .filter(|s| s.five_hour.is_some() || s.seven_day.is_some())
             .max_by_key(|s| s.at)
     }
@@ -94,7 +119,11 @@ impl StatusSnapshot {
 
 /// Diretório de projeto do Claude Code para um cwd (`/a/b.c` → `-a-b-c`).
 pub fn project_dir(cwd: &Path) -> PathBuf {
-    let enc: String = cwd.to_string_lossy().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+    let enc: String = cwd
+        .to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
     paths::claude_dir().join("projects").join(enc)
 }
 
@@ -127,12 +156,22 @@ pub fn ensure_trusted(dir: &Path) -> anyhow::Result<()> {
     let path = global_config_path();
     let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".into());
     let mut v: Value = serde_json::from_str(&text)?;
-    let trusted = |v: &Value, d: &Path| v.pointer("/projects").and_then(|p| p.get(d.to_string_lossy().as_ref())).and_then(|p| p.get("hasTrustDialogAccepted")).and_then(Value::as_bool) == Some(true);
+    let trusted = |v: &Value, d: &Path| {
+        v.pointer("/projects")
+            .and_then(|p| p.get(d.to_string_lossy().as_ref()))
+            .and_then(|p| p.get("hasTrustDialogAccepted"))
+            .and_then(Value::as_bool)
+            == Some(true)
+    };
     if dir.ancestors().any(|d| trusted(&v, d)) {
         return Ok(());
     }
-    let root = v.as_object_mut().ok_or_else(|| anyhow::anyhow!("{} não é um objeto", path.display()))?;
-    let projects = root.entry("projects").or_insert_with(|| Value::Object(Default::default()));
+    let root = v
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("{} não é um objeto", path.display()))?;
+    let projects = root
+        .entry("projects")
+        .or_insert_with(|| Value::Object(Default::default()));
     let entry = projects
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("projects não é um objeto"))?
@@ -161,7 +200,11 @@ pub struct Injection {
 }
 
 /// Monta `program` + `args` para abrir/retomar a sessão no Claude Code.
-pub fn command(session: &Session, inj: &Injection, extra_prompt: Option<&str>) -> (String, Vec<String>) {
+pub fn command(
+    session: &Session,
+    inj: &Injection,
+    extra_prompt: Option<&str>,
+) -> (String, Vec<String>) {
     let id = session.claude_session.to_string();
     let mut args = Vec::new();
     if find_transcript(&session.cwd, &id).is_some() {
@@ -185,7 +228,11 @@ pub fn command(session: &Session, inj: &Injection, extra_prompt: Option<&str>) -
         args.push(p.to_string());
     }
     args.extend(session.claude_args.iter().cloned());
-    if let Some(p) = session.initial_prompt.as_deref().filter(|p| !p.trim().is_empty()) {
+    if let Some(p) = session
+        .initial_prompt
+        .as_deref()
+        .filter(|p| !p.trim().is_empty())
+    {
         args.push("--".into());
         args.push(p.to_string());
     }

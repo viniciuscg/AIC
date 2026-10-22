@@ -6,8 +6,8 @@ use alacritty_terminal::term::TermMode;
 use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::vte::ansi::{Color, CursorShape};
 use egui::{
-    Align2, Color32, CornerRadius, EventFilter, FontId, Id, Key, MouseWheelUnit,
-    PointerButton, Pos2, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2,
+    Align2, Color32, CornerRadius, EventFilter, FontId, Id, Key, MouseWheelUnit, PointerButton,
+    Pos2, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2,
 };
 
 use crate::backend::TerminalBackend;
@@ -23,7 +23,10 @@ pub struct TerminalFont {
 
 impl Default for TerminalFont {
     fn default() -> Self {
-        Self { regular: FontId::monospace(14.0), bold: None }
+        Self {
+            regular: FontId::monospace(14.0),
+            bold: None,
+        }
     }
 }
 
@@ -52,7 +55,14 @@ impl<'a> TerminalView<'a> {
         font: &'a TerminalFont,
         bindings: &'a BindingsLayout,
     ) -> Self {
-        Self { backend, theme, font, bindings, focused: false, padding: 6.0 }
+        Self {
+            backend,
+            theme,
+            font,
+            bindings,
+            focused: false,
+            padding: 6.0,
+        }
     }
 
     pub fn focused(mut self, focused: bool) -> Self {
@@ -86,7 +96,12 @@ impl<'a> TerminalView<'a> {
             ui.memory_mut(|m| {
                 m.set_focus_lock_filter(
                     response.id,
-                    EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true },
+                    EventFilter {
+                        tab: true,
+                        horizontal_arrows: true,
+                        vertical_arrows: true,
+                        escape: true,
+                    },
                 )
             });
             self.keyboard(ui);
@@ -108,8 +123,16 @@ impl<'a> TerminalView<'a> {
                     self.backend.write(text.into_bytes());
                     wrote = true;
                 }
-                egui::Event::Key { key, pressed: true, modifiers, .. } => {
-                    match self.bindings.get_action(InputKind::KeyCode(key), modifiers, mode) {
+                egui::Event::Key {
+                    key,
+                    pressed: true,
+                    modifiers,
+                    ..
+                } => {
+                    match self
+                        .bindings
+                        .get_action(InputKind::KeyCode(key), modifiers, mode)
+                    {
                         BindingAction::Char(c) => {
                             self.backend.write(c.to_string().into_bytes());
                             wrote = true;
@@ -212,7 +235,13 @@ impl<'a> TerminalView<'a> {
                         self.backend.scroll(lines);
                     }
                 }
-                egui::Event::PointerButton { button: PointerButton::Primary, pressed, pos, modifiers, .. } => {
+                egui::Event::PointerButton {
+                    button: PointerButton::Primary,
+                    pressed,
+                    pos,
+                    modifiers,
+                    ..
+                } => {
                     if !inner.contains(pos) && pressed {
                         continue;
                     }
@@ -249,7 +278,8 @@ impl<'a> TerminalView<'a> {
                     // manda o movimento, senão ele só vê clique e soltura e não seleciona nada.
                     if mouse_mode && !mods.shift {
                         let report = if state.dragging {
-                            mode.intersects(TermMode::MOUSE_DRAG | TermMode::MOUSE_MOTION).then_some(32)
+                            mode.intersects(TermMode::MOUSE_DRAG | TermMode::MOUSE_MOTION)
+                                .then_some(32)
                         } else {
                             mode.contains(TermMode::MOUSE_MOTION).then_some(35)
                         };
@@ -293,8 +323,8 @@ impl<'a> TerminalView<'a> {
         let offset = content.display_offset as i32;
         let selection = content.selection;
         let cursor = content.cursor;
-        let show_cursor = content.mode.contains(TermMode::SHOW_CURSOR)
-            && cursor.shape != CursorShape::Hidden;
+        let show_cursor =
+            content.mode.contains(TermMode::SHOW_CURSOR) && cursor.shape != CursorShape::Hidden;
         let link = self.backend.hovered_link.clone();
 
         // Texto em "runs" (mesma cor/estilo na mesma linha) = bem menos shapes por frame.
@@ -365,7 +395,11 @@ impl<'a> TerminalView<'a> {
 
             let is_cursor = show_cursor && point == cursor.point;
             if is_cursor && self.focused && cursor.shape == CursorShape::Block {
-                painter.rect_filled(Rect::from_min_size(Pos2::new(x, y), Vec2::new(w, cell.y)), CornerRadius::ZERO, theme.cursor);
+                painter.rect_filled(
+                    Rect::from_min_size(Pos2::new(x, y), Vec2::new(w, cell.y)),
+                    CornerRadius::ZERO,
+                    theme.cursor,
+                );
                 fg = theme.background;
             }
 
@@ -373,18 +407,27 @@ impl<'a> TerminalView<'a> {
                 || link.as_ref().is_some_and(|l| l.contains(&point))
             {
                 let uy = y + cell.y - 1.0;
-                painter.line_segment([Pos2::new(x, uy), Pos2::new(x + w, uy)], Stroke::new(1.0, fg));
+                painter.line_segment(
+                    [Pos2::new(x, uy), Pos2::new(x + w, uy)],
+                    Stroke::new(1.0, fg),
+                );
             }
             if c.flags.contains(Flags::STRIKEOUT) {
                 let sy = y + cell.y / 2.0;
-                painter.line_segment([Pos2::new(x, sy), Pos2::new(x + w, sy)], Stroke::new(1.0, fg));
+                painter.line_segment(
+                    [Pos2::new(x, sy), Pos2::new(x + w, sy)],
+                    Stroke::new(1.0, fg),
+                );
             }
 
             let ch = c.c;
             let bold = c.flags.contains(Flags::BOLD) && self.font.bold.is_some();
             // Caracteres fora do "seguro" (ícones, emoji, CJK) vão sozinhos, centralizados
             // na célula, para não desalinhar a linha se a fonte de fallback for mais larga.
-            let simple = !wide && (ch.is_ascii() || ('\u{a0}'..='\u{24ff}').contains(&ch) || ('\u{2500}'..='\u{259f}').contains(&ch));
+            let simple = !wide
+                && (ch.is_ascii()
+                    || ('\u{a0}'..='\u{24ff}').contains(&ch)
+                    || ('\u{2500}'..='\u{259f}').contains(&ch));
 
             let continues = current.as_ref().is_some_and(|r| {
                 r.color == fg && r.bold == bold && last_line == row && last_col_end == col
@@ -393,13 +436,27 @@ impl<'a> TerminalView<'a> {
                 flush(&mut current, &mut runs);
             }
             if simple {
-                let r = current.get_or_insert_with(|| Run { x, y, text: String::new(), color: fg, bold, centered: false });
+                let r = current.get_or_insert_with(|| Run {
+                    x,
+                    y,
+                    text: String::new(),
+                    color: fg,
+                    bold,
+                    centered: false,
+                });
                 r.text.push(if ch == '\t' { ' ' } else { ch });
                 if let Some(zw) = c.zerowidth() {
                     r.text.extend(zw);
                 }
             } else if ch != ' ' {
-                runs.push(Run { x: x + w / 2.0, y, text: ch.to_string(), color: fg, bold: false, centered: true });
+                runs.push(Run {
+                    x: x + w / 2.0,
+                    y,
+                    text: ch.to_string(),
+                    color: fg,
+                    bold: false,
+                    centered: true,
+                });
             }
             last_line = row;
             last_col_end = col + 1;
@@ -408,17 +465,29 @@ impl<'a> TerminalView<'a> {
                 let r = Rect::from_min_size(Pos2::new(x, y), Vec2::new(w, cell.y));
                 match cursor.shape {
                     CursorShape::Beam => {
-                        painter.rect_filled(Rect::from_min_size(r.min, Vec2::new(2.0, cell.y)), CornerRadius::ZERO, theme.cursor);
+                        painter.rect_filled(
+                            Rect::from_min_size(r.min, Vec2::new(2.0, cell.y)),
+                            CornerRadius::ZERO,
+                            theme.cursor,
+                        );
                     }
                     CursorShape::Underline => {
                         painter.rect_filled(
-                            Rect::from_min_size(Pos2::new(r.min.x, r.max.y - 2.0), Vec2::new(w, 2.0)),
+                            Rect::from_min_size(
+                                Pos2::new(r.min.x, r.max.y - 2.0),
+                                Vec2::new(w, 2.0),
+                            ),
                             CornerRadius::ZERO,
                             theme.cursor,
                         );
                     }
                     _ => {
-                        painter.rect_stroke(r.shrink(0.5), CornerRadius::ZERO, Stroke::new(1.0, theme.cursor), StrokeKind::Inside);
+                        painter.rect_stroke(
+                            r.shrink(0.5),
+                            CornerRadius::ZERO,
+                            Stroke::new(1.0, theme.cursor),
+                            StrokeKind::Inside,
+                        );
                     }
                 }
             }
@@ -427,8 +496,16 @@ impl<'a> TerminalView<'a> {
         drop(term);
 
         for r in runs {
-            let font = if r.bold { self.font.bold.clone().unwrap() } else { self.font.regular.clone() };
-            let align = if r.centered { Align2::CENTER_TOP } else { Align2::LEFT_TOP };
+            let font = if r.bold {
+                self.font.bold.clone().unwrap()
+            } else {
+                self.font.regular.clone()
+            };
+            let align = if r.centered {
+                Align2::CENTER_TOP
+            } else {
+                Align2::LEFT_TOP
+            };
             painter.text(Pos2::new(r.x, r.y), align, r.text, font, r.color);
         }
     }
@@ -445,5 +522,9 @@ fn key_char(key: Key, shift: bool) -> Option<char> {
             _ => None,
         };
     }
-    Some(if shift { c.to_ascii_uppercase() } else { c.to_ascii_lowercase() })
+    Some(if shift {
+        c.to_ascii_uppercase()
+    } else {
+        c.to_ascii_lowercase()
+    })
 }

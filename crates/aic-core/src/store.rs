@@ -47,7 +47,9 @@ impl Store {
 
     /// Muda quando OUTRA conexão escreve no banco.
     pub fn data_version(&self) -> i64 {
-        self.conn.query_row("PRAGMA data_version", [], |r| r.get(0)).unwrap_or(0)
+        self.conn
+            .query_row("PRAGMA data_version", [], |r| r.get(0))
+            .unwrap_or(0)
     }
 
     fn all<T: DeserializeOwned>(&self, table: &str) -> Result<Vec<T>> {
@@ -72,7 +74,10 @@ impl Store {
     }
 
     fn delete(&self, table: &str, id: Id) -> Result<()> {
-        self.conn.execute(&format!("DELETE FROM {table} WHERE id = ?1"), params![id.to_string()])?;
+        self.conn.execute(
+            &format!("DELETE FROM {table} WHERE id = ?1"),
+            params![id.to_string()],
+        )?;
         Ok(())
     }
 
@@ -85,7 +90,11 @@ impl Store {
     pub fn task(&self, id: Id) -> Result<Option<Task>> {
         let json: Option<String> = self
             .conn
-            .query_row("SELECT json FROM tasks WHERE id = ?1", params![id.to_string()], |r| r.get(0))
+            .query_row(
+                "SELECT json FROM tasks WHERE id = ?1",
+                params![id.to_string()],
+                |r| r.get(0),
+            )
             .optional()?;
         Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
     }
@@ -94,7 +103,11 @@ impl Store {
         self.conn.execute(
             "INSERT INTO tasks (id, json, updated_at) VALUES (?1, ?2, ?3)
              ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at",
-            params![t.id.to_string(), serde_json::to_string(t)?, t.updated_at.to_rfc3339()],
+            params![
+                t.id.to_string(),
+                serde_json::to_string(t)?,
+                t.updated_at.to_rfc3339()
+            ],
         )?;
         Ok(())
     }
@@ -129,7 +142,10 @@ impl Store {
 
     pub fn delete_session(&self, id: Id) -> Result<()> {
         self.delete("sessions", id)?;
-        self.conn.execute("DELETE FROM scrollback WHERE session = ?1", params![id.to_string()])?;
+        self.conn.execute(
+            "DELETE FROM scrollback WHERE session = ?1",
+            params![id.to_string()],
+        )?;
         Ok(())
     }
 
@@ -155,7 +171,11 @@ impl Store {
 
     pub fn scrollback(&self, session: Id) -> Option<String> {
         self.conn
-            .query_row("SELECT text FROM scrollback WHERE session = ?1", params![session.to_string()], |r| r.get(0))
+            .query_row(
+                "SELECT text FROM scrollback WHERE session = ?1",
+                params![session.to_string()],
+                |r| r.get(0),
+            )
             .optional()
             .ok()
             .flatten()
@@ -164,7 +184,13 @@ impl Store {
     /// Existe uma sessão anterior salva para oferecer "reabrir"?
     pub fn has_cache(&self) -> bool {
         self.get_kv("cache.saved").as_deref() == Some("1")
-            && self.conn.query_row("SELECT COUNT(*) FROM workspaces", [], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+            && self
+                .conn
+                .query_row("SELECT COUNT(*) FROM workspaces", [], |r| {
+                    r.get::<_, i64>(0)
+                })
+                .unwrap_or(0)
+                > 0
     }
 
     pub fn mark_cache(&self, saved: bool) -> Result<()> {
@@ -181,7 +207,9 @@ impl Store {
 
     pub fn get_kv(&self, key: &str) -> Option<String> {
         self.conn
-            .query_row("SELECT value FROM kv WHERE key = ?1", params![key], |r| r.get(0))
+            .query_row("SELECT value FROM kv WHERE key = ?1", params![key], |r| {
+                r.get(0)
+            })
             .optional()
             .ok()
             .flatten()
@@ -234,7 +262,8 @@ mod tests {
         let s = Store::open_in_memory().unwrap();
         let w = Workspace::new("Sprint");
         s.save_workspace(&w).unwrap();
-        s.save_session(&Session::new(w.id, "a", SessionKind::Claude, "/tmp".into())).unwrap();
+        s.save_session(&Session::new(w.id, "a", SessionKind::Claude, "/tmp".into()))
+            .unwrap();
         s.save_task(&Task::new("fica")).unwrap();
         s.mark_cache(true).unwrap();
         assert!(s.has_cache());

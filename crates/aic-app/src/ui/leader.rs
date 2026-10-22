@@ -37,82 +37,100 @@ fn tree() -> Vec<Item> {
     use Item::{Group, Run};
     vec![
         Run('x', "Fechar o que está em foco", CloseFocused),
-        Group('s', "Sessões (terminais)", vec![
-            Run('n', "Novo Claude", NewSession),
-            Run('t', "Novo terminal ao lado", NewShell),
-            Run('x', "Fechar terminal", CloseSession),
-            Run('r', "Renomear terminal", RenameSession),
-            Run('R', "Reiniciar terminal", RestartSession),
-            Run('c', "Mandar contexto da tarefa", SendContext),
-            Run('a', "Próximo que precisa de você", NextWaiting),
-            Run('m', "Maximizar / restaurar", ToggleMaximize),
-            Run(']', "Próximo terminal", NextSession),
-            Run('[', "Terminal anterior", PrevSession),
-            Run('h', "Foco à esquerda", FocusLeft),
-            Run('j', "Foco abaixo", FocusDown),
-            Run('k', "Foco acima", FocusUp),
-            Run('l', "Foco à direita", FocusRight),
-            Run('z', "Soltar o teclado do terminal", ReleaseTerminal),
-            Run('s', "Ir pra aba Sessões", ViewSessions),
-        ]),
-        Group('b', "Blocos", vec![
-            Run('n', "Novo bloco", NewBlock),
-            Run('x', "Fechar bloco", CloseBlock),
-            Run('r', "Renomear bloco", RenameBlock),
-            Run('a', "Arranjo dos terminais", CycleSplit),
-            Run('p', "Painel do bloco", ToggleBlockSide),
-            Run('c', "Recolher / expandir", CollapseBlock),
-            Run('k', "Subir bloco", MoveBlockUp),
-            Run('j', "Descer bloco", MoveBlockDown),
-            Run('1', "Ir pro bloco 1", Goto(1)),
-            Run('2', "Ir pro bloco 2", Goto(2)),
-            Run('3', "Ir pro bloco 3", Goto(3)),
-            Run('4', "Ir pro bloco 4", Goto(4)),
-            Run('5', "Ir pro bloco 5", Goto(5)),
-            Run('6', "Ir pro bloco 6", Goto(6)),
-            Run('7', "Ir pro bloco 7", Goto(7)),
-            Run('8', "Ir pro bloco 8", Goto(8)),
-            Run('9', "Ir pro bloco 9", Goto(9)),
-        ]),
-        Group('t', "Tarefas", vec![
-            Run('n', "Nova tarefa", QuickAdd),
-        ]),
-        Group('v', "Visualização", vec![
-            Run('v', "Trocar visualização", CycleView),
-            Run('l', "Foco ⇄ grade", ToggleLayout),
-            Run('d', "Lista lateral", ToggleSidebar),
-            Run('+', "Aumentar fonte", ZoomIn),
-            Run('-', "Diminuir fonte", ZoomOut),
-            Run('0', "Fonte padrão", ZoomReset),
-        ]),
-        Group('w', "Workspaces", vec![
-            Run('w', "Trocar de workspace", Workspaces),
-            Run('n', "Criar workspace", NewWorkspace),
-            Run('r', "Renomear workspace", RenameWorkspace),
-            Run(']', "Próximo workspace", NextWorkspace),
-            Run('[', "Workspace anterior", PrevWorkspace),
-            Run('l', "Voltar pro anterior (vai e volta)", LastWorkspace),
-            Run('1', "Workspace 1", GotoWorkspace(1)),
-            Run('2', "Workspace 2", GotoWorkspace(2)),
-            Run('3', "Workspace 3", GotoWorkspace(3)),
-            Run('4', "Workspace 4", GotoWorkspace(4)),
-            Run('5', "Workspace 5", GotoWorkspace(5)),
-            Run('6', "Workspace 6", GotoWorkspace(6)),
-            Run('7', "Workspace 7", GotoWorkspace(7)),
-            Run('8', "Workspace 8", GotoWorkspace(8)),
-            Run('9', "Workspace 9", GotoWorkspace(9)),
-        ]),
-        Group('a', "Abas", vec![
-            Run('s', "Sessões", ViewSessions),
-            Run('g', "Worktrees", ViewWorktrees),
-            Run('d', "Changes (diff)", ViewChanges),
-            Run('k', "Tokens", ViewUsage),
-            Run(',', "Config", ViewSettings),
-            Run('/', "Pesquisar na Config", SearchSettings),
-            Run('?', "Manual", ViewHelp),
-            Run('n', "Próxima aba", NextView),
-            Run('p', "Aba anterior", PrevView),
-        ]),
+        Group(
+            's',
+            "Sessões (terminais)",
+            vec![
+                Run('n', "Novo Claude", NewSession),
+                Run('t', "Novo terminal ao lado", NewShell),
+                Run('x', "Fechar terminal", CloseSession),
+                Run('r', "Renomear terminal", RenameSession),
+                Run('R', "Reiniciar terminal", RestartSession),
+                Run('c', "Mandar contexto da tarefa", SendContext),
+                Run('a', "Próximo que precisa de você", NextWaiting),
+                Run('m', "Maximizar / restaurar", ToggleMaximize),
+                Run(']', "Próximo terminal", NextSession),
+                Run('[', "Terminal anterior", PrevSession),
+                Run('h', "Foco à esquerda", FocusLeft),
+                Run('j', "Foco abaixo", FocusDown),
+                Run('k', "Foco acima", FocusUp),
+                Run('l', "Foco à direita", FocusRight),
+                Run('z', "Soltar o teclado do terminal", ReleaseTerminal),
+                Run('s', "Ir pra aba Sessões", ViewSessions),
+            ],
+        ),
+        Group(
+            'b',
+            "Blocos",
+            vec![
+                Run('n', "Novo bloco", NewBlock),
+                Run('x', "Fechar bloco", CloseBlock),
+                Run('r', "Renomear bloco", RenameBlock),
+                Run('a', "Arranjo dos terminais", CycleSplit),
+                Run('p', "Painel do bloco", ToggleBlockSide),
+                Run('c', "Recolher / expandir", CollapseBlock),
+                Run('k', "Subir bloco", MoveBlockUp),
+                Run('j', "Descer bloco", MoveBlockDown),
+                Run('1', "Ir pro bloco 1", Goto(1)),
+                Run('2', "Ir pro bloco 2", Goto(2)),
+                Run('3', "Ir pro bloco 3", Goto(3)),
+                Run('4', "Ir pro bloco 4", Goto(4)),
+                Run('5', "Ir pro bloco 5", Goto(5)),
+                Run('6', "Ir pro bloco 6", Goto(6)),
+                Run('7', "Ir pro bloco 7", Goto(7)),
+                Run('8', "Ir pro bloco 8", Goto(8)),
+                Run('9', "Ir pro bloco 9", Goto(9)),
+            ],
+        ),
+        Group('t', "Tarefas", vec![Run('n', "Nova tarefa", QuickAdd)]),
+        Group(
+            'v',
+            "Visualização",
+            vec![
+                Run('v', "Trocar visualização", CycleView),
+                Run('l', "Foco ⇄ grade", ToggleLayout),
+                Run('d', "Lista lateral", ToggleSidebar),
+                Run('+', "Aumentar fonte", ZoomIn),
+                Run('-', "Diminuir fonte", ZoomOut),
+                Run('0', "Fonte padrão", ZoomReset),
+            ],
+        ),
+        Group(
+            'w',
+            "Workspaces",
+            vec![
+                Run('w', "Trocar de workspace", Workspaces),
+                Run('n', "Criar workspace", NewWorkspace),
+                Run('r', "Renomear workspace", RenameWorkspace),
+                Run(']', "Próximo workspace", NextWorkspace),
+                Run('[', "Workspace anterior", PrevWorkspace),
+                Run('l', "Voltar pro anterior (vai e volta)", LastWorkspace),
+                Run('1', "Workspace 1", GotoWorkspace(1)),
+                Run('2', "Workspace 2", GotoWorkspace(2)),
+                Run('3', "Workspace 3", GotoWorkspace(3)),
+                Run('4', "Workspace 4", GotoWorkspace(4)),
+                Run('5', "Workspace 5", GotoWorkspace(5)),
+                Run('6', "Workspace 6", GotoWorkspace(6)),
+                Run('7', "Workspace 7", GotoWorkspace(7)),
+                Run('8', "Workspace 8", GotoWorkspace(8)),
+                Run('9', "Workspace 9", GotoWorkspace(9)),
+            ],
+        ),
+        Group(
+            'a',
+            "Abas",
+            vec![
+                Run('s', "Sessões", ViewSessions),
+                Run('g', "Worktrees", ViewWorktrees),
+                Run('d', "Changes (diff)", ViewChanges),
+                Run('k', "Tokens", ViewUsage),
+                Run(',', "Config", ViewSettings),
+                Run('/', "Pesquisar na Config", SearchSettings),
+                Run('?', "Manual", ViewHelp),
+                Run('n', "Próxima aba", NextView),
+                Run('p', "Aba anterior", PrevView),
+            ],
+        ),
         Run('g', "Worktrees", ViewWorktrees),
         Run('d', "Changes (diff)", ViewChanges),
         Run('l', "Layne (assistente)", ToggleLayne),
@@ -149,7 +167,12 @@ fn level(app: &App, path: &[char]) -> (Vec<Item>, Vec<&'static str>) {
     let mut cur = items(app);
     let mut names = vec![];
     for k in path {
-        let Some(pos) = cur.iter().position(|i| matches!(i, Item::Group(g, ..) if g == k)) else { break };
+        let Some(pos) = cur
+            .iter()
+            .position(|i| matches!(i, Item::Group(g, ..) if g == k))
+        else {
+            break;
+        };
         if let Item::Group(_, l, sub) = cur.swap_remove(pos) {
             names.push(l);
             cur = sub;
@@ -160,7 +183,9 @@ fn level(app: &App, path: &[char]) -> (Vec<Item>, Vec<&'static str>) {
 
 /// Tecla líder normalizada ("Ctrl+Space").
 pub fn label(app: &App) -> String {
-    parse_shortcut(&app.cfg.leader).map(|s| format_shortcut(&s)).unwrap_or_else(|| app.cfg.leader.clone())
+    parse_shortcut(&app.cfg.leader)
+        .map(|s| format_shortcut(&s))
+        .unwrap_or_else(|| app.cfg.leader.clone())
 }
 
 /// Caractere de uma tecla (pela tecla lógica, então respeita o layout do teclado).
@@ -181,7 +206,11 @@ fn key_char(key: Key, shift: bool) -> Option<char> {
             if !c.is_ascii_alphanumeric() {
                 return None;
             }
-            if shift { c.to_ascii_uppercase() } else { c.to_ascii_lowercase() }
+            if shift {
+                c.to_ascii_uppercase()
+            } else {
+                c.to_ascii_lowercase()
+            }
         }
     })
 }
@@ -193,12 +222,17 @@ pub fn handle(app: &mut App, ctx: &Context) -> bool {
         app.leader = None;
         return false;
     }
-    let Some(sc) = parse_shortcut(&app.cfg.leader) else { return false };
+    let Some(sc) = parse_shortcut(&app.cfg.leader) else {
+        return false;
+    };
     if app.leader.is_none() {
         if ctx.input_mut(|i| consume_exact(i, sc.modifiers, sc.logical_key)) {
             app.leader = Some(LeaderState::default());
             // o resto do teclado deste frame também não vai pro terminal
-            ctx.input_mut(|i| i.events.retain(|e| !matches!(e, Event::Key { .. } | Event::Text(_))));
+            ctx.input_mut(|i| {
+                i.events
+                    .retain(|e| !matches!(e, Event::Key { .. } | Event::Text(_)))
+            });
             return true;
         }
         return false;
@@ -207,7 +241,12 @@ pub fn handle(app: &mut App, ctx: &Context) -> bool {
     let keys: Vec<(Key, egui::Modifiers)> = ctx.input_mut(|i| {
         let mut out = vec![];
         i.events.retain(|e| match e {
-            Event::Key { key, pressed, modifiers, .. } => {
+            Event::Key {
+                key,
+                pressed,
+                modifiers,
+                ..
+            } => {
                 if *pressed {
                     out.push((*key, *modifiers));
                 }
@@ -240,11 +279,16 @@ pub fn handle(app: &mut App, ctx: &Context) -> bool {
             }
             _ => {}
         }
-        let Some(c) = key_char(key, mods.shift) else { continue };
+        let Some(c) = key_char(key, mods.shift) else {
+            continue;
+        };
         let path = st.path.clone();
         let (lvl, _) = level(app, &path);
         // tecla em maiúscula sem item próprio vale a minúscula (Shift esquecido)
-        let found = lvl.iter().position(|i| i.key() == c).or_else(|| lvl.iter().position(|i| i.key() == c.to_ascii_lowercase()));
+        let found = lvl
+            .iter()
+            .position(|i| i.key() == c)
+            .or_else(|| lvl.iter().position(|i| i.key() == c.to_ascii_lowercase()));
         let st = app.leader.as_mut().expect("líder aberta");
         match found.map(|p| &lvl[p]) {
             Some(Item::Group(k, ..)) => {
@@ -288,32 +332,72 @@ pub fn show(app: &mut App, ctx: &Context) {
                     ui.set_min_width(560.0);
                     ui.horizontal(|ui| {
                         widgets::kbd(ui, &label(app), &theme);
-                        let crumb = std::iter::once("Atalhos").chain(names.iter().copied()).collect::<Vec<_>>().join("  ›  ");
-                        ui.label(RichText::new(crumb).font(FontId::monospace(13.0)).color(theme.accent_hi).strong());
+                        let crumb = std::iter::once("Atalhos")
+                            .chain(names.iter().copied())
+                            .collect::<Vec<_>>()
+                            .join("  ›  ");
+                        ui.label(
+                            RichText::new(crumb)
+                                .font(FontId::monospace(13.0))
+                                .color(theme.accent_hi)
+                                .strong(),
+                        );
                     });
                     ui.add_space(6.0);
                     // duas colunas quando a lista é grande
-                    let half = if lvl.len() > 9 { lvl.len().div_ceil(2) } else { lvl.len() };
+                    let half = if lvl.len() > 9 {
+                        lvl.len().div_ceil(2)
+                    } else {
+                        lvl.len()
+                    };
                     ui.horizontal_top(|ui| {
                         for chunk in lvl.chunks(half.max(1)) {
-                            egui::Grid::new(("leader-col", chunk.first().map(|i| i.key()).unwrap_or(' '))).num_columns(4).spacing([10.0, 4.0]).show(ui, |ui| {
+                            egui::Grid::new((
+                                "leader-col",
+                                chunk.first().map(|i| i.key()).unwrap_or(' '),
+                            ))
+                            .num_columns(4)
+                            .spacing([10.0, 4.0])
+                            .show(ui, |ui| {
                                 for item in chunk {
                                     widgets::kbd(ui, &item.key().to_string(), &theme);
                                     match item {
                                         Item::Group(k, l, sub) => {
-                                            let text = RichText::new(format!("{l}  ›")).color(theme.accent_hi);
-                                            if ui.add(egui::Button::new(text).frame(false)).on_hover_text(format!("{} itens", sub.len())).clicked() {
+                                            let text = RichText::new(format!("{l}  ›"))
+                                                .color(theme.accent_hi);
+                                            if ui
+                                                .add(egui::Button::new(text).frame(false))
+                                                .on_hover_text(format!("{} itens", sub.len()))
+                                                .clicked()
+                                            {
                                                 open_group = Some(*k);
                                             }
                                             ui.label("");
                                             ui.label("");
                                         }
                                         Item::Run(_, l, a) => {
-                                            if ui.add(egui::Button::new(RichText::new(*l).color(theme.ink)).frame(false)).on_hover_text(a.meta().name).clicked() {
+                                            if ui
+                                                .add(
+                                                    egui::Button::new(
+                                                        RichText::new(*l).color(theme.ink),
+                                                    )
+                                                    .frame(false),
+                                                )
+                                                .on_hover_text(a.meta().name)
+                                                .clicked()
+                                            {
                                                 run = Some(*a);
                                             }
-                                            ui.label(RichText::new(app.keymap.label(*a)).font(FontId::monospace(11.0)).color(theme.faint));
-                                            ui.label(RichText::new(super::prefix::chord(app, *a)).font(FontId::monospace(11.0)).color(theme.accent));
+                                            ui.label(
+                                                RichText::new(app.keymap.label(*a))
+                                                    .font(FontId::monospace(11.0))
+                                                    .color(theme.faint),
+                                            );
+                                            ui.label(
+                                                RichText::new(super::prefix::chord(app, *a))
+                                                    .font(FontId::monospace(11.0))
+                                                    .color(theme.accent),
+                                            );
                                         }
                                     }
                                     ui.end_row();
@@ -327,7 +411,10 @@ pub fn show(app: &mut App, ctx: &Context) {
                         ui.label(RichText::new(format!("⚠ {e}")).color(theme.warn));
                     }
                     ui.horizontal(|ui| {
-                        ui.label(widgets::subtle("letra escolhe · Backspace volta · Esc fecha", &theme).small());
+                        ui.label(
+                            widgets::subtle("letra escolhe · Backspace volta · Esc fecha", &theme)
+                                .small(),
+                        );
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.small_button("Fechar menu").clicked() {
                                 close = true;
@@ -387,7 +474,10 @@ mod tests {
         fn check(v: &[Item]) {
             for i in v {
                 let c = i.key();
-                assert!(c.is_ascii_alphanumeric() || ",.-+[]?/".contains(c), "tecla {c}");
+                assert!(
+                    c.is_ascii_alphanumeric() || ",.-+[]?/".contains(c),
+                    "tecla {c}"
+                );
                 if let Item::Group(_, _, sub) = i {
                     check(sub);
                 }

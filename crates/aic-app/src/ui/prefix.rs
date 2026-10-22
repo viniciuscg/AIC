@@ -14,7 +14,9 @@ use crate::app::{App, ToastKind};
 
 /// Prefixo normalizado ("Ctrl+B"); vazio se desligado ou inválido.
 pub fn label(app: &App) -> String {
-    parse_shortcut(&app.cfg.prefix).map(|s| format_shortcut(&s)).unwrap_or_default()
+    parse_shortcut(&app.cfg.prefix)
+        .map(|s| format_shortcut(&s))
+        .unwrap_or_default()
 }
 
 /// "Ctrl+B c": o acorde de prefixo de uma ação (vazio se ela não tem tecla de prefixo).
@@ -28,15 +30,26 @@ pub fn chord(app: &App, a: crate::actions::Action) -> String {
 /// O que a tecla apertada vira na tabela do prefixo. Texto tem prioridade (respeita o layout do
 /// teclado, `(` `$` `%`); teclas sem texto (Tab, setas, Enter) vêm do evento de tecla.
 pub(crate) fn token(events: &[Event]) -> Option<Result<String, ()>> {
-    let has_text = events.iter().any(|e| matches!(e, Event::Text(t) if !t.is_empty()));
+    let has_text = events
+        .iter()
+        .any(|e| matches!(e, Event::Text(t) if !t.is_empty()));
     for e in events {
         match e {
             Event::Text(t) => {
                 if let Some(c) = t.chars().next() {
-                    return Some(Ok(if c == ' ' { "Space".into() } else { c.to_string() }));
+                    return Some(Ok(if c == ' ' {
+                        "Space".into()
+                    } else {
+                        c.to_string()
+                    }));
                 }
             }
-            Event::Key { key, pressed: true, modifiers, .. } => {
+            Event::Key {
+                key,
+                pressed: true,
+                modifiers,
+                ..
+            } => {
                 let named = match key {
                     Key::Escape => return Some(Err(())),
                     Key::Tab => Some("Tab"),
@@ -55,7 +68,9 @@ pub(crate) fn token(events: &[Event]) -> Option<Result<String, ()>> {
                     return Some(Ok(n.into()));
                 }
                 // Sem evento de texto (Ctrl/Alt seguro, ou teste): deduz pela tecla lógica.
-                if !has_text && !modifiers.ctrl && !modifiers.alt
+                if !has_text
+                    && !modifiers.ctrl
+                    && !modifiers.alt
                     && let Some(c) = key_char(*key, modifiers.shift)
                 {
                     return Some(Ok(c.to_string()));
@@ -93,7 +108,11 @@ fn key_char(key: Key, shift: bool) -> Option<char> {
             if !c.is_ascii_alphanumeric() {
                 return None;
             }
-            if shift { c.to_ascii_uppercase() } else { c.to_ascii_lowercase() }
+            if shift {
+                c.to_ascii_uppercase()
+            } else {
+                c.to_ascii_lowercase()
+            }
         }
     })
 }
@@ -109,7 +128,10 @@ pub fn handle(app: &mut App, ctx: &Context) -> bool {
             app.prefix_pending = true;
             app.leader = None;
             // o resto deste frame também não vai pro terminal
-            ctx.input_mut(|i| i.events.retain(|e| !matches!(e, Event::Key { .. } | Event::Text(_))));
+            ctx.input_mut(|i| {
+                i.events
+                    .retain(|e| !matches!(e, Event::Key { .. } | Event::Text(_)))
+            });
             return true;
         }
         return false;
@@ -134,14 +156,19 @@ pub fn handle(app: &mut App, ctx: &Context) -> bool {
         send_prefix_to_terminal(app, sc.logical_key, sc.modifiers);
         return true;
     }
-    let Some(tok) = token(&events) else { return true };
+    let Some(tok) = token(&events) else {
+        return true;
+    };
     app.prefix_pending = false;
     let Ok(tok) = tok else { return true };
     match app.keymap.prefix_action(&tok) {
         Some(a) => app.run_action(ctx, a),
         None => {
             let p = label(app);
-            app.toast(&format!("{p} {tok} não faz nada · {p} ? mostra todos os atalhos"), ToastKind::Info);
+            app.toast(
+                &format!("{p} {tok} não faz nada · {p} ? mostra todos os atalhos"),
+                ToastKind::Info,
+            );
         }
     }
     true
@@ -156,7 +183,11 @@ fn send_prefix_to_terminal(app: &mut App, key: Key, mods: Modifiers) {
         .filter(|c| c.is_ascii_alphabetic())
         .map(|c| (c.to_ascii_uppercase() as u8) - b'@');
     let Some(byte) = byte else { return };
-    let term = if app.layne.focus { app.layne.rt.as_ref() } else { app.focused().and_then(|id| app.sessions.get(&id)) };
+    let term = if app.layne.focus {
+        app.layne.rt.as_ref()
+    } else {
+        app.focused().and_then(|id| app.sessions.get(&id))
+    };
     if let Some(t) = term.and_then(|r| r.term.as_ref()) {
         t.write(vec![byte]);
     }
@@ -167,7 +198,13 @@ mod tests {
     use super::*;
 
     fn key(k: Key, m: Modifiers) -> Event {
-        Event::Key { key: k, physical_key: None, pressed: true, repeat: false, modifiers: m }
+        Event::Key {
+            key: k,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: m,
+        }
     }
 
     #[test]
@@ -179,16 +216,31 @@ mod tests {
 
     #[test]
     fn teclas_sem_texto() {
-        assert_eq!(token(&[key(Key::Tab, Modifiers::NONE)]), Some(Ok("Tab".into())));
-        assert_eq!(token(&[key(Key::ArrowLeft, Modifiers::NONE)]), Some(Ok("←".into())));
+        assert_eq!(
+            token(&[key(Key::Tab, Modifiers::NONE)]),
+            Some(Ok("Tab".into()))
+        );
+        assert_eq!(
+            token(&[key(Key::ArrowLeft, Modifiers::NONE)]),
+            Some(Ok("←".into()))
+        );
         assert_eq!(token(&[key(Key::Escape, Modifiers::NONE)]), Some(Err(())));
-        assert_eq!(token(&[key(Key::Space, Modifiers::NONE), Event::Text(" ".into())]), Some(Ok("Space".into())));
+        assert_eq!(
+            token(&[key(Key::Space, Modifiers::NONE), Event::Text(" ".into())]),
+            Some(Ok("Space".into()))
+        );
     }
 
     #[test]
     fn sem_texto_deduz_pela_tecla() {
         assert_eq!(token(&[key(Key::X, Modifiers::NONE)]), Some(Ok("x".into())));
-        assert_eq!(token(&[key(Key::C, Modifiers::SHIFT)]), Some(Ok("C".into())));
-        assert_eq!(token(&[key(Key::Num3, Modifiers::NONE)]), Some(Ok("3".into())));
+        assert_eq!(
+            token(&[key(Key::C, Modifiers::SHIFT)]),
+            Some(Ok("C".into()))
+        );
+        assert_eq!(
+            token(&[key(Key::Num3, Modifiers::NONE)]),
+            Some(Ok("3".into()))
+        );
     }
 }

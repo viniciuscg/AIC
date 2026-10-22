@@ -25,22 +25,45 @@ pub struct Mic {
 }
 
 fn has(bin: &str) -> bool {
-    Command::new("sh").arg("-c").arg(format!("command -v {bin}")).stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success())
+    Command::new("sh")
+        .arg("-c")
+        .arg(format!("command -v {bin}"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 /// Microfones (fontes de entrada; os "monitor" das saídas ficam de fora).
 pub fn list_mics() -> Vec<Mic> {
-    let Ok(out) = Command::new("pactl").args(["-f", "json", "list", "sources"]).stderr(Stdio::null()).output() else { return vec![] };
-    let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) else { return vec![] };
+    let Ok(out) = Command::new("pactl")
+        .args(["-f", "json", "list", "sources"])
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return vec![];
+    };
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) else {
+        return vec![];
+    };
     v.as_array()
         .into_iter()
         .flatten()
         .filter_map(|s| {
             let name = s.get("name")?.as_str()?.to_string();
-            if name.ends_with(".monitor") || s.pointer("/monitor_source").and_then(|m| m.as_str()).is_some_and(|m| !m.is_empty() && m != "n/a") {
+            if name.ends_with(".monitor")
+                || s.pointer("/monitor_source")
+                    .and_then(|m| m.as_str())
+                    .is_some_and(|m| !m.is_empty() && m != "n/a")
+            {
                 return None;
             }
-            let desc = s.get("description").and_then(|d| d.as_str()).filter(|d| *d != "(null)").unwrap_or(&name).to_string();
+            let desc = s
+                .get("description")
+                .and_then(|d| d.as_str())
+                .filter(|d| *d != "(null)")
+                .unwrap_or(&name)
+                .to_string();
             Some(Mic { name, desc })
         })
         .collect()
@@ -48,16 +71,29 @@ pub fn list_mics() -> Vec<Mic> {
 
 /// Microfone padrão do sistema.
 pub fn default_mic() -> Option<String> {
-    let out = Command::new("pactl").arg("get-default-source").stderr(Stdio::null()).output().ok()?;
+    let out = Command::new("pactl")
+        .arg("get-default-source")
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
     let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
     (!s.is_empty()).then_some(s)
 }
 
 /// Programa + args que gravam `file` do microfone `mic`.
-pub fn record_command(mic: Option<&str>, file: &Path, available: impl Fn(&str) -> bool) -> Option<(String, Vec<String>)> {
+pub fn record_command(
+    mic: Option<&str>,
+    file: &Path,
+    available: impl Fn(&str) -> bool,
+) -> Option<(String, Vec<String>)> {
     let f = file.to_string_lossy().to_string();
     if available("parecord") {
-        let mut a = vec!["--rate=16000".into(), "--channels=1".into(), "--format=s16le".into(), "--file-format=wav".into()];
+        let mut a = vec![
+            "--rate=16000".into(),
+            "--channels=1".into(),
+            "--format=s16le".into(),
+            "--file-format=wav".into(),
+        ];
         if let Some(m) = mic {
             a.push(format!("--device={m}"));
         }
@@ -65,7 +101,12 @@ pub fn record_command(mic: Option<&str>, file: &Path, available: impl Fn(&str) -
         return Some(("parecord".into(), a));
     }
     if available("pw-record") {
-        let mut a = vec!["--rate".into(), "16000".into(), "--channels".into(), "1".into()];
+        let mut a = vec![
+            "--rate".into(),
+            "16000".into(),
+            "--channels".into(),
+            "1".into(),
+        ];
         if let Some(m) = mic {
             a.extend(["--target".into(), m.to_string()]);
         }
@@ -73,7 +114,19 @@ pub fn record_command(mic: Option<&str>, file: &Path, available: impl Fn(&str) -
         return Some(("pw-record".into(), a));
     }
     if available("arecord") {
-        return Some(("arecord".into(), vec!["-q".into(), "-f".into(), "S16_LE".into(), "-r".into(), "16000".into(), "-c".into(), "1".into(), f]));
+        return Some((
+            "arecord".into(),
+            vec![
+                "-q".into(),
+                "-f".into(),
+                "S16_LE".into(),
+                "-r".into(),
+                "16000".into(),
+                "-c".into(),
+                "1".into(),
+                f,
+            ],
+        ));
     }
     None
 }
@@ -90,12 +143,28 @@ impl Recording {
     pub fn start(mic: Option<&str>) -> Result<Self> {
         let dir = paths::state_dir().join("voice");
         std::fs::create_dir_all(&dir)?;
-        let file = dir.join(format!("{}.wav", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+        let file = dir.join(format!(
+            "{}.wav",
+            chrono::Local::now().format("%Y%m%d-%H%M%S")
+        ));
         let Some((prog, args)) = record_command(mic, &file, has) else {
-            bail!("nenhum gravador encontrado (instale pulseaudio-utils, pipewire-bin ou alsa-utils)");
+            bail!(
+                "nenhum gravador encontrado (instale pulseaudio-utils, pipewire-bin ou alsa-utils)"
+            );
         };
-        let child = Command::new(&prog).args(&args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().with_context(|| format!("abrindo {prog}"))?;
-        Ok(Self { child, file, started: Instant::now(), mic: mic.map(String::from) })
+        let child = Command::new(&prog)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .with_context(|| format!("abrindo {prog}"))?;
+        Ok(Self {
+            child,
+            file,
+            started: Instant::now(),
+            mic: mic.map(String::from),
+        })
     }
 
     pub fn elapsed(&self) -> Duration {
@@ -111,7 +180,11 @@ impl Recording {
                     use std::io::Read;
                     let _ = e.read_to_string(&mut err);
                 }
-                Some(if err.trim().is_empty() { format!("o gravador saiu ({status})") } else { err.trim().to_string() })
+                Some(if err.trim().is_empty() {
+                    format!("o gravador saiu ({status})")
+                } else {
+                    err.trim().to_string()
+                })
             }
             _ => None,
         }
@@ -119,7 +192,9 @@ impl Recording {
 
     /// Para (SIGINT, pra fechar o WAV) e devolve o arquivo.
     pub fn stop(mut self) -> Result<PathBuf> {
-        let _ = Command::new("kill").args(["-INT", &self.child.id().to_string()]).status();
+        let _ = Command::new("kill")
+            .args(["-INT", &self.child.id().to_string()])
+            .status();
         let deadline = Instant::now() + Duration::from_secs(3);
         loop {
             if self.child.try_wait()?.is_some() {
@@ -152,12 +227,18 @@ impl Recording {
 /// `{file}` e `{lang}` do comando próprio, com aspas simples de shell.
 pub fn fill_command(template: &str, file: &Path, lang: &str) -> String {
     let q = |s: &str| format!("'{}'", s.replace('\'', r"'\''"));
-    template.replace("{file}", &q(&file.to_string_lossy())).replace("{lang}", &q(lang))
+    template
+        .replace("{file}", &q(&file.to_string_lossy()))
+        .replace("{lang}", &q(lang))
 }
 
 /// Limpa o que os transcritores costumam devolver a mais (marcações, espaços, linhas).
 pub fn clean(text: &str) -> String {
-    let t: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty() && !matches!(*l, "[BLANK_AUDIO]" | "[MUSIC]" | "(música)")).collect();
+    let t: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !matches!(*l, "[BLANK_AUDIO]" | "[MUSIC]" | "(música)"))
+        .collect();
     t.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -178,21 +259,45 @@ fn transcribe_keep(cfg: &VoiceConfig, file: &Path) -> Result<String> {
         Transcriber::WhisperCpp => {
             let model = cfg.model_path();
             if !model.exists() {
-                bail!("modelo do whisper.cpp não encontrado em {} (Config → Layne)", paths::pretty(&model));
+                bail!(
+                    "modelo do whisper.cpp não encontrado em {} (Config → Layne)",
+                    paths::pretty(&model)
+                );
             }
             let mut c = Command::new(&cfg.whisper_bin);
-            c.arg("-m").arg(&model).arg("-f").arg(file).args(["-nt", "-np"]);
+            c.arg("-m")
+                .arg(&model)
+                .arg("-f")
+                .arg(file)
+                .args(["-nt", "-np"]);
             c.args(["-l", if lang.is_empty() { "auto" } else { lang }]);
-            let out = c.output().with_context(|| format!("rodando {} (instalado?)", cfg.whisper_bin))?;
+            let out = c
+                .output()
+                .with_context(|| format!("rodando {} (instalado?)", cfg.whisper_bin))?;
             if !out.status.success() {
-                bail!("{} falhou: {}", cfg.whisper_bin, String::from_utf8_lossy(&out.stderr).lines().last().unwrap_or(""));
+                bail!(
+                    "{} falhou: {}",
+                    cfg.whisper_bin,
+                    String::from_utf8_lossy(&out.stderr)
+                        .lines()
+                        .last()
+                        .unwrap_or("")
+                );
             }
             Ok(String::from_utf8_lossy(&out.stdout).to_string())
         }
         Transcriber::Api => {
-            let key = std::env::var(&cfg.api_key_env).ok().filter(|k| !k.trim().is_empty()).with_context(|| format!("defina {} no ~/.config/aic/.env", cfg.api_key_env))?;
-            let part = reqwest::blocking::multipart::Part::bytes(std::fs::read(file)?).file_name("audio.wav").mime_str("audio/wav")?;
-            let mut form = reqwest::blocking::multipart::Form::new().part("file", part).text("model", cfg.api_model.clone()).text("response_format", "text");
+            let key = std::env::var(&cfg.api_key_env)
+                .ok()
+                .filter(|k| !k.trim().is_empty())
+                .with_context(|| format!("defina {} no ~/.config/aic/.env", cfg.api_key_env))?;
+            let part = reqwest::blocking::multipart::Part::bytes(std::fs::read(file)?)
+                .file_name("audio.wav")
+                .mime_str("audio/wav")?;
+            let mut form = reqwest::blocking::multipart::Form::new()
+                .part("file", part)
+                .text("model", cfg.api_model.clone())
+                .text("response_format", "text");
             if !lang.is_empty() {
                 form = form.text("language", lang.to_string());
             }
@@ -207,19 +312,36 @@ fn transcribe_keep(cfg: &VoiceConfig, file: &Path) -> Result<String> {
             let status = resp.status();
             let body = resp.text().unwrap_or_default();
             if !status.is_success() {
-                bail!("API respondeu {status}: {}", body.chars().take(200).collect::<String>());
+                bail!(
+                    "API respondeu {status}: {}",
+                    body.chars().take(200).collect::<String>()
+                );
             }
             // response_format=text devolve texto puro; algumas APIs ignoram e mandam JSON
-            Ok(serde_json::from_str::<serde_json::Value>(&body).ok().and_then(|v| v.get("text")?.as_str().map(String::from)).unwrap_or(body))
+            Ok(serde_json::from_str::<serde_json::Value>(&body)
+                .ok()
+                .and_then(|v| v.get("text")?.as_str().map(String::from))
+                .unwrap_or(body))
         }
         Transcriber::Command => {
             if cfg.command.trim().is_empty() {
                 bail!("defina o comando de transcrição (Config → Layne)");
             }
             let cmd = fill_command(&cfg.command, file, lang);
-            let out = Command::new("sh").arg("-c").arg(&cmd).output().context("rodando o comando de transcrição")?;
+            let out = Command::new("sh")
+                .arg("-c")
+                .arg(&cmd)
+                .output()
+                .context("rodando o comando de transcrição")?;
             if !out.status.success() {
-                bail!("o comando saiu com {}: {}", out.status, String::from_utf8_lossy(&out.stderr).lines().last().unwrap_or(""));
+                bail!(
+                    "o comando saiu com {}: {}",
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr)
+                        .lines()
+                        .last()
+                        .unwrap_or("")
+                );
             }
             Ok(String::from_utf8_lossy(&out.stdout).to_string())
         }
@@ -247,13 +369,20 @@ mod tests {
 
     #[test]
     fn comando_proprio_com_aspas() {
-        let c = fill_command("whisper {file} --language {lang}", Path::new("/tmp/it's.wav"), "pt");
+        let c = fill_command(
+            "whisper {file} --language {lang}",
+            Path::new("/tmp/it's.wav"),
+            "pt",
+        );
         assert_eq!(c, r"whisper '/tmp/it'\''s.wav' --language 'pt'");
     }
 
     #[test]
     fn limpa_saida() {
-        assert_eq!(clean("  [BLANK_AUDIO]\n Cria um workspace\n  pessoal  \n"), "Cria um workspace pessoal");
+        assert_eq!(
+            clean("  [BLANK_AUDIO]\n Cria um workspace\n  pessoal  \n"),
+            "Cria um workspace pessoal"
+        );
         assert_eq!(clean("[BLANK_AUDIO]"), "");
     }
 }

@@ -15,13 +15,13 @@
 
 use std::io::Read;
 
-use anyhow::{Result, bail};
-use chrono::Local;
 use aic_core::claude::StatusSnapshot;
 use aic_core::events::{self, HookEvent};
 use aic_core::inbox::{self, Command as Cmd};
 use aic_core::quickadd;
 use aic_core::{Config, Id, Store, TaskStatus, paths};
+use anyhow::{Result, bail};
+use chrono::Local;
 
 pub enum Cli {
     Gui { fresh: bool },
@@ -36,11 +36,18 @@ pub fn parse(args: Vec<String>) -> Cli {
             let mut rest: Vec<String> = it.collect();
             let ws = take_opt(&mut rest, &["--ws", "--workspace", "-w"]);
             let session = take_flag(&mut rest, &["--session"]);
-            Cli::Run(Box::new(move || add(&rest.join(" "), session, ws.as_deref())))
+            Cli::Run(Box::new(move || {
+                add(&rest.join(" "), session, ws.as_deref())
+            }))
         }
         Some("tasks" | "ls") => {
             let rest: Vec<String> = it.collect();
-            Cli::Run(Box::new(move || tasks(rest.iter().any(|a| a == "--all"), rest.iter().any(|a| a == "--json"))))
+            Cli::Run(Box::new(move || {
+                tasks(
+                    rest.iter().any(|a| a == "--all"),
+                    rest.iter().any(|a| a == "--json"),
+                )
+            }))
         }
         Some("done") => {
             let id = it.next().unwrap_or_default();
@@ -113,7 +120,9 @@ Uso:
 
 /// Tira `--flag valor` (ou `--flag=valor`) de `args`.
 fn take_opt(args: &mut Vec<String>, names: &[&str]) -> Option<String> {
-    let i = args.iter().position(|a| names.contains(&a.as_str()) || names.iter().any(|n| a.starts_with(&format!("{n}="))))?;
+    let i = args.iter().position(|a| {
+        names.contains(&a.as_str()) || names.iter().any(|n| a.starts_with(&format!("{n}=")))
+    })?;
     let a = args.remove(i);
     match a.split_once('=') {
         Some((_, v)) if a.starts_with("--") => Some(v.to_string()),
@@ -140,12 +149,18 @@ fn ask(cmd: Cmd, secs: u64) -> Result<String> {
             Ok(r.message)
         }
         Some(r) => bail!("{}", r.message),
-        None => bail!("o AIC não respondeu em {secs}s (o pedido fica na fila e roda quando ele puder)"),
+        None => {
+            bail!("o AIC não respondeu em {secs}s (o pedido fica na fila e roda quando ele puder)")
+        }
     }
 }
 
 fn workspace(mut args: Vec<String>) -> Result<()> {
-    let sub = if args.is_empty() { "ls".to_string() } else { args.remove(0) };
+    let sub = if args.is_empty() {
+        "ls".to_string()
+    } else {
+        args.remove(0)
+    };
     match sub.as_str() {
         "ls" | "list" => {
             let store = store()?;
@@ -172,8 +187,18 @@ fn workspace(mut args: Vec<String>) -> Result<()> {
             }
             for (i, w) in wss.iter().enumerate() {
                 let s = sessions.iter().filter(|s| s.workspace == w.id).count();
-                let t = tasks.iter().filter(|t| t.workspace == Some(w.id) && !matches!(t.status, TaskStatus::Done | TaskStatus::Archived)).count();
-                println!("{}  {:<24} {s} terminais · {t} tarefas abertas", i + 1, w.name);
+                let t = tasks
+                    .iter()
+                    .filter(|t| {
+                        t.workspace == Some(w.id)
+                            && !matches!(t.status, TaskStatus::Done | TaskStatus::Archived)
+                    })
+                    .count();
+                println!(
+                    "{}  {:<24} {s} terminais · {t} tarefas abertas",
+                    i + 1,
+                    w.name
+                );
             }
             Ok(())
         }
@@ -198,11 +223,20 @@ fn workspace(mut args: Vec<String>) -> Result<()> {
 
 fn session(mut args: Vec<String>) -> Result<()> {
     // tudo depois de `--` é a primeira mensagem pro Claude
-    let prompt = args.iter().position(|a| a == "--").map(|i| args.split_off(i).into_iter().skip(1).collect::<Vec<_>>().join(" "));
+    let prompt = args.iter().position(|a| a == "--").map(|i| {
+        args.split_off(i)
+            .into_iter()
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join(" ")
+    });
     let workspace = take_opt(&mut args, &["--ws", "--workspace", "-w"]);
     let repo = take_opt(&mut args, &["--repo", "-r"]);
     let cwd = take_opt(&mut args, &["--cwd", "--dir", "-C"]).map(|p| {
-        let p = p.strip_prefix("~/").map(|r| paths::home_dir().join(r)).unwrap_or_else(|| p.into());
+        let p = p
+            .strip_prefix("~/")
+            .map(|r| paths::home_dir().join(r))
+            .unwrap_or_else(|| p.into());
         std::path::absolute(&p).unwrap_or(p)
     });
     let branch = take_opt(&mut args, &["--branch", "-b"]);
@@ -212,7 +246,20 @@ fn session(mut args: Vec<String>) -> Result<()> {
     if let Some(extra) = args.first() {
         bail!("argumento desconhecido: {extra} (veja `aic help`)");
     }
-    ask(Cmd::NewSession { workspace, name, repo, cwd, shell, branch, prompt: prompt.filter(|p| !p.trim().is_empty()), task }, 20).map(|_| ())
+    ask(
+        Cmd::NewSession {
+            workspace,
+            name,
+            repo,
+            cwd,
+            shell,
+            branch,
+            prompt: prompt.filter(|p| !p.trim().is_empty()),
+            task,
+        },
+        20,
+    )
+    .map(|_| ())
 }
 
 fn sessions(json: bool) -> Result<()> {
@@ -241,7 +288,13 @@ fn sessions(json: bool) -> Result<()> {
                 aic_core::SessionKind::Shell => "shell",
                 aic_core::SessionKind::Command(_) => "cmd",
             };
-            println!("  {}  {:<6} {:<28} {}", &s.id.to_string()[..8], kind, s.name, paths::pretty(&s.cwd));
+            println!(
+                "  {}  {:<6} {:<28} {}",
+                &s.id.to_string()[..8],
+                kind,
+                s.name,
+                paths::pretty(&s.cwd)
+            );
         }
     }
     if !inbox::app_running() {
@@ -300,13 +353,21 @@ fn add(text: &str, link_session: bool, ws: Option<&str>) -> Result<()> {
             workspaces
                 .iter()
                 .find(|x| x.name.eq_ignore_ascii_case(w))
-                .or_else(|| workspaces.iter().find(|x| x.name.to_lowercase().starts_with(&w.to_lowercase())))
+                .or_else(|| {
+                    workspaces
+                        .iter()
+                        .find(|x| x.name.to_lowercase().starts_with(&w.to_lowercase()))
+                })
                 .map(|x| x.id)
-                .ok_or_else(|| anyhow::anyhow!("workspace \"{w}\" não existe (crie com `aic ws new`)"))?,
+                .ok_or_else(|| {
+                    anyhow::anyhow!("workspace \"{w}\" não existe (crie com `aic ws new`)")
+                })?,
         ),
         None => None,
     };
-    task.workspace = by_flag.or_else(|| ws_name.and_then(|n| workspaces.iter().find(|w| w.name == n).map(|w| w.id))).or_else(|| env_id("AIC_WORKSPACE"));
+    task.workspace = by_flag
+        .or_else(|| ws_name.and_then(|n| workspaces.iter().find(|w| w.name == n).map(|w| w.id)))
+        .or_else(|| env_id("AIC_WORKSPACE"));
     if link_session {
         task.session = env_id("AIC_SESSION");
     }
@@ -315,7 +376,11 @@ fn add(text: &str, link_session: bool, ws: Option<&str>) -> Result<()> {
     if chips.is_empty() {
         println!("✓ tarefa criada [{short}]: {}", task.title);
     } else {
-        println!("✓ tarefa criada [{short}]: {}  ({})", task.title, chips.join(" · "));
+        println!(
+            "✓ tarefa criada [{short}]: {}  ({})",
+            task.title,
+            chips.join(" · ")
+        );
     }
     Ok(())
 }
@@ -324,7 +389,12 @@ fn tasks(all: bool, json: bool) -> Result<()> {
     let store = store()?;
     let mut list = store.tasks()?;
     list.retain(|t| all || !matches!(t.status, TaskStatus::Done | TaskStatus::Archived));
-    list.sort_by(|a, b| a.status.cmp(&b.status).then(b.priority.cmp(&a.priority)).then(a.rank.total_cmp(&b.rank)));
+    list.sort_by(|a, b| {
+        a.status
+            .cmp(&b.status)
+            .then(b.priority.cmp(&a.priority))
+            .then(a.rank.total_cmp(&b.rank))
+    });
     if json {
         println!("{}", serde_json::to_string_pretty(&list)?);
         return Ok(());
@@ -361,7 +431,11 @@ fn done(prefix: &str) -> Result<()> {
         bail!("passe pelo menos 4 caracteres do id (veja `aic tasks`)");
     }
     let store = store()?;
-    let matches: Vec<_> = store.tasks()?.into_iter().filter(|t| t.id.to_string().starts_with(prefix)).collect();
+    let matches: Vec<_> = store
+        .tasks()?
+        .into_iter()
+        .filter(|t| t.id.to_string().starts_with(prefix))
+        .collect();
     match matches.as_slice() {
         [t] => {
             let mut t = t.clone();
@@ -380,8 +454,12 @@ fn done(prefix: &str) -> Result<()> {
 fn hook() -> Result<()> {
     let mut input = String::new();
     let _ = std::io::stdin().read_to_string(&mut input);
-    let Ok(v) = serde_json::from_str::<serde_json::Value>(&input) else { return Ok(()) };
-    let session = std::env::var("AIC_SESSION").ok().and_then(|s| s.parse().ok());
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(&input) else {
+        return Ok(());
+    };
+    let session = std::env::var("AIC_SESSION")
+        .ok()
+        .and_then(|s| s.parse().ok());
     let e = HookEvent::from_hook_input(&v, session, aic_term::now_ms());
     let _ = events::append(&e);
     Ok(())
@@ -419,7 +497,13 @@ fn export_icon(dir: &str) -> Result<()> {
     std::fs::create_dir_all(dir)?;
     for size in ICON_SIZES {
         let path = dir.join(format!("aic-{size}.png"));
-        image::save_buffer(&path, &crate::icon_rgba(size), size, size, image::ExtendedColorType::Rgba8)?;
+        image::save_buffer(
+            &path,
+            &crate::icon_rgba(size),
+            size,
+            size,
+            image::ExtendedColorType::Rgba8,
+        )?;
         println!("{}", path.display());
     }
     Ok(())

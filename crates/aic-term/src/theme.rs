@@ -119,7 +119,11 @@ impl TerminalTheme {
             i if i == NamedColor::Cursor as usize => self.cursor,
             _ => self.foreground,
         };
-        Rgb { r: c.r(), g: c.g(), b: c.b() }
+        Rgb {
+            r: c.r(),
+            g: c.g(),
+            b: c.b(),
+        }
     }
 }
 

@@ -3,8 +3,10 @@
 
 use std::time::Duration;
 
+use aic_term::{
+    BindingsLayout, TermSettings, TerminalBackend, TerminalFont, TerminalTheme, TerminalView,
+};
 use egui_kittest::Harness;
-use aic_term::{BindingsLayout, TermSettings, TerminalBackend, TerminalFont, TerminalTheme, TerminalView};
 
 #[test]
 fn renderiza_cores_caixas_e_icones() {
@@ -36,10 +38,13 @@ sleep 5
             });
             let size = ui.available_size();
             let f = font_ui.lock().unwrap().clone();
-            TerminalView::new(t, &theme, &f, &bindings).focused(true).show(ui, size);
+            TerminalView::new(t, &theme, &f, &bindings)
+                .focused(true)
+                .show(ui, size);
         });
 
-    *font.lock().unwrap() = aic_term::fonts::install(&harness.ctx, "JetBrainsMono Nerd Font Mono", None, 14.0);
+    *font.lock().unwrap() =
+        aic_term::fonts::install(&harness.ctx, "JetBrainsMono Nerd Font Mono", None, 14.0);
 
     for _ in 0..10 {
         harness.step();

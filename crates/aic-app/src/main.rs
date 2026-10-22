@@ -1,5 +1,5 @@
 use aic_app::cli::{self, Cli};
-use aic_app::{App, AicApp};
+use aic_app::{AicApp, App};
 
 fn main() {
     aic_core::paths::load_dotenv();

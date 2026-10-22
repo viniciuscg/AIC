@@ -9,9 +9,29 @@ pub fn play(path: &Path, volume: f32) {
     std::thread::spawn(move || {
         let v = volume.clamp(0.0, 1.5);
         let attempts: Vec<(&str, Vec<String>)> = vec![
-            ("pw-play", vec!["--volume".into(), format!("{v:.2}"), path_str(&path)]),
-            ("paplay", vec![format!("--volume={}", (v * 65536.0) as u32), path_str(&path)]),
-            ("ffplay", vec!["-nodisp".into(), "-autoexit".into(), "-loglevel".into(), "quiet".into(), "-volume".into(), ((v * 100.0) as u32).to_string(), path_str(&path)]),
+            (
+                "pw-play",
+                vec!["--volume".into(), format!("{v:.2}"), path_str(&path)],
+            ),
+            (
+                "paplay",
+                vec![
+                    format!("--volume={}", (v * 65536.0) as u32),
+                    path_str(&path),
+                ],
+            ),
+            (
+                "ffplay",
+                vec![
+                    "-nodisp".into(),
+                    "-autoexit".into(),
+                    "-loglevel".into(),
+                    "quiet".into(),
+                    "-volume".into(),
+                    ((v * 100.0) as u32).to_string(),
+                    path_str(&path),
+                ],
+            ),
             ("aplay", vec!["-q".into(), path_str(&path)]),
         ];
         for (bin, args) in attempts {

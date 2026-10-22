@@ -52,7 +52,17 @@ pub struct LayneState {
 
 impl Default for LayneState {
     fn default() -> Self {
-        Self { open: false, focus: false, rt: None, rec: None, transcribing: None, last_heard: None, mics: None, inbox_at: Instant::now(), tried: false }
+        Self {
+            open: false,
+            focus: false,
+            rt: None,
+            rec: None,
+            transcribing: None,
+            last_heard: None,
+            mics: None,
+            inbox_at: Instant::now(),
+            tried: false,
+        }
     }
 }
 
@@ -66,7 +76,10 @@ impl LayneState {
     }
 
     pub fn state(&self) -> SessionState {
-        self.rt.as_ref().map(Runtime::state).unwrap_or(SessionState::Boot)
+        self.rt
+            .as_ref()
+            .map(Runtime::state)
+            .unwrap_or(SessionState::Boot)
     }
 
     pub fn session_id(&self) -> Option<Id> {
@@ -90,7 +103,12 @@ fn session_id(app: &App) -> Id {
 
 /// Args do `claude` do Layne: o agente, permissão pro `aic` e o modelo escolhido.
 pub fn claude_args(model: Option<&str>) -> Vec<String> {
-    let mut a: Vec<String> = vec!["--agent".into(), AGENT.into(), "--allowedTools".into(), "Bash(aic:*)".into()];
+    let mut a: Vec<String> = vec![
+        "--agent".into(),
+        AGENT.into(),
+        "--allowedTools".into(),
+        "Bash(aic:*)".into(),
+    ];
     if let Some(m) = model.map(str::trim).filter(|m| !m.is_empty()) {
         a.extend(["--model".into(), m.to_string()]);
     }
@@ -101,7 +119,10 @@ pub fn claude_args(model: Option<&str>) -> Vec<String> {
 pub fn start(app: &mut App, ctx: &Context) {
     app.layne.tried = true;
     if app.inj.plugin_dir.is_none() {
-        return app.toast("Layne precisa do plugin do AIC (rode ./install.sh)", ToastKind::Warn);
+        return app.toast(
+            "Layne precisa do plugin do AIC (rode ./install.sh)",
+            ToastKind::Warn,
+        );
     }
     let cwd = dir();
     let _ = std::fs::create_dir_all(&cwd);
@@ -115,7 +136,14 @@ pub fn start(app: &mut App, ctx: &Context) {
     s.claude_args = claude_args(app.cfg.layne.model.as_deref());
     let mut rt = Runtime::new(s);
     let term_id = app.alloc_term_id();
-    rt.spawn(ctx, term_id, &app.inj, &app.theme.term, None, app.cfg.on(Module::Tmux));
+    rt.spawn(
+        ctx,
+        term_id,
+        &app.inj,
+        &app.theme.term,
+        None,
+        app.cfg.on(Module::Tmux),
+    );
     if let Some(e) = &rt.spawn_error {
         app.toast(&format!("Layne não abriu: {e}"), ToastKind::Err);
     }
@@ -135,7 +163,9 @@ pub fn restart(app: &mut App, ctx: &Context) {
 
 /// Começa uma conversa nova (esquece a anterior).
 pub fn reset(app: &mut App, ctx: &Context) {
-    let _ = app.store.set_kv(KV_SESSION, &aic_core::new_id().to_string());
+    let _ = app
+        .store
+        .set_kv(KV_SESSION, &aic_core::new_id().to_string());
     restart(app, ctx);
 }
 
@@ -147,7 +177,10 @@ fn ensure(app: &mut App, ctx: &Context) {
 
 pub fn show(app: &mut App, ctx: &Context) {
     if !app.cfg.on(Module::Layne) {
-        return app.toast("Módulo \"Layne\" desligado (Config → Módulos)", ToastKind::Warn);
+        return app.toast(
+            "Módulo \"Layne\" desligado (Config → Módulos)",
+            ToastKind::Warn,
+        );
     }
     ensure(app, ctx);
     app.layne.open = true;
@@ -167,7 +200,10 @@ pub fn toggle(app: &mut App, ctx: &Context) {
 /// Liga/desliga a gravação. Ao parar, transcreve numa thread e manda pro Layne.
 pub fn toggle_voice(app: &mut App, ctx: &Context) {
     if !app.cfg.on(Module::Layne) {
-        return app.toast("Módulo \"Layne\" desligado (Config → Módulos)", ToastKind::Warn);
+        return app.toast(
+            "Módulo \"Layne\" desligado (Config → Módulos)",
+            ToastKind::Warn,
+        );
     }
     if let Some(rec) = app.layne.rec.take() {
         return finish_recording(app, ctx, rec);
@@ -198,17 +234,21 @@ fn finish_recording(app: &mut App, ctx: &Context, rec: Recording) {
     let cfg = app.cfg.layne.voice.clone();
     let (tx, rx) = channel();
     let ctx = ctx.clone();
-    let _ = std::thread::Builder::new().name("aic-voz".into()).spawn(move || {
-        let _ = tx.send(voice::transcribe(&cfg, &file).map_err(|e| format!("{e:#}")));
-        ctx.request_repaint();
-    });
+    let _ = std::thread::Builder::new()
+        .name("aic-voz".into())
+        .spawn(move || {
+            let _ = tx.send(voice::transcribe(&cfg, &file).map_err(|e| format!("{e:#}")));
+            ctx.request_repaint();
+        });
     app.layne.transcribing = Some((rx, Instant::now()));
 }
 
 /// Escreve no terminal do Layne; `send` aperta Enter.
 pub fn say(app: &mut App, ctx: &Context, text: &str, send: bool) -> bool {
     show(app, ctx);
-    let Some(term) = app.layne.rt.as_ref().and_then(|r| r.term.as_ref()) else { return false };
+    let Some(term) = app.layne.rt.as_ref().and_then(|r| r.term.as_ref()) else {
+        return false;
+    };
     term.paste(text);
     if send {
         // o Enter vai separado do colar: no Claude Code, Enter dentro do bracketed paste vira quebra de linha
@@ -242,7 +282,8 @@ pub fn tick(app: &mut App, ctx: &Context) {
         if let Some(err) = rec.failed() {
             app.layne.rec = None;
             app.toast(&format!("Gravação parou: {err}"), ToastKind::Err);
-        } else if rec.elapsed() > Duration::from_secs(app.cfg.layne.voice.max_seconds.max(5) as u64) {
+        } else if rec.elapsed() > Duration::from_secs(app.cfg.layne.voice.max_seconds.max(5) as u64)
+        {
             let rec = app.layne.rec.take().expect("gravando");
             finish_recording(app, ctx, rec);
         } else {
@@ -258,7 +299,10 @@ pub fn tick(app: &mut App, ctx: &Context) {
                     Ok(text) => {
                         let send = app.cfg.layne.voice.auto_send;
                         if !say(app, ctx, &text, send) {
-                            app.toast("Layne não está rodando; o texto ficou só no painel", ToastKind::Warn);
+                            app.toast(
+                                "Layne não está rodando; o texto ficou só no painel",
+                                ToastKind::Warn,
+                            );
                         }
                         app.layne.last_heard = Some(text);
                     }
@@ -273,8 +317,11 @@ pub fn tick(app: &mut App, ctx: &Context) {
 
 /// Evento de hook que não é de nenhuma sessão de workspace: é do Layne?
 pub fn on_event(app: &mut App, e: &HookEvent) {
-    let Some(rt) = app.layne.rt.as_mut() else { return };
-    let mine = e.aic_session == Some(rt.s.id) || e.claude_session == rt.s.claude_session.to_string();
+    let Some(rt) = app.layne.rt.as_mut() else {
+        return;
+    };
+    let mine =
+        e.aic_session == Some(rt.s.id) || e.claude_session == rt.s.claude_session.to_string();
     if !mine {
         return;
     }
@@ -294,8 +341,15 @@ fn find_ws(app: &App, name: &str) -> Option<usize> {
     if n.is_empty() {
         return None;
     }
-    let names: Vec<String> = app.workspaces.iter().map(|w| w.name.to_lowercase()).collect();
-    names.iter().position(|w| *w == n).or_else(|| names.iter().position(|w| w.starts_with(&n)))
+    let names: Vec<String> = app
+        .workspaces
+        .iter()
+        .map(|w| w.name.to_lowercase())
+        .collect();
+    names
+        .iter()
+        .position(|w| *w == n)
+        .or_else(|| names.iter().position(|w| w.starts_with(&n)))
 }
 
 /// Vai pro workspace pelo nome, criando se não existir. Devolve o nome final.
@@ -314,11 +368,18 @@ fn run(app: &mut App, ctx: &Context, env: Envelope) {
             let name = name.trim().to_string();
             if name.is_empty() {
                 Err("o workspace precisa de um nome".into())
-            } else if let Some(i) = app.workspaces.iter().position(|w| w.name.eq_ignore_ascii_case(&name)) {
+            } else if let Some(i) = app
+                .workspaces
+                .iter()
+                .position(|w| w.name.eq_ignore_ascii_case(&name))
+            {
                 if switch {
                     app.switch_ws(i);
                 }
-                Ok(format!("workspace \"{}\" já existia", app.workspaces[i].name))
+                Ok(format!(
+                    "workspace \"{}\" já existia",
+                    app.workspaces[i].name
+                ))
             } else {
                 let before = app.ws;
                 app.new_workspace(&name);
@@ -334,9 +395,22 @@ fn run(app: &mut App, ctx: &Context, env: Envelope) {
                 app.set_view(View::Sessions);
                 Ok(format!("no workspace \"{}\"", app.workspaces[i].name))
             }
-            None => Err(format!("nenhum workspace chamado \"{name}\" (veja `aic ws ls`)")),
+            None => Err(format!(
+                "nenhum workspace chamado \"{name}\" (veja `aic ws ls`)"
+            )),
         },
-        Command::NewSession { workspace, name, repo, cwd, shell, branch, prompt, task } => new_session(app, ctx, workspace, name, repo, cwd, shell, branch, prompt, task),
+        Command::NewSession {
+            workspace,
+            name,
+            repo,
+            cwd,
+            shell,
+            branch,
+            prompt,
+            task,
+        } => new_session(
+            app, ctx, workspace, name, repo, cwd, shell, branch, prompt, task,
+        ),
         Command::Say { text, send } => {
             if say(app, ctx, &text, send) {
                 Ok(format!("mandado pro {NAME}"))
@@ -347,7 +421,11 @@ fn run(app: &mut App, ctx: &Context, env: Envelope) {
         Command::Voice => {
             toggle_voice(app, ctx);
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-            Ok(if app.layne.recording() { "gravando…".into() } else { "gravação parada".into() })
+            Ok(if app.layne.recording() {
+                "gravando…".into()
+            } else {
+                "gravação parada".into()
+            })
         }
         Command::Show => {
             show(app, ctx);
@@ -378,19 +456,31 @@ fn new_session(
         (Some(r), _) => app.cfg.repo_path(r).or_else(|| {
             // prefixo, como no #repo
             let all = app.cfg.repo_paths();
-            let hits: Vec<_> = all.iter().filter(|(n, _)| n.starts_with(r.as_str())).collect();
+            let hits: Vec<_> = all
+                .iter()
+                .filter(|(n, _)| n.starts_with(r.as_str()))
+                .collect();
             (hits.len() == 1).then(|| hits[0].1.clone())
         }),
         (None, Some(c)) => Some(c.clone()),
         (None, None) => Some(paths::home_dir()),
     }
-    .ok_or_else(|| format!("repo \"{}\" não encontrado nas pastas de projetos (veja `aic repos`)", repo.clone().unwrap_or_default()))?;
+    .ok_or_else(|| {
+        format!(
+            "repo \"{}\" não encontrado nas pastas de projetos (veja `aic repos`)",
+            repo.clone().unwrap_or_default()
+        )
+    })?;
     if !dir.is_dir() {
         return Err(format!("pasta {} não existe", dir.display()));
     }
     let task = match task.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
         Some(prefix) => {
-            let hits: Vec<&aic_core::Task> = app.tasks.iter().filter(|t| t.id.to_string().starts_with(prefix)).collect();
+            let hits: Vec<&aic_core::Task> = app
+                .tasks
+                .iter()
+                .filter(|t| t.id.to_string().starts_with(prefix))
+                .collect();
             match hits.as_slice() {
                 [t] => Some(t.id),
                 [] => return Err(format!("nenhuma tarefa com id {prefix}…")),
@@ -410,19 +500,44 @@ fn new_session(
         Some(w) => goto_or_create(app, w),
         None => app.current_ws().map(|w| w.name.clone()).unwrap_or_default(),
     };
-    let kind = if shell { SessionKind::Shell } else { SessionKind::Claude };
+    let kind = if shell {
+        SessionKind::Shell
+    } else {
+        SessionKind::Claude
+    };
     let label = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| {
-        let base = app.cfg.repo_of(&dir).or_else(|| dir.file_name().map(|n| n.to_string_lossy().to_string())).unwrap_or_else(|| "home".into());
-        if shell { format!("{base} (shell)") } else { base }
+        let base = app
+            .cfg
+            .repo_of(&dir)
+            .or_else(|| dir.file_name().map(|n| n.to_string_lossy().to_string()))
+            .unwrap_or_else(|| "home".into());
+        if shell {
+            format!("{base} (shell)")
+        } else {
+            base
+        }
     });
     app.set_view(View::Sessions);
-    let id = app.create_session_in(ctx, None, label.clone(), kind, dir.clone(), worktree, task, vec![], prompt.filter(|p| !p.trim().is_empty()));
+    let id = app.create_session_in(
+        ctx,
+        None,
+        label.clone(),
+        kind,
+        dir.clone(),
+        worktree,
+        task,
+        vec![],
+        prompt.filter(|p| !p.trim().is_empty()),
+    );
     if id.is_nil() {
         return Err("não deu pra abrir o terminal".into());
     }
     // o terminal novo pega o foco; o Layne solta o teclado
     app.layne.focus = false;
-    Ok(format!("\"{label}\" aberto no workspace \"{ws}\" em {}", paths::pretty(&dir)))
+    Ok(format!(
+        "\"{label}\" aberto no workspace \"{ws}\" em {}",
+        paths::pretty(&dir)
+    ))
 }
 
 // ───────────────────────── painel ─────────────────────────
@@ -435,14 +550,27 @@ pub fn panel(app: &mut App, ui: &mut Ui) {
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
         widgets::state_dot(ui, r.center(), 5.0, state, &theme);
-        ui.label(RichText::new(NAME).font(FontId::monospace(16.0)).color(theme.accent_hi));
+        ui.label(
+            RichText::new(NAME)
+                .font(FontId::monospace(16.0))
+                .color(theme.accent_hi),
+        );
         widgets::state_badge(ui, crate::brand::state_label(state), state, &theme);
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if widgets::icon_button(ui, I_CLOSE, "", &app.keymap.tip(Action::ToggleLayne, "Fechar o painel")).clicked() {
+            if widgets::icon_button(
+                ui,
+                I_CLOSE,
+                "",
+                &app.keymap.tip(Action::ToggleLayne, "Fechar o painel"),
+            )
+            .clicked()
+            {
                 app.layne.open = false;
                 app.layne.focus = false;
             }
-            if widgets::icon_button(ui, I_RESTART, "", "Reiniciar o Layne (a conversa continua)").clicked() {
+            if widgets::icon_button(ui, I_RESTART, "", "Reiniciar o Layne (a conversa continua)")
+                .clicked()
+            {
                 let ctx = ui.ctx().clone();
                 restart(app, &ctx);
             }
@@ -455,7 +583,16 @@ pub fn panel(app: &mut App, ui: &mut Ui) {
     if let Some((el, _)) = rec {
         ui.horizontal(|ui| {
             ui.label(RichText::new(format!("● gravando {}s", el.as_secs())).color(theme.err));
-            ui.label(widgets::subtle(format!("{} para · Esc descarta", app.keymap.label(Action::LayneVoice)), &theme).small());
+            ui.label(
+                widgets::subtle(
+                    format!(
+                        "{} para · Esc descarta",
+                        app.keymap.label(Action::LayneVoice)
+                    ),
+                    &theme,
+                )
+                .small(),
+            );
             if ui.small_button("descartar").clicked() {
                 cancel_voice(app);
             }
@@ -475,9 +612,19 @@ pub fn panel(app: &mut App, ui: &mut Ui) {
     ui.add_space(4.0);
 
     let rect = ui.available_rect_before_wrap();
-    ui.painter().rect_filled(rect, theme.radius(), theme.term.background);
-    let border = if app.layne.focus { theme.accent } else { theme.border };
-    ui.painter().rect_stroke(rect, theme.radius(), egui::Stroke::new(if app.layne.focus { 2.0 } else { 1.0 }, border), egui::StrokeKind::Inside);
+    ui.painter()
+        .rect_filled(rect, theme.radius(), theme.term.background);
+    let border = if app.layne.focus {
+        theme.accent
+    } else {
+        theme.border
+    };
+    ui.painter().rect_stroke(
+        rect,
+        theme.radius(),
+        egui::Stroke::new(if app.layne.focus { 2.0 } else { 1.0 }, border),
+        egui::StrokeKind::Inside,
+    );
     let inner = rect.shrink(3.0);
 
     let Some(rt) = app.layne.rt.as_mut() else {
@@ -504,13 +651,22 @@ pub fn panel(app: &mut App, ui: &mut Ui) {
     let Some(term) = rt.term.as_mut() else { return };
     let exited = term.is_exited();
     let mut child = ui.new_child(UiBuilder::new().max_rect(inner));
-    let resp = TerminalView::new(term, &app.theme.term, &app.font, &app.term_bindings).focused(focus && !exited).show(&mut child, inner.size());
+    let resp = TerminalView::new(term, &app.theme.term, &app.font, &app.term_bindings)
+        .focused(focus && !exited)
+        .show(&mut child, inner.size());
     if resp.clicked() || resp.drag_started() {
         app.layne.focus = true;
     }
     ui.allocate_rect(rect, Sense::hover());
     if exited {
-        let mut c = ui.new_child(UiBuilder::new().max_rect(egui::Rect::from_center_size(inner.center(), Vec2::new(260.0, 60.0))).layout(Layout::top_down(Align::Center)));
+        let mut c = ui.new_child(
+            UiBuilder::new()
+                .max_rect(egui::Rect::from_center_size(
+                    inner.center(),
+                    Vec2::new(260.0, 60.0),
+                ))
+                .layout(Layout::top_down(Align::Center)),
+        );
         c.label(RichText::new("O Layne saiu.").color(theme.err));
         if c.button(format!("{I_RESTART} Reabrir")).clicked() {
             let ctx = c.ctx().clone();
@@ -526,10 +682,23 @@ fn mic_button(app: &mut App, ui: &mut Ui) {
     let (icon, color, tip) = if rec {
         (I_STOP, theme.err, "Parar e mandar pro Layne")
     } else {
-        (I_MIC, if busy { theme.faint } else { theme.ink }, "Falar com o Layne (grava até você parar)")
+        (
+            I_MIC,
+            if busy { theme.faint } else { theme.ink },
+            "Falar com o Layne (grava até você parar)",
+        )
     };
-    let b = egui::Button::new(RichText::new(icon).font(FontId::monospace(15.0)).color(color)).frame(rec);
-    if ui.add_enabled(!busy, b).on_hover_text(app.keymap.tip(Action::LayneVoice, tip)).clicked() {
+    let b = egui::Button::new(
+        RichText::new(icon)
+            .font(FontId::monospace(15.0))
+            .color(color),
+    )
+    .frame(rec);
+    if ui
+        .add_enabled(!busy, b)
+        .on_hover_text(app.keymap.tip(Action::LayneVoice, tip))
+        .clicked()
+    {
         let ctx = ui.ctx().clone();
         toggle_voice(app, &ctx);
     }
@@ -542,7 +711,10 @@ pub fn settings(app: &mut App, ui: &mut Ui, row: impl Fn(usize) -> bool) {
     let theme = app.theme.clone();
     let mut save = false;
     if !app.cfg.on(Module::Layne) {
-        ui.label(widgets::subtle("Módulo desligado (Config → Módulos → Layne).", &theme));
+        ui.label(widgets::subtle(
+            "Módulo desligado (Config → Módulos → Layne).",
+            &theme,
+        ));
     }
     egui::Grid::new("layne-cfg").num_columns(2).spacing([16.0, 8.0]).show(ui, |ui| {
         if row(0) {
@@ -688,12 +860,19 @@ pub fn settings(app: &mut App, ui: &mut Ui, row: impl Fn(usize) -> bool) {
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { s.to_string() } else { format!("{}…", s.chars().take(n).collect::<String>()) }
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
+        format!("{}…", s.chars().take(n).collect::<String>())
+    }
 }
 
 /// Moldura do painel lateral.
 pub fn frame(app: &App) -> egui::Frame {
-    egui::Frame::new().fill(app.theme.bg2).inner_margin(Margin::same(6)).stroke(egui::Stroke::new(1.0, app.theme.border))
+    egui::Frame::new()
+        .fill(app.theme.bg2)
+        .inner_margin(Margin::same(6))
+        .stroke(egui::Stroke::new(1.0, app.theme.border))
 }
 
 /// Ao fechar o app sem manter as sessões, a do Layne também morre (o tmux é derrubado inteiro);

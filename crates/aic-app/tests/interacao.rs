@@ -8,13 +8,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use egui::{Key, Modifiers};
-use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
 use aic_app::app::{App, View};
 use aic_app::ui::modals::Modal;
 use aic_app::ui::widgets::{I_PLUS, I_TERM};
 use aic_core::{Id, SessionKind};
+use egui::{Key, Modifiers};
+use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 
 /// Os testes mexem em variáveis de ambiente: um de cada vez.
 static LOCK: Mutex<()> = Mutex::new(());
@@ -43,13 +43,15 @@ fn sandbox(name: &str, extra_config: &str) -> PathBuf {
 type H = Harness<'static, Option<App>>;
 
 fn harness(size: [f32; 2]) -> H {
-    let mut h = Harness::builder().with_size(egui::vec2(size[0], size[1])).build_ui_state(
-        |ui, app: &mut Option<App>| {
-            let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
-            aic_app::ui::draw(a, ui);
-        },
-        None,
-    );
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(size[0], size[1]))
+        .build_ui_state(
+            |ui, app: &mut Option<App>| {
+                let a = app.get_or_insert_with(|| App::new(ui.ctx(), true).expect("app"));
+                aic_app::ui::draw(a, ui);
+            },
+            None,
+        );
     h.run_steps(2);
     h
 }
@@ -72,7 +74,10 @@ fn click(h: &mut H, label: &str) {
 
 /// Primeiro de vários botões com o mesmo rótulo.
 fn click_first(h: &mut H, label: &str) {
-    h.get_all_by_label(label).next().unwrap_or_else(|| panic!("sem botão \"{label}\"")).click();
+    h.get_all_by_label(label)
+        .next()
+        .unwrap_or_else(|| panic!("sem botão \"{label}\""))
+        .click();
     frames(h, 3);
 }
 
@@ -100,7 +105,17 @@ fn terminal(h: &mut H, name: &str, cmd: &str) -> Id {
     let ctx = h.ctx.clone();
     let a = app(h);
     let block = a.new_block(name, None);
-    let id = a.create_session_in(&ctx, block, name.into(), SessionKind::Command(cmd.into()), std::env::temp_dir(), None, None, vec![], None);
+    let id = a.create_session_in(
+        &ctx,
+        block,
+        name.into(),
+        SessionKind::Command(cmd.into()),
+        std::env::temp_dir(),
+        None,
+        None,
+        vec![],
+        None,
+    );
     frames(h, 3);
     id
 }
@@ -143,22 +158,47 @@ fn cabecalho_do_terminal() {
     assert!(!app(&mut h).maximized, "restaurar");
 
     click(&mut h, "Fechar terminal");
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseSession { .. })), "✕ pede confirmação");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::CloseSession { .. })),
+        "✕ pede confirmação"
+    );
     click(&mut h, "Cancelar");
-    assert!(app(&mut h).modal.is_none() && app(&mut h).sessions.contains_key(&id), "cancelar mantém o terminal");
+    assert!(
+        app(&mut h).modal.is_none() && app(&mut h).sessions.contains_key(&id),
+        "cancelar mantém o terminal"
+    );
     click(&mut h, "Fechar terminal");
     click(&mut h, "Fechar  ⏎");
-    assert!(!app(&mut h).sessions.contains_key(&id), "fechar encerra o terminal");
+    assert!(
+        !app(&mut h).sessions.contains_key(&id),
+        "fechar encerra o terminal"
+    );
 
     // reiniciar: o processo sai na 1ª vez e fica rodando na 2ª
     let marker = dir.join("marker");
-    let cmd = format!("test -f {m} || {{ touch {m}; exit 0; }}; sleep 60", m = marker.display());
+    let cmd = format!(
+        "test -f {m} || {{ touch {m}; exit 0; }}; sleep 60",
+        m = marker.display()
+    );
     let id = terminal(&mut h, "reinicia", &cmd);
-    wait_until(&mut h, "processo sair", |a| a.sessions[&id].term.as_ref().is_some_and(|t| t.is_exited()));
+    wait_until(&mut h, "processo sair", |a| {
+        a.sessions[&id].term.as_ref().is_some_and(|t| t.is_exited())
+    });
     frames(&mut h, 2);
-    assert!(exists(&h, &format!("{} Reabrir (Enter)", aic_app::ui::widgets::I_RESTART)), "tela de processo encerrado");
+    assert!(
+        exists(
+            &h,
+            &format!("{} Reabrir (Enter)", aic_app::ui::widgets::I_RESTART)
+        ),
+        "tela de processo encerrado"
+    );
     click(&mut h, "Reiniciar terminal");
-    wait_until(&mut h, "terminal reiniciado", |a| a.sessions[&id].term.as_ref().is_some_and(|t| !t.is_exited()));
+    wait_until(&mut h, "terminal reiniciado", |a| {
+        a.sessions[&id]
+            .term
+            .as_ref()
+            .is_some_and(|t| !t.is_exited())
+    });
 
     kill_all(&mut h);
 }
@@ -182,13 +222,20 @@ fn cabecalho_do_bloco() {
     assert_ne!(app(&mut h).blocks[&block].split, split, "⊞ muda o arranjo");
 
     click(&mut h, &format!("{I_PLUS} Claude"));
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::NewSession(_))), "+ Claude abre o diálogo");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::NewSession(_))),
+        "+ Claude abre o diálogo"
+    );
     click(&mut h, "Cancelar");
     assert!(app(&mut h).modal.is_none(), "cancelar fecha a nova sessão");
 
     let n = app(&mut h).blocks[&block].panes.len();
     click(&mut h, &format!("{I_TERM} terminal"));
-    assert_eq!(app(&mut h).blocks[&block].panes.len(), n + 1, "terminal abre um split no bloco");
+    assert_eq!(
+        app(&mut h).blocks[&block].panes.len(),
+        n + 1,
+        "terminal abre um split no bloco"
+    );
 
     click(&mut h, "Recolher bloco");
     assert!(app(&mut h).blocks[&block].collapsed, "recolher");
@@ -196,19 +243,31 @@ fn cabecalho_do_bloco() {
     assert!(!app(&mut h).blocks[&block].collapsed, "expandir");
 
     click(&mut h, "Fechar bloco");
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseBlock { .. })), "✕ do bloco pede confirmação");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::CloseBlock { .. })),
+        "✕ do bloco pede confirmação"
+    );
     click(&mut h, "Cancelar  (Esc)");
     assert!(app(&mut h).modal.is_none() && app(&mut h).blocks.contains_key(&block));
     click(&mut h, "Fechar bloco");
     click(&mut h, "Fechar  ⏎");
-    assert!(!app(&mut h).blocks.contains_key(&block), "fechar bloco remove o bloco");
+    assert!(
+        !app(&mut h).blocks.contains_key(&block),
+        "fechar bloco remove o bloco"
+    );
 
     // bloco novo pelo + da lista e renomear pelo diálogo
     let b = app(&mut h).new_block("vazio", None).unwrap();
     frames(&mut h, 3);
-    let label = format!("{I_PLUS}  Novo bloco  ({})", app(&mut h).keymap.label(aic_app::actions::Action::NewBlock));
+    let label = format!(
+        "{I_PLUS}  Novo bloco  ({})",
+        app(&mut h).keymap.label(aic_app::actions::Action::NewBlock)
+    );
     click(&mut h, &label);
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::RenameBlock { .. })), "novo bloco pede o nome");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::RenameBlock { .. })),
+        "novo bloco pede o nome"
+    );
     click(&mut h, "Cancelar  (Esc)");
     assert!(app(&mut h).modal.is_none());
     assert!(app(&mut h).blocks.contains_key(&b));
@@ -228,15 +287,26 @@ fn captura_rapida_e_tarefas_do_bloco() {
 
     // Ctrl+Shift+Space → captura rápida → Criar
     key(&mut h, ctrl_shift(), Key::Space);
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::QuickAdd { .. })), "Ctrl+Shift+Space abre a captura");
-    if let Some(Modal::QuickAdd { text, link_enabled, .. }) = &mut app(&mut h).modal {
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::QuickAdd { .. })),
+        "Ctrl+Shift+Space abre a captura"
+    );
+    if let Some(Modal::QuickAdd {
+        text, link_enabled, ..
+    }) = &mut app(&mut h).modal
+    {
         *text = "tarefa criada no clique".into();
         *link_enabled = true;
     }
     frames(&mut h, 2);
     click(&mut h, "Criar  ⏎");
     assert!(app(&mut h).modal.is_none());
-    let t = app(&mut h).tasks.iter().find(|t| t.title == "tarefa criada no clique").cloned().expect("Criar cria a tarefa");
+    let t = app(&mut h)
+        .tasks
+        .iter()
+        .find(|t| t.title == "tarefa criada no clique")
+        .cloned()
+        .expect("Criar cria a tarefa");
     assert_eq!(t.session, Some(id), "vinculada ao terminal em foco");
 
     key(&mut h, ctrl_shift(), Key::Space);
@@ -246,7 +316,10 @@ fn captura_rapida_e_tarefas_do_bloco() {
     // painel Tarefas do bloco: a tarefa aparece e o check conclui
     app(&mut h).update_block(block, |b| b.side = true);
     frames(&mut h, 3);
-    assert!(exists(&h, "tarefa criada no clique"), "a tarefa aparece no painel do bloco");
+    assert!(
+        exists(&h, "tarefa criada no clique"),
+        "a tarefa aparece no painel do bloco"
+    );
 
     kill_all(&mut h);
 }
@@ -270,8 +343,18 @@ fn notas_por_sessao() {
     assert!(!app(&mut h).term_focus, "o editor fica com o teclado");
     h.event(egui::Event::Text("lembrar do CORS".into()));
     frames(&mut h, 2);
-    assert_eq!(app(&mut h).sessions[&b].s.notes, "lembrar do CORS", "digitar grava na sessão");
-    let saved = app(&mut h).store.sessions().unwrap().into_iter().find(|s| s.id == b).unwrap();
+    assert_eq!(
+        app(&mut h).sessions[&b].s.notes,
+        "lembrar do CORS",
+        "digitar grava na sessão"
+    );
+    let saved = app(&mut h)
+        .store
+        .sessions()
+        .unwrap()
+        .into_iter()
+        .find(|s| s.id == b)
+        .unwrap();
     assert_eq!(saved.notes, "lembrar do CORS", "salvo no banco sem pedir");
 
     // Esc devolve o teclado pro terminal
@@ -292,14 +375,21 @@ fn notas_por_sessao() {
     h.event(egui::Event::Text("outra".into()));
     frames(&mut h, 2);
     assert_eq!(app(&mut h).sessions[&a].s.notes, "outra");
-    assert_eq!(app(&mut h).sessions[&b].s.notes, "lembrar do CORS", "a nota da outra sessão não muda");
+    assert_eq!(
+        app(&mut h).sessions[&b].s.notes,
+        "lembrar do CORS",
+        "a nota da outra sessão não muda"
+    );
 
     // notas de bloco (de antes) vão pra sessão em foco do bloco ao reabrir
     let block = app(&mut h).block_of(a).unwrap();
     app(&mut h).update_block(block, |bl| bl.notes = "nota do bloco".into());
     app(&mut h).migrate_block_notes();
     assert_eq!(app(&mut h).sessions[&a].s.notes, "outra\n\nnota do bloco");
-    assert!(app(&mut h).blocks[&block].notes.is_empty(), "o bloco fica sem nota");
+    assert!(
+        app(&mut h).blocks[&block].notes.is_empty(),
+        "o bloco fica sem nota"
+    );
 
     kill_all(&mut h);
 }
@@ -341,7 +431,10 @@ fn modais_toasts_e_abas() {
     // workspaces: criar pelo diálogo e fechar
     let n = app(&mut h).workspaces.len();
     key(&mut h, ctrl_shift(), Key::O);
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::Workspaces { .. })), "Ctrl+Shift+O abre workspaces");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::Workspaces { .. })),
+        "Ctrl+Shift+O abre workspaces"
+    );
     click(&mut h, "Fechar  (Esc)");
     assert!(app(&mut h).modal.is_none());
     key(&mut h, ctrl_shift(), Key::O);
@@ -362,20 +455,34 @@ fn modais_toasts_e_abas() {
 
     // renomear bloco/sessão pelos botões
     let id = terminal(&mut h, "renomeia", "sleep 60");
-    app(&mut h).modal = Some(Modal::Rename { id, text: "novo nome".into(), first: false });
+    app(&mut h).modal = Some(Modal::Rename {
+        id,
+        text: "novo nome".into(),
+        first: false,
+    });
     frames(&mut h, 2);
     click(&mut h, "Salvar  ⏎");
-    assert_eq!(app(&mut h).session_label(id), "novo nome", "Salvar renomeia");
+    assert_eq!(
+        app(&mut h).session_label(id),
+        "novo nome",
+        "Salvar renomeia"
+    );
 
     // módulo desligado: aba some e atalho fica inerte (não vaza)
     app(&mut h).cfg.modules.insert("worktrees".into(), false);
     frames(&mut h, 2);
-    assert!(!exists(&h, "Aba Worktrees"), "aba Worktrees some com o módulo desligado");
+    assert!(
+        !exists(&h, "Aba Worktrees"),
+        "aba Worktrees some com o módulo desligado"
+    );
     key(&mut h, ctrl_shift(), Key::G);
     assert_ne!(app(&mut h).view, View::Worktrees);
     app(&mut h).cfg.modules.insert("tasks".into(), false);
     key(&mut h, ctrl_shift(), Key::Space);
-    assert!(app(&mut h).modal.is_none(), "captura rápida inerte com Tarefas desligado");
+    assert!(
+        app(&mut h).modal.is_none(),
+        "captura rápida inerte com Tarefas desligado"
+    );
 
     kill_all(&mut h);
 }
@@ -384,7 +491,14 @@ fn modais_toasts_e_abas() {
 
 fn git(dir: &Path, args: &[&str]) {
     let ok = std::process::Command::new("git")
-        .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "commit.gpgsign=false",
+        ])
         .args(args)
         .current_dir(dir)
         .output()
@@ -405,7 +519,10 @@ fn worktrees() {
     git(&repo, &["add", "."]);
     git(&repo, &["commit", "-qm", "init"]);
     let wt = dir.join("repos/proj.worktrees/feat");
-    git(&repo, &["worktree", "add", "-q", "-b", "feat", wt.to_str().unwrap()]);
+    git(
+        &repo,
+        &["worktree", "add", "-q", "-b", "feat", wt.to_str().unwrap()],
+    );
 
     let mut h = harness([1400.0, 900.0]);
     app(&mut h).repos = app(&mut h).cfg.repos();
@@ -414,7 +531,10 @@ fn worktrees() {
 
     click(&mut h, "Atualizar worktrees");
     click(&mut h, "Remover worktree");
-    assert!(exists(&h, "Forçar (descarta mudanças)"), "🗑 pede confirmação");
+    assert!(
+        exists(&h, "Forçar (descarta mudanças)"),
+        "🗑 pede confirmação"
+    );
     click(&mut h, "Cancelar");
     assert!(!exists(&h, "Forçar (descarta mudanças)"), "Cancelar fecha");
     assert!(wt.exists());
@@ -439,14 +559,25 @@ fn config_alterar_atalho() {
     assert_eq!(app(&mut h).settings.capturing, Some(Action::Quit));
     // a combinação de outra ação é GRAVADA, não executada (antes abria a Nova sessão)
     key(&mut h, ctrl_shift(), Key::N);
-    assert!(app(&mut h).modal.is_none(), "gravar Ctrl+Shift+N não pode abrir a nova sessão");
+    assert!(
+        app(&mut h).modal.is_none(),
+        "gravar Ctrl+Shift+N não pode abrir a nova sessão"
+    );
     assert_eq!(app(&mut h).keymap.label(Action::Quit), "Ctrl+Shift+N");
     assert_eq!(app(&mut h).settings.capturing, None);
 
     click(&mut h, "Atalho padrão: Sair do AIC");
-    assert_eq!(app(&mut h).keymap.label(Action::Quit), "Ctrl+Shift+Q", "padrão volta o atalho");
+    assert_eq!(
+        app(&mut h).keymap.label(Action::Quit),
+        "Ctrl+Shift+Q",
+        "padrão volta o atalho"
+    );
     click(&mut h, "Restaurar padrões");
-    assert_eq!(app(&mut h).keymap.label(Action::NewSession), "Ctrl+Shift+N", "restaurar padrões");
+    assert_eq!(
+        app(&mut h).keymap.label(Action::NewSession),
+        "Ctrl+Shift+N",
+        "restaurar padrões"
+    );
 
     // tecla líder
     click(&mut h, "Alterar a tecla líder");
@@ -463,10 +594,22 @@ fn config_alterar_atalho() {
     assert_eq!(app(&mut h).settings.capturing_prefix, Some(Action::Quit));
     key(&mut h, Modifiers::NONE, Key::X);
     assert_eq!(app(&mut h).keymap.prefix_keys(Action::Quit), ["x"]);
-    assert!(app(&mut h).keymap.prefix_keys(Action::CloseFocused).is_empty(), "x sai de quem tinha");
-    click(&mut h, "Tecla de prefixo padrão: Fechar o que está em foco (terminal, bloco vazio ou a aba)");
+    assert!(
+        app(&mut h)
+            .keymap
+            .prefix_keys(Action::CloseFocused)
+            .is_empty(),
+        "x sai de quem tinha"
+    );
+    click(
+        &mut h,
+        "Tecla de prefixo padrão: Fechar o que está em foco (terminal, bloco vazio ou a aba)",
+    );
     assert_eq!(app(&mut h).keymap.prefix_keys(Action::CloseFocused), ["x"]);
-    assert!(app(&mut h).keymap.prefix_keys(Action::Quit).is_empty(), "e volta pro dono");
+    assert!(
+        app(&mut h).keymap.prefix_keys(Action::Quit).is_empty(),
+        "e volta pro dono"
+    );
 
     // o prefixo em si: não aceita colidir com a líder
     click(&mut h, "Alterar o prefixo");
@@ -497,7 +640,10 @@ fn busca_na_config() {
     assert_eq!(app(&mut h).settings.search, "fonte");
     assert!(exists(&h, "Fonte do terminal"), "a linha buscada fica");
     assert!(!exists(&h, "Escala da interface"), "o resto da seção some");
-    assert!(!exists(&h, "Alterar atalho: Sair do AIC"), "outras seções somem");
+    assert!(
+        !exists(&h, "Alterar atalho: Sair do AIC"),
+        "outras seções somem"
+    );
 
     // sem acento e por palavra-chave: "notificacao" acha a linha de notificação
     app(&mut h).settings.search = "notificacao".into();
@@ -525,7 +671,11 @@ fn busca_na_config() {
     assert_eq!(app(&mut h).view, View::Settings);
     h.event(egui::Event::Text("som".into()));
     frames(&mut h, 3);
-    assert_eq!(app(&mut h).settings.search, "som", "a busca já estava focada");
+    assert_eq!(
+        app(&mut h).settings.search,
+        "som",
+        "a busca já estava focada"
+    );
 }
 
 // ───────────────────────── prefixo (tmux) ─────────────────────────
@@ -549,7 +699,13 @@ fn prefixo_estilo_tmux() {
     // x fecha o que está em foco: o terminal (pede confirmação)
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::X);
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseSession { id, .. } if *id == a)), "Ctrl+B x fecha o terminal em foco");
+    assert!(
+        is_modal(
+            &mut h,
+            |m| matches!(m, Modal::CloseSession { id, .. } if *id == a)
+        ),
+        "Ctrl+B x fecha o terminal em foco"
+    );
     key(&mut h, Modifiers::NONE, Key::Escape);
     app(&mut h).modal = None;
 
@@ -565,7 +721,11 @@ fn prefixo_estilo_tmux() {
     assert_eq!(app(&mut h).view, View::Worktrees, "Ctrl+B p");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::X);
-    assert_eq!(app(&mut h).view, View::Sessions, "Ctrl+B x na aba volta pras sessões");
+    assert_eq!(
+        app(&mut h).view,
+        View::Sessions,
+        "Ctrl+B x na aba volta pras sessões"
+    );
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::P);
     let last = *app(&mut h).tabs().last().unwrap();
@@ -577,7 +737,10 @@ fn prefixo_estilo_tmux() {
     frames(&mut h, 2);
     assert_eq!(app(&mut h).ws, 1);
     assert!(exists(&h, "Workspace 2 front"), "workspace na barra");
-    assert!(app(&mut h).ws_sessions().is_empty(), "o workspace novo só mostra as sessões dele");
+    assert!(
+        app(&mut h).ws_sessions().is_empty(),
+        "o workspace novo só mostra as sessões dele"
+    );
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::Num1);
     assert_eq!(app(&mut h).ws, 0, "Ctrl+B 1");
@@ -603,7 +766,10 @@ fn prefixo_estilo_tmux() {
     key(&mut h, ctrl(), Key::B);
     h.event(egui::Event::Text("$".into()));
     frames(&mut h, 2);
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::RenameWorkspace { .. })), "Ctrl+B $");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::RenameWorkspace { .. })),
+        "Ctrl+B $"
+    );
     app(&mut h).modal = None;
     app(&mut h).rename_workspace("api");
     assert_eq!(app(&mut h).current_ws().unwrap().name, "api");
@@ -613,7 +779,12 @@ fn prefixo_estilo_tmux() {
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::Y);
     assert!(!app(&mut h).prefix_pending);
-    assert!(app(&mut h).toasts.iter().any(|t| t.text.contains("não faz nada")));
+    assert!(
+        app(&mut h)
+            .toasts
+            .iter()
+            .any(|t| t.text.contains("não faz nada"))
+    );
 
     // ? abre o catálogo; Ctrl+B Ctrl+B não dispara nada (vai pro terminal)
     key(&mut h, ctrl(), Key::B);
@@ -623,13 +794,20 @@ fn prefixo_estilo_tmux() {
     key(&mut h, Modifiers::NONE, Key::Escape);
     key(&mut h, ctrl(), Key::B);
     key(&mut h, ctrl(), Key::B);
-    assert!(!app(&mut h).prefix_pending && app(&mut h).modal.is_none() && app(&mut h).leader.is_none());
+    assert!(
+        !app(&mut h).prefix_pending && app(&mut h).modal.is_none() && app(&mut h).leader.is_none()
+    );
 
     // prefixo remapeado pelo keybinds: vale a tecla nova
-    app(&mut h).keymap.set_prefix(Action::NewWorkspace, vec!["N".into()]);
+    app(&mut h)
+        .keymap
+        .set_prefix(Action::NewWorkspace, vec!["N".into()]);
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::SHIFT, Key::N);
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::Workspaces { .. })), "Ctrl+B N (remapeado)");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::Workspaces { .. })),
+        "Ctrl+B N (remapeado)"
+    );
     app(&mut h).modal = None;
 
     kill_all(&mut h);
@@ -649,11 +827,21 @@ fn tecla_lider() {
     key(&mut h, ctrl(), Key::Space);
     assert!(app(&mut h).leader.is_some(), "Ctrl+Space abre o menu");
     key(&mut h, Modifiers::NONE, Key::S);
-    assert_eq!(app(&mut h).leader.as_ref().unwrap().path, vec!['s'], "s entra em Sessões");
+    assert_eq!(
+        app(&mut h).leader.as_ref().unwrap().path,
+        vec!['s'],
+        "s entra em Sessões"
+    );
     key(&mut h, Modifiers::NONE, Key::Q);
-    assert!(app(&mut h).leader.as_ref().unwrap().error.is_some(), "tecla inválida avisa");
+    assert!(
+        app(&mut h).leader.as_ref().unwrap().error.is_some(),
+        "tecla inválida avisa"
+    );
     key(&mut h, Modifiers::NONE, Key::Backspace);
-    assert!(app(&mut h).leader.as_ref().unwrap().path.is_empty(), "Backspace volta");
+    assert!(
+        app(&mut h).leader.as_ref().unwrap().path.is_empty(),
+        "Backspace volta"
+    );
     key(&mut h, Modifiers::NONE, Key::Escape);
     assert!(app(&mut h).leader.is_none(), "Esc fecha");
 
@@ -669,7 +857,10 @@ fn tecla_lider() {
     // clique nos itens do menu
     key(&mut h, ctrl(), Key::Space);
     click(&mut h, "Paleta de comandos");
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::Palette { .. })), "clique no item roda a ação");
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::Palette { .. })),
+        "clique no item roda a ação"
+    );
     key(&mut h, Modifiers::NONE, Key::Escape);
     key(&mut h, ctrl(), Key::Space);
     click(&mut h, "Fechar menu");
@@ -678,9 +869,15 @@ fn tecla_lider() {
     // módulo desligado: o grupo Tarefas some do menu
     app(&mut h).cfg.modules.insert("tasks".into(), false);
     key(&mut h, ctrl(), Key::Space);
-    assert!(!exists(&h, "Tarefas  ›"), "grupo de módulo desligado não aparece");
+    assert!(
+        !exists(&h, "Tarefas  ›"),
+        "grupo de módulo desligado não aparece"
+    );
     key(&mut h, Modifiers::NONE, Key::T);
-    assert!(app(&mut h).leader.as_ref().unwrap().error.is_some(), "t vira tecla inválida");
+    assert!(
+        app(&mut h).leader.as_ref().unwrap().error.is_some(),
+        "t vira tecla inválida"
+    );
     key(&mut h, Modifiers::NONE, Key::Escape);
     app(&mut h).cfg.modules.remove("tasks");
 
@@ -699,7 +896,10 @@ fn tecla_lider() {
     img.save(out.join("lider.png")).unwrap();
     key(&mut h, Modifiers::NONE, Key::S);
     frames(&mut h, 3);
-    h.render().expect("render").save(out.join("lider-sessoes.png")).unwrap();
+    h.render()
+        .expect("render")
+        .save(out.join("lider-sessoes.png"))
+        .unwrap();
 
     kill_all(&mut h);
 }
@@ -714,21 +914,42 @@ fn caixa_de_entrada_do_layne() {
     let mut h = harness([1400.0, 900.0]);
     assert!(inbox::app_running(), "o app marca que está aberto");
 
-    let id = inbox::send(Command::NewWorkspace { name: "Pessoal".into(), switch: false }).unwrap();
-    wait_until(&mut h, "workspace criado", |a| a.workspaces.iter().any(|w| w.name == "Pessoal"));
+    let id = inbox::send(Command::NewWorkspace {
+        name: "Pessoal".into(),
+        switch: false,
+    })
+    .unwrap();
+    wait_until(&mut h, "workspace criado", |a| {
+        a.workspaces.iter().any(|w| w.name == "Pessoal")
+    });
     let r = inbox::wait_reply(&id, Duration::from_secs(2)).expect("resposta");
     assert!(r.ok, "{}", r.message);
-    assert_eq!(app(&mut h).current_ws().unwrap().name, "Principal", "sem --go fica onde estava");
+    assert_eq!(
+        app(&mut h).current_ws().unwrap().name,
+        "Principal",
+        "sem --go fica onde estava"
+    );
 
-    let id = inbox::send(Command::GotoWorkspace { name: "pess".into() }).unwrap();
-    wait_until(&mut h, "trocar de workspace", |a| a.current_ws().is_some_and(|w| w.name == "Pessoal"));
+    let id = inbox::send(Command::GotoWorkspace {
+        name: "pess".into(),
+    })
+    .unwrap();
+    wait_until(&mut h, "trocar de workspace", |a| {
+        a.current_ws().is_some_and(|w| w.name == "Pessoal")
+    });
     assert!(inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok);
 
-    let id = inbox::send(Command::GotoWorkspace { name: "nada".into() }).unwrap();
+    let id = inbox::send(Command::GotoWorkspace {
+        name: "nada".into(),
+    })
+    .unwrap();
     frames(&mut h, 2);
     std::thread::sleep(Duration::from_millis(350));
     frames(&mut h, 2);
-    assert!(!inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok, "workspace inexistente é erro");
+    assert!(
+        !inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok,
+        "workspace inexistente é erro"
+    );
 
     let id = inbox::send(Command::NewSession {
         workspace: Some("Trabalho".into()),
@@ -741,15 +962,34 @@ fn caixa_de_entrada_do_layne() {
         task: None,
     })
     .unwrap();
-    wait_until(&mut h, "sessão aberta", |a| a.sessions.values().any(|r| r.s.name == "api (shell)"));
+    wait_until(&mut h, "sessão aberta", |a| {
+        a.sessions.values().any(|r| r.s.name == "api (shell)")
+    });
     let r = inbox::wait_reply(&id, Duration::from_secs(2)).unwrap();
     assert!(r.ok && r.message.contains("Trabalho"), "{}", r.message);
-    assert_eq!(app(&mut h).current_ws().unwrap().name, "Trabalho", "workspace criado e aberto");
+    assert_eq!(
+        app(&mut h).current_ws().unwrap().name,
+        "Trabalho",
+        "workspace criado e aberto"
+    );
 
-    let id = inbox::send(Command::NewSession { workspace: None, name: None, repo: Some("naoexiste".into()), cwd: None, shell: true, branch: None, prompt: None, task: None }).unwrap();
+    let id = inbox::send(Command::NewSession {
+        workspace: None,
+        name: None,
+        repo: Some("naoexiste".into()),
+        cwd: None,
+        shell: true,
+        branch: None,
+        prompt: None,
+        task: None,
+    })
+    .unwrap();
     frames(&mut h, 2);
     std::thread::sleep(Duration::from_millis(350));
     frames(&mut h, 2);
-    assert!(!inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok, "repo inexistente é erro");
+    assert!(
+        !inbox::wait_reply(&id, Duration::from_secs(2)).unwrap().ok,
+        "repo inexistente é erro"
+    );
     kill_all(&mut h);
 }

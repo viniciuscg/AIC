@@ -10,8 +10,8 @@
 
 use std::collections::BTreeMap;
 
-use egui::{Key, KeyboardShortcut, Modifiers};
 use aic_core::{Module, paths};
+use egui::{Key, KeyboardShortcut, Modifiers};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Action {
@@ -89,10 +89,34 @@ pub struct Meta {
     pub default: Option<KeyboardShortcut>,
 }
 
-const CS: Modifiers = Modifiers { alt: false, ctrl: true, shift: true, mac_cmd: false, command: true };
-const C: Modifiers = Modifiers { alt: false, ctrl: true, shift: false, mac_cmd: false, command: true };
-const CA: Modifiers = Modifiers { alt: true, ctrl: true, shift: false, mac_cmd: false, command: true };
-const A: Modifiers = Modifiers { alt: true, ctrl: false, shift: false, mac_cmd: false, command: false };
+const CS: Modifiers = Modifiers {
+    alt: false,
+    ctrl: true,
+    shift: true,
+    mac_cmd: false,
+    command: true,
+};
+const C: Modifiers = Modifiers {
+    alt: false,
+    ctrl: true,
+    shift: false,
+    mac_cmd: false,
+    command: true,
+};
+const CA: Modifiers = Modifiers {
+    alt: true,
+    ctrl: true,
+    shift: false,
+    mac_cmd: false,
+    command: true,
+};
+const A: Modifiers = Modifiers {
+    alt: true,
+    ctrl: false,
+    shift: false,
+    mac_cmd: false,
+    command: false,
+};
 const N: Modifiers = Modifiers::NONE;
 
 fn ks(m: Modifiers, k: Key) -> Option<KeyboardShortcut> {
@@ -103,19 +127,64 @@ impl Action {
     pub fn all() -> Vec<Action> {
         use Action::*;
         let mut v = vec![
-            CloseFocused, NewSession, ToggleLayne, LayneVoice, NewShell, CloseSession, RenameSession, RestartSession, SendContext, NextSession, PrevSession, NextWaiting,
-            FocusLeft, FocusRight, FocusUp, FocusDown,
+            CloseFocused,
+            NewSession,
+            ToggleLayne,
+            LayneVoice,
+            NewShell,
+            CloseSession,
+            RenameSession,
+            RestartSession,
+            SendContext,
+            NextSession,
+            PrevSession,
+            NextWaiting,
+            FocusLeft,
+            FocusRight,
+            FocusUp,
+            FocusDown,
         ];
         v.extend((1..=9).map(Goto));
         v.extend([
-            ToggleLayout, CycleView, ToggleMaximize, ReleaseTerminal, NewBlock, CloseBlock, RenameBlock, CycleSplit, ToggleBlockSide,
-            CollapseBlock, MoveBlockUp, MoveBlockDown, ToggleNotes, QuickAdd, Workspaces, NewWorkspace,
-            NextWorkspace, PrevWorkspace,
+            ToggleLayout,
+            CycleView,
+            ToggleMaximize,
+            ReleaseTerminal,
+            NewBlock,
+            CloseBlock,
+            RenameBlock,
+            CycleSplit,
+            ToggleBlockSide,
+            CollapseBlock,
+            MoveBlockUp,
+            MoveBlockDown,
+            ToggleNotes,
+            QuickAdd,
+            Workspaces,
+            NewWorkspace,
+            NextWorkspace,
+            PrevWorkspace,
         ]);
         v.extend((1..=9).map(GotoWorkspace));
         v.extend([
-            LastWorkspace, RenameWorkspace, ViewSessions, ViewWorktrees, ViewChanges, ViewUsage, ViewSettings, ViewHelp, NextView, PrevView,
-            SearchSettings, Catalog, Palette, ZoomIn, ZoomOut, ZoomReset, ToggleSidebar, Quit,
+            LastWorkspace,
+            RenameWorkspace,
+            ViewSessions,
+            ViewWorktrees,
+            ViewChanges,
+            ViewUsage,
+            ViewSettings,
+            ViewHelp,
+            NextView,
+            PrevView,
+            SearchSettings,
+            Catalog,
+            Palette,
+            ZoomIn,
+            ZoomOut,
+            ZoomReset,
+            ToggleSidebar,
+            Quit,
         ]);
         v
     }
@@ -128,7 +197,8 @@ impl Action {
             ViewWorktrees => Some(Module::Worktrees),
             ViewChanges => Some(Module::Changes),
             ViewUsage => Some(Module::Usage),
-            Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_) | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
+            Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_)
+            | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
             ToggleNotes => Some(Module::Notes),
             ToggleLayne | LayneVoice => Some(Module::Layne),
             Catalog => Some(Module::Hints),
@@ -144,27 +214,120 @@ impl Action {
     pub fn meta(self) -> Meta {
         use Action::*;
         let (id, name, group, default) = match self {
-            CloseFocused => ("close_focused", "Fechar o que está em foco (terminal, bloco vazio ou a aba)", "Foco", None),
-            NewSession => ("new_session", "Novo Claude no bloco atual (escolhe pasta/worktree)", "Sessões", ks(CS, Key::N)),
-            ToggleLayne => ("toggle_layne", "Layne: abrir/fechar o assistente (ou pegar o teclado dele)", "Layne", ks(CA, Key::L)),
-            LayneVoice => ("layne_voice", "Layne: falar (grava; de novo para e manda)", "Layne", ks(CA, Key::V)),
-            NewShell => ("new_shell", "Novo terminal ao lado, na mesma pasta (split)", "Sessões", ks(CS, Key::T)),
-            CloseSession => ("close_session", "Fechar o terminal em foco", "Sessões", ks(CS, Key::W)),
-            RenameSession => ("rename_session", "Renomear o terminal em foco", "Sessões", ks(CS, Key::R)),
-            RestartSession => ("restart_session", "Reiniciar o terminal em foco (o Claude retoma a conversa)", "Sessões", ks(CS, Key::F5)),
-            SendContext => ("send_context", "Mandar o contexto da tarefa pro Claude em foco", "Sessões", ks(CA, Key::K)),
-            NextSession => ("next_session", "Ir pro próximo terminal", "Sessões", ks(C, Key::PageDown)),
-            PrevSession => ("prev_session", "Ir pro terminal anterior", "Sessões", ks(C, Key::PageUp)),
-            NextWaiting => ("next_waiting", "Ir pro próximo terminal que precisa de você", "Sessões", ks(CS, Key::A)),
-            FocusLeft => ("focus_left", "Mover o foco pro terminal à esquerda", "Sessões", ks(CS, Key::ArrowLeft)),
-            FocusRight => ("focus_right", "Mover o foco pro terminal à direita", "Sessões", ks(CS, Key::ArrowRight)),
-            FocusUp => ("focus_up", "Mover o foco pro terminal de cima", "Sessões", ks(CS, Key::ArrowUp)),
-            FocusDown => ("focus_down", "Mover o foco pro terminal de baixo", "Sessões", ks(CS, Key::ArrowDown)),
+            CloseFocused => (
+                "close_focused",
+                "Fechar o que está em foco (terminal, bloco vazio ou a aba)",
+                "Foco",
+                None,
+            ),
+            NewSession => (
+                "new_session",
+                "Novo Claude no bloco atual (escolhe pasta/worktree)",
+                "Sessões",
+                ks(CS, Key::N),
+            ),
+            ToggleLayne => (
+                "toggle_layne",
+                "Layne: abrir/fechar o assistente (ou pegar o teclado dele)",
+                "Layne",
+                ks(CA, Key::L),
+            ),
+            LayneVoice => (
+                "layne_voice",
+                "Layne: falar (grava; de novo para e manda)",
+                "Layne",
+                ks(CA, Key::V),
+            ),
+            NewShell => (
+                "new_shell",
+                "Novo terminal ao lado, na mesma pasta (split)",
+                "Sessões",
+                ks(CS, Key::T),
+            ),
+            CloseSession => (
+                "close_session",
+                "Fechar o terminal em foco",
+                "Sessões",
+                ks(CS, Key::W),
+            ),
+            RenameSession => (
+                "rename_session",
+                "Renomear o terminal em foco",
+                "Sessões",
+                ks(CS, Key::R),
+            ),
+            RestartSession => (
+                "restart_session",
+                "Reiniciar o terminal em foco (o Claude retoma a conversa)",
+                "Sessões",
+                ks(CS, Key::F5),
+            ),
+            SendContext => (
+                "send_context",
+                "Mandar o contexto da tarefa pro Claude em foco",
+                "Sessões",
+                ks(CA, Key::K),
+            ),
+            NextSession => (
+                "next_session",
+                "Ir pro próximo terminal",
+                "Sessões",
+                ks(C, Key::PageDown),
+            ),
+            PrevSession => (
+                "prev_session",
+                "Ir pro terminal anterior",
+                "Sessões",
+                ks(C, Key::PageUp),
+            ),
+            NextWaiting => (
+                "next_waiting",
+                "Ir pro próximo terminal que precisa de você",
+                "Sessões",
+                ks(CS, Key::A),
+            ),
+            FocusLeft => (
+                "focus_left",
+                "Mover o foco pro terminal à esquerda",
+                "Sessões",
+                ks(CS, Key::ArrowLeft),
+            ),
+            FocusRight => (
+                "focus_right",
+                "Mover o foco pro terminal à direita",
+                "Sessões",
+                ks(CS, Key::ArrowRight),
+            ),
+            FocusUp => (
+                "focus_up",
+                "Mover o foco pro terminal de cima",
+                "Sessões",
+                ks(CS, Key::ArrowUp),
+            ),
+            FocusDown => (
+                "focus_down",
+                "Mover o foco pro terminal de baixo",
+                "Sessões",
+                ks(CS, Key::ArrowDown),
+            ),
             Goto(n) => {
                 // Blocos/Abas: vai pro bloco N; Foco/Grade: pro terminal N
                 let i = (n.clamp(1, 9) - 1) as usize;
-                let key = [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6, Key::Num7, Key::Num8, Key::Num9][i];
-                let id: &'static str = ["goto_1", "goto_2", "goto_3", "goto_4", "goto_5", "goto_6", "goto_7", "goto_8", "goto_9"][i];
+                let key = [
+                    Key::Num1,
+                    Key::Num2,
+                    Key::Num3,
+                    Key::Num4,
+                    Key::Num5,
+                    Key::Num6,
+                    Key::Num7,
+                    Key::Num8,
+                    Key::Num9,
+                ][i];
+                let id: &'static str = [
+                    "goto_1", "goto_2", "goto_3", "goto_4", "goto_5", "goto_6", "goto_7", "goto_8",
+                    "goto_9",
+                ][i];
                 let name: &'static str = [
                     "Ir pro bloco 1 (ou terminal 1 no Foco/Grade)",
                     "Ir pro bloco 2 (ou terminal 2 no Foco/Grade)",
@@ -178,29 +341,139 @@ impl Action {
                 ][i];
                 (id, name, "Sessões", ks(A, key))
             }
-            ToggleLayout => ("toggle_layout", "Alternar foco ⇄ grade", "Sessões", ks(CS, Key::L)),
+            ToggleLayout => (
+                "toggle_layout",
+                "Alternar foco ⇄ grade",
+                "Sessões",
+                ks(CS, Key::L),
+            ),
             // Ctrl+Shift+V é o colar do terminal: a troca de visualização fica no F
-            CycleView => ("cycle_view", "Trocar a visualização (blocos → abas → foco → grade)", "Sessões", ks(CS, Key::F)),
-            ToggleMaximize => ("toggle_maximize", "Maximizar/restaurar o terminal em foco", "Sessões", ks(CS, Key::M)),
-            ReleaseTerminal => ("release_terminal", "Soltar o teclado do terminal (atalhos de tela voltam a valer)", "Sessões", ks(CS, Key::Escape)),
-            NewBlock => ("new_block", "Novo bloco (contexto)", "Blocos", ks(CS, Key::Enter)),
-            CloseBlock => ("close_block", "Fechar o bloco e todos os terminais dele", "Blocos", ks(CS, Key::X)),
-            RenameBlock => ("rename_block", "Renomear o bloco", "Blocos", ks(CS, Key::F2)),
-            CycleSplit => ("cycle_split", "Mudar o arranjo dos terminais (lado a lado → principal → empilhado → grade)", "Blocos", ks(CS, Key::Backslash)),
-            ToggleBlockSide => ("toggle_block_side", "Mostrar/esconder o painel do bloco (tarefas)", "Blocos", ks(CS, Key::I)),
-            CollapseBlock => ("collapse_block", "Recolher/expandir o bloco", "Blocos", ks(CA, Key::C)),
-            MoveBlockUp => ("move_block_up", "Subir o bloco na lista", "Blocos", ks(CA, Key::ArrowUp)),
-            MoveBlockDown => ("move_block_down", "Descer o bloco na lista", "Blocos", ks(CA, Key::ArrowDown)),
-            ToggleNotes => ("toggle_notes", "Notas da sessão em foco: abrir (e escrever) / fechar", "Sessões", ks(CS, Key::E)),
-            QuickAdd => ("quick_add", "Nova tarefa (captura rápida)", "Tarefas", ks(CS, Key::Space)),
-            Workspaces => ("workspaces", "Trocar de workspace", "Workspaces", ks(CS, Key::O)),
-            NewWorkspace => ("new_workspace", "Criar workspace", "Workspaces", ks(CA, Key::O)),
-            NextWorkspace => ("next_workspace", "Ir pro próximo workspace", "Workspaces", ks(CS, Key::PageDown)),
-            PrevWorkspace => ("prev_workspace", "Ir pro workspace anterior", "Workspaces", ks(CS, Key::PageUp)),
+            CycleView => (
+                "cycle_view",
+                "Trocar a visualização (blocos → abas → foco → grade)",
+                "Sessões",
+                ks(CS, Key::F),
+            ),
+            ToggleMaximize => (
+                "toggle_maximize",
+                "Maximizar/restaurar o terminal em foco",
+                "Sessões",
+                ks(CS, Key::M),
+            ),
+            ReleaseTerminal => (
+                "release_terminal",
+                "Soltar o teclado do terminal (atalhos de tela voltam a valer)",
+                "Sessões",
+                ks(CS, Key::Escape),
+            ),
+            NewBlock => (
+                "new_block",
+                "Novo bloco (contexto)",
+                "Blocos",
+                ks(CS, Key::Enter),
+            ),
+            CloseBlock => (
+                "close_block",
+                "Fechar o bloco e todos os terminais dele",
+                "Blocos",
+                ks(CS, Key::X),
+            ),
+            RenameBlock => (
+                "rename_block",
+                "Renomear o bloco",
+                "Blocos",
+                ks(CS, Key::F2),
+            ),
+            CycleSplit => (
+                "cycle_split",
+                "Mudar o arranjo dos terminais (lado a lado → principal → empilhado → grade)",
+                "Blocos",
+                ks(CS, Key::Backslash),
+            ),
+            ToggleBlockSide => (
+                "toggle_block_side",
+                "Mostrar/esconder o painel do bloco (tarefas)",
+                "Blocos",
+                ks(CS, Key::I),
+            ),
+            CollapseBlock => (
+                "collapse_block",
+                "Recolher/expandir o bloco",
+                "Blocos",
+                ks(CA, Key::C),
+            ),
+            MoveBlockUp => (
+                "move_block_up",
+                "Subir o bloco na lista",
+                "Blocos",
+                ks(CA, Key::ArrowUp),
+            ),
+            MoveBlockDown => (
+                "move_block_down",
+                "Descer o bloco na lista",
+                "Blocos",
+                ks(CA, Key::ArrowDown),
+            ),
+            ToggleNotes => (
+                "toggle_notes",
+                "Notas da sessão em foco: abrir (e escrever) / fechar",
+                "Sessões",
+                ks(CS, Key::E),
+            ),
+            QuickAdd => (
+                "quick_add",
+                "Nova tarefa (captura rápida)",
+                "Tarefas",
+                ks(CS, Key::Space),
+            ),
+            Workspaces => (
+                "workspaces",
+                "Trocar de workspace",
+                "Workspaces",
+                ks(CS, Key::O),
+            ),
+            NewWorkspace => (
+                "new_workspace",
+                "Criar workspace",
+                "Workspaces",
+                ks(CA, Key::O),
+            ),
+            NextWorkspace => (
+                "next_workspace",
+                "Ir pro próximo workspace",
+                "Workspaces",
+                ks(CS, Key::PageDown),
+            ),
+            PrevWorkspace => (
+                "prev_workspace",
+                "Ir pro workspace anterior",
+                "Workspaces",
+                ks(CS, Key::PageUp),
+            ),
             GotoWorkspace(n) => {
                 let i = (n.clamp(1, 9) - 1) as usize;
-                let key = [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6, Key::Num7, Key::Num8, Key::Num9][i];
-                let id: &'static str = ["workspace_1", "workspace_2", "workspace_3", "workspace_4", "workspace_5", "workspace_6", "workspace_7", "workspace_8", "workspace_9"][i];
+                let key = [
+                    Key::Num1,
+                    Key::Num2,
+                    Key::Num3,
+                    Key::Num4,
+                    Key::Num5,
+                    Key::Num6,
+                    Key::Num7,
+                    Key::Num8,
+                    Key::Num9,
+                ][i];
+                let id: &'static str = [
+                    "workspace_1",
+                    "workspace_2",
+                    "workspace_3",
+                    "workspace_4",
+                    "workspace_5",
+                    "workspace_6",
+                    "workspace_7",
+                    "workspace_8",
+                    "workspace_9",
+                ][i];
                 let name: &'static str = [
                     "Ir pro workspace 1",
                     "Ir pro workspace 2",
@@ -214,26 +487,111 @@ impl Action {
                 ][i];
                 (id, name, "Workspaces", ks(CA, key))
             }
-            LastWorkspace => ("last_workspace", "Voltar pro workspace anterior (vai e volta)", "Workspaces", None),
-            RenameWorkspace => ("rename_workspace", "Renomear o workspace atual", "Workspaces", None),
-            ViewSessions => ("view_sessions", "Ir pra aba Sessões", "Visões", ks(CS, Key::S)),
-            ViewWorktrees => ("view_worktrees", "Ir pra aba Worktrees", "Visões", ks(CS, Key::G)),
-            ViewChanges => ("view_changes", "Ir pra aba Changes (arquivos mudados e diff)", "Visões", ks(CA, Key::G)),
-            ViewUsage => ("view_usage", "Ir pra aba Tokens (limites e custo)", "Visões", ks(CS, Key::U)),
-            ViewSettings => ("view_settings", "Abrir configurações e atalhos", "Visões", ks(C, Key::Comma)),
+            LastWorkspace => (
+                "last_workspace",
+                "Voltar pro workspace anterior (vai e volta)",
+                "Workspaces",
+                None,
+            ),
+            RenameWorkspace => (
+                "rename_workspace",
+                "Renomear o workspace atual",
+                "Workspaces",
+                None,
+            ),
+            ViewSessions => (
+                "view_sessions",
+                "Ir pra aba Sessões",
+                "Visões",
+                ks(CS, Key::S),
+            ),
+            ViewWorktrees => (
+                "view_worktrees",
+                "Ir pra aba Worktrees",
+                "Visões",
+                ks(CS, Key::G),
+            ),
+            ViewChanges => (
+                "view_changes",
+                "Ir pra aba Changes (arquivos mudados e diff)",
+                "Visões",
+                ks(CA, Key::G),
+            ),
+            ViewUsage => (
+                "view_usage",
+                "Ir pra aba Tokens (limites e custo)",
+                "Visões",
+                ks(CS, Key::U),
+            ),
+            ViewSettings => (
+                "view_settings",
+                "Abrir configurações e atalhos",
+                "Visões",
+                ks(C, Key::Comma),
+            ),
             ViewHelp => ("view_help", "Abrir o manual", "Visões", ks(N, Key::F1)),
-            NextView => ("next_view", "Próxima aba da barra (Sessões → Worktrees → …)", "Visões", ks(C, Key::Tab)),
-            PrevView => ("prev_view", "Aba anterior da barra", "Visões", ks(CS, Key::Tab)),
-            SearchSettings => ("search_settings", "Pesquisar nas configurações", "Visões", None),
-            Catalog => ("catalog", "Catálogo de atalhos (o mesmo da tecla líder)", "Visões", None),
-            Palette => ("palette", "Paleta de comandos (busca ações, terminais e tarefas)", "Visões", ks(CS, Key::P)),
-            ZoomIn => ("zoom_in", "Aumentar a fonte do terminal", "Visual", ks(CS, Key::Equals)),
-            ZoomOut => ("zoom_out", "Diminuir a fonte do terminal", "Visual", ks(CS, Key::Minus)),
-            ZoomReset => ("zoom_reset", "Voltar a fonte do terminal ao padrão", "Visual", ks(CS, Key::Num0)),
-            ToggleSidebar => ("toggle_sidebar", "Mostrar/esconder a lista lateral (visualização Foco)", "Visual", ks(CS, Key::D)),
+            NextView => (
+                "next_view",
+                "Próxima aba da barra (Sessões → Worktrees → …)",
+                "Visões",
+                ks(C, Key::Tab),
+            ),
+            PrevView => (
+                "prev_view",
+                "Aba anterior da barra",
+                "Visões",
+                ks(CS, Key::Tab),
+            ),
+            SearchSettings => (
+                "search_settings",
+                "Pesquisar nas configurações",
+                "Visões",
+                None,
+            ),
+            Catalog => (
+                "catalog",
+                "Catálogo de atalhos (o mesmo da tecla líder)",
+                "Visões",
+                None,
+            ),
+            Palette => (
+                "palette",
+                "Paleta de comandos (busca ações, terminais e tarefas)",
+                "Visões",
+                ks(CS, Key::P),
+            ),
+            ZoomIn => (
+                "zoom_in",
+                "Aumentar a fonte do terminal",
+                "Visual",
+                ks(CS, Key::Equals),
+            ),
+            ZoomOut => (
+                "zoom_out",
+                "Diminuir a fonte do terminal",
+                "Visual",
+                ks(CS, Key::Minus),
+            ),
+            ZoomReset => (
+                "zoom_reset",
+                "Voltar a fonte do terminal ao padrão",
+                "Visual",
+                ks(CS, Key::Num0),
+            ),
+            ToggleSidebar => (
+                "toggle_sidebar",
+                "Mostrar/esconder a lista lateral (visualização Foco)",
+                "Visual",
+                ks(CS, Key::D),
+            ),
             Quit => ("quit", "Sair do AIC", "Visual", ks(CS, Key::Q)),
         };
-        Meta { id, name, group, default }
+        Meta {
+            id,
+            name,
+            group,
+            default,
+        }
     }
 
     /// Teclas padrão depois do prefixo (`Ctrl+B`). Segue o tmux onde dá: `c` cria, `%` divide,
@@ -273,7 +631,17 @@ impl Action {
             NextWorkspace => &[")"],
             PrevWorkspace => &["("],
             GotoWorkspace(n) => {
-                const KEYS: [&[&str]; 9] = [&["1"], &["2"], &["3"], &["4"], &["5"], &["6"], &["7"], &["8"], &["9"]];
+                const KEYS: [&[&str]; 9] = [
+                    &["1"],
+                    &["2"],
+                    &["3"],
+                    &["4"],
+                    &["5"],
+                    &["6"],
+                    &["7"],
+                    &["8"],
+                    &["9"],
+                ];
                 KEYS[(n.clamp(1, 9) - 1) as usize]
             }
             LastWorkspace => &["Tab"],
@@ -323,24 +691,64 @@ pub fn norm_prefix_key(s: &str) -> Option<String> {
 
 /// Atalhos de contexto (só valem numa visão, com o terminal sem foco). Vão pro catálogo.
 pub const CONTEXT_KEYS: &[(&str, &str, &str)] = &[
-    ("Prefixo", "Ctrl+B (configurável)", "Aperte, solte e aperte a tecla da ação (como no tmux); funciona com o terminal focado"),
-    ("Prefixo", "Ctrl+B Ctrl+B", "Manda um Ctrl+B de verdade pro terminal"),
+    (
+        "Prefixo",
+        "Ctrl+B (configurável)",
+        "Aperte, solte e aperte a tecla da ação (como no tmux); funciona com o terminal focado",
+    ),
+    (
+        "Prefixo",
+        "Ctrl+B Ctrl+B",
+        "Manda um Ctrl+B de verdade pro terminal",
+    ),
     ("Prefixo", "Ctrl+B Esc", "Cancela"),
-    ("Tecla líder", "Ctrl+Space (configurável)", "Abre o catálogo de atalhos agrupados (funciona com o terminal focado)"),
+    (
+        "Tecla líder",
+        "Ctrl+Space (configurável)",
+        "Abre o catálogo de atalhos agrupados (funciona com o terminal focado)",
+    ),
     ("Tecla líder", "letra", "Entra no grupo / roda a ação"),
     ("Tecla líder", "Backspace", "Volta um nível"),
     ("Tecla líder", "Esc", "Fecha o menu"),
-    ("Notas", "Esc", "Devolve o teclado pro terminal (a nota se salva sozinha)"),
-    ("Captura rápida", "#repo @hoje !alta +workspace ^DEV-1 ~tag", "Marcadores inline"),
+    (
+        "Notas",
+        "Esc",
+        "Devolve o teclado pro terminal (a nota se salva sozinha)",
+    ),
+    (
+        "Captura rápida",
+        "#repo @hoje !alta +workspace ^DEV-1 ~tag",
+        "Marcadores inline",
+    ),
     ("Captura rápida", "Enter / Esc", "Criar / cancelar"),
-    ("Captura rápida", "Alt+L", "Vincular (ou não) ao terminal em foco"),
-    ("Nova sessão", "Alt+1 / Alt+2 / Alt+3", "Claude / Shell / Comando"),
+    (
+        "Captura rápida",
+        "Alt+L",
+        "Vincular (ou não) ao terminal em foco",
+    ),
+    (
+        "Nova sessão",
+        "Alt+1 / Alt+2 / Alt+3",
+        "Claude / Shell / Comando",
+    ),
     ("Nova sessão", "Alt+W", "Isolar num worktree"),
     ("Diálogos", "Enter / Esc", "Confirmar / cancelar"),
-    ("Diálogos", "↑ / ↓  ou  Ctrl+N / Ctrl+P", "Escolher na lista"),
+    (
+        "Diálogos",
+        "↑ / ↓  ou  Ctrl+N / Ctrl+P",
+        "Escolher na lista",
+    ),
     ("Sessões", "t", "Nova tarefa (com o terminal sem foco)"),
-    ("Sessões", "Clique no terminal", "Devolver o teclado ao terminal"),
-    ("Sessões", "Enter (terminal encerrado)", "Reabrir o processo"),
+    (
+        "Sessões",
+        "Clique no terminal",
+        "Devolver o teclado ao terminal",
+    ),
+    (
+        "Sessões",
+        "Enter (terminal encerrado)",
+        "Reabrir o processo",
+    ),
     ("Terminal", "Ctrl+Shift+C / Ctrl+Shift+V", "Copiar / colar"),
     ("Terminal", "Shift+Enter", "Nova linha no prompt do Claude"),
     ("Terminal", "Ctrl+clique", "Abrir link"),
@@ -349,7 +757,11 @@ pub const CONTEXT_KEYS: &[(&str, &str, &str)] = &[
     ("Worktrees", "Enter", "Abrir sessão no worktree"),
     ("Worktrees", "Delete", "Remover worktree (a branch fica)"),
     ("Worktrees", "r", "Atualizar a lista"),
-    ("Config", "alterar → combinação", "Gravar atalho (Esc cancela, Backspace limpa)"),
+    (
+        "Config",
+        "alterar → combinação",
+        "Gravar atalho (Esc cancela, Backspace limpa)",
+    ),
     ("Config", "/", "Pesquisar uma configuração"),
 ];
 
@@ -358,7 +770,12 @@ pub const CONTEXT_KEYS: &[(&str, &str, &str)] = &[
 pub fn consume_exact(i: &mut egui::InputState, m: Modifiers, k: Key) -> bool {
     let mut hit = false;
     i.events.retain(|e| match e {
-        egui::Event::Key { key, pressed: true, modifiers, .. } if !hit && *key == k && same_mods(*modifiers, m) => {
+        egui::Event::Key {
+            key,
+            pressed: true,
+            modifiers,
+            ..
+        } if !hit && *key == k && same_mods(*modifiers, m) => {
             hit = true;
             false
         }
@@ -388,22 +805,41 @@ impl Keymap {
     }
 
     pub fn load() -> Self {
-        let map: BTreeMap<Action, Option<KeyboardShortcut>> =
-            Action::all().into_iter().map(|a| (a, a.meta().default)).collect();
-        let prefix: BTreeMap<Action, Vec<String>> = Action::all().into_iter().map(|a| (a, prefix_defaults(a))).collect();
+        let map: BTreeMap<Action, Option<KeyboardShortcut>> = Action::all()
+            .into_iter()
+            .map(|a| (a, a.meta().default))
+            .collect();
+        let prefix: BTreeMap<Action, Vec<String>> = Action::all()
+            .into_iter()
+            .map(|a| (a, prefix_defaults(a)))
+            .collect();
         let mut km = Self { map, prefix };
         if let Ok(text) = std::fs::read_to_string(Self::path()) {
             if let Ok(table) = text.parse::<toml::Table>() {
                 for a in Action::all() {
                     if let Some(v) = table.get(a.meta().id).and_then(|v| v.as_str()) {
-                        km.map.insert(a, if v.is_empty() || v == "nenhum" { None } else { parse_shortcut(v) });
+                        km.map.insert(
+                            a,
+                            if v.is_empty() || v == "nenhum" {
+                                None
+                            } else {
+                                parse_shortcut(v)
+                            },
+                        );
                     }
                 }
                 if let Some(pt) = table.get("prefix").and_then(|v| v.as_table()) {
                     for a in Action::all() {
                         let keys: Option<Vec<String>> = match pt.get(a.meta().id) {
-                            Some(toml::Value::String(s)) => Some(norm_prefix_key(s).into_iter().collect()),
-                            Some(toml::Value::Array(v)) => Some(v.iter().filter_map(|x| x.as_str()).filter_map(norm_prefix_key).collect()),
+                            Some(toml::Value::String(s)) => {
+                                Some(norm_prefix_key(s).into_iter().collect())
+                            }
+                            Some(toml::Value::Array(v)) => Some(
+                                v.iter()
+                                    .filter_map(|x| x.as_str())
+                                    .filter_map(norm_prefix_key)
+                                    .collect(),
+                            ),
                             _ => None,
                         };
                         if let Some(keys) = keys {
@@ -418,18 +854,27 @@ impl Keymap {
     }
 
     pub fn save(&self) -> anyhow::Result<()> {
-        let mut out = String::from("# Atalhos do AIC. Formato: acao = \"Ctrl+Shift+N\" (vazio desliga)\n");
+        let mut out =
+            String::from("# Atalhos do AIC. Formato: acao = \"Ctrl+Shift+N\" (vazio desliga)\n");
         for (a, s) in &self.map {
             if *s != a.meta().default {
                 let v = s.map(|s| format_shortcut(&s)).unwrap_or_default();
                 out.push_str(&format!("{} = \"{}\"\n", a.meta().id, v));
             }
         }
-        let changed: Vec<_> = self.prefix.iter().filter(|(a, k)| **k != prefix_defaults(**a)).collect();
+        let changed: Vec<_> = self
+            .prefix
+            .iter()
+            .filter(|(a, k)| **k != prefix_defaults(**a))
+            .collect();
         if !changed.is_empty() {
             out.push_str("\n# Teclas depois do prefixo (Ctrl+B). Formato: acao = \"x\" ou [\"h\", \"←\"]\n[prefix]\n");
             for (a, keys) in changed {
-                let v = keys.iter().map(|k| format!("{k:?}")).collect::<Vec<_>>().join(", ");
+                let v = keys
+                    .iter()
+                    .map(|k| format!("{k:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 out.push_str(&format!("{} = [{v}]\n", a.meta().id));
             }
         }
@@ -478,7 +923,10 @@ impl Keymap {
 
     /// Ação da tecla apertada depois do prefixo.
     pub fn prefix_action(&self, key: &str) -> Option<Action> {
-        self.prefix.iter().find(|(_, keys)| keys.iter().any(|k| k == key)).map(|(a, _)| *a)
+        self.prefix
+            .iter()
+            .find(|(_, keys)| keys.iter().any(|k| k == key))
+            .map(|(a, _)| *a)
     }
 
     /// "x" / "h ←" (teclas de prefixo da ação, sem o prefixo).
@@ -491,7 +939,11 @@ impl Keymap {
         let mut out = Vec::new();
         ctx.input_mut(|i| {
             // mais modificadores primeiro, pra Ctrl+Shift+X não ser engolido por Ctrl+X
-            let mut entries: Vec<_> = self.map.iter().filter_map(|(a, s)| s.map(|s| (*a, s))).collect();
+            let mut entries: Vec<_> = self
+                .map
+                .iter()
+                .filter_map(|(a, s)| s.map(|s| (*a, s)))
+                .collect();
             entries.sort_by_key(|(_, s)| std::cmp::Reverse(modifier_count(s.modifiers)));
             for (a, s) in entries {
                 if i.consume_shortcut(&s) {
@@ -515,7 +967,11 @@ impl Keymap {
         if let Some(k) = self.prefix_keys(a).first() {
             keys.push(format!("prefixo {k}"));
         }
-        if keys.is_empty() { text.to_string() } else { format!("{text}  ({})", keys.join(" · ")) }
+        if keys.is_empty() {
+            text.to_string()
+        } else {
+            format!("{text}  ({})", keys.join(" · "))
+        }
     }
 }
 
@@ -538,9 +994,16 @@ pub fn format_shortcut(s: &KeyboardShortcut) -> String {
         Key::Comma => ",".to_string(),
         Key::Equals => "=".to_string(),
         Key::Minus => "-".to_string(),
-        Key::Num0 | Key::Num1 | Key::Num2 | Key::Num3 | Key::Num4 | Key::Num5 | Key::Num6 | Key::Num7 | Key::Num8 | Key::Num9 => {
-            s.logical_key.name().to_string()
-        }
+        Key::Num0
+        | Key::Num1
+        | Key::Num2
+        | Key::Num3
+        | Key::Num4
+        | Key::Num5
+        | Key::Num6
+        | Key::Num7
+        | Key::Num8
+        | Key::Num9 => s.logical_key.name().to_string(),
         Key::ArrowLeft => "←".into(),
         Key::ArrowRight => "→".into(),
         Key::ArrowUp => "↑".into(),
@@ -594,7 +1057,11 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         for a in Action::all() {
             if let Some(s) = a.meta().default {
-                assert!(seen.insert(format_shortcut(&s)), "repetido: {}", format_shortcut(&s));
+                assert!(
+                    seen.insert(format_shortcut(&s)),
+                    "repetido: {}",
+                    format_shortcut(&s)
+                );
             }
         }
     }
@@ -603,7 +1070,11 @@ mod tests {
     #[test]
     fn toda_acao_tem_atalho() {
         for a in Action::all() {
-            assert!(a.meta().default.is_some() || !a.prefix_default().is_empty(), "sem atalho: {}", a.meta().id);
+            assert!(
+                a.meta().default.is_some() || !a.prefix_default().is_empty(),
+                "sem atalho: {}",
+                a.meta().id
+            );
         }
     }
 
@@ -613,34 +1084,62 @@ mod tests {
         for a in Action::all() {
             for k in a.prefix_default() {
                 assert!(seen.insert(*k), "tecla de prefixo repetida: {k}");
-                assert_eq!(norm_prefix_key(k).as_deref(), Some(*k), "tecla de prefixo inválida: {k}");
+                assert_eq!(
+                    norm_prefix_key(k).as_deref(),
+                    Some(*k),
+                    "tecla de prefixo inválida: {k}"
+                );
             }
         }
     }
 
     #[test]
     fn prefixo_ida_e_volta_no_toml() {
-        let mut k = Keymap { map: BTreeMap::new(), prefix: Action::all().into_iter().map(|a| (a, prefix_defaults(a))).collect() };
+        let mut k = Keymap {
+            map: BTreeMap::new(),
+            prefix: Action::all()
+                .into_iter()
+                .map(|a| (a, prefix_defaults(a)))
+                .collect(),
+        };
         k.set_prefix(Action::CloseFocused, vec!["q".into(), "\"".into()]);
         assert_eq!(k.prefix_action("q"), Some(Action::CloseFocused));
         assert_eq!(k.prefix_action("x"), None);
         k.set_prefix(Action::NewSession, vec!["q".into()]);
-        assert_eq!(k.prefix_keys(Action::CloseFocused), ["\""], "a tecla sai de quem tinha");
-        assert_eq!(k.prefix_action("\""), Some(Action::CloseFocused), "aspas tiram o split antigo");
+        assert_eq!(
+            k.prefix_keys(Action::CloseFocused),
+            ["\""],
+            "a tecla sai de quem tinha"
+        );
+        assert_eq!(
+            k.prefix_action("\""),
+            Some(Action::CloseFocused),
+            "aspas tiram o split antigo"
+        );
     }
 
     /// Ctrl+letra sem Shift é do terminal (Ctrl+C, Ctrl+D, Ctrl+R, Ctrl+L…), assim como
     /// Ctrl+Shift+C/V (copiar/colar). Nenhum atalho padrão pode roubar essas teclas.
     #[test]
     fn nao_rouba_teclas_do_terminal() {
-        let letra = |k: Key| k.name().len() == 1 && k.name().chars().all(|c| c.is_ascii_alphabetic());
+        let letra =
+            |k: Key| k.name().len() == 1 && k.name().chars().all(|c| c.is_ascii_alphabetic());
         for a in Action::all() {
             let Some(s) = a.meta().default else { continue };
             let m = s.modifiers;
             let txt = format_shortcut(&s);
-            assert!(!(m.ctrl && !m.shift && !m.alt && letra(s.logical_key)), "rouba Ctrl+letra do terminal: {txt}");
-            assert!(!(m.ctrl && m.shift && !m.alt && matches!(s.logical_key, Key::C | Key::V)), "rouba copiar/colar: {txt}");
-            assert!(!(m.is_none() && letra(s.logical_key)), "letra sem modificador: {txt}");
+            assert!(
+                !(m.ctrl && !m.shift && !m.alt && letra(s.logical_key)),
+                "rouba Ctrl+letra do terminal: {txt}"
+            );
+            assert!(
+                !(m.ctrl && m.shift && !m.alt && matches!(s.logical_key, Key::C | Key::V)),
+                "rouba copiar/colar: {txt}"
+            );
+            assert!(
+                !(m.is_none() && letra(s.logical_key)),
+                "letra sem modificador: {txt}"
+            );
         }
     }
 
@@ -649,17 +1148,31 @@ mod tests {
         let leader = parse_shortcut(&aic_core::Config::default().leader).expect("líder válida");
         for a in Action::all() {
             if let Some(s) = a.meta().default {
-                assert!(!(s.logical_key == leader.logical_key && same_mods(s.modifiers, leader.modifiers)), "colide com a líder: {}", a.meta().id);
+                assert!(
+                    !(s.logical_key == leader.logical_key
+                        && same_mods(s.modifiers, leader.modifiers)),
+                    "colide com a líder: {}",
+                    a.meta().id
+                );
             }
         }
     }
 
     #[test]
     fn consome_so_a_combinacao_exata() {
-        let key = |m: Modifiers| egui::Event::Key { key: Key::L, physical_key: None, pressed: true, repeat: false, modifiers: m };
+        let key = |m: Modifiers| egui::Event::Key {
+            key: Key::L,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: m,
+        };
         let mut i = egui::InputState::default();
         i.events = vec![key(Modifiers::SHIFT)];
-        assert!(!consume_exact(&mut i, Modifiers::NONE, Key::L), "l não pode engolir Shift+L");
+        assert!(
+            !consume_exact(&mut i, Modifiers::NONE, Key::L),
+            "l não pode engolir Shift+L"
+        );
         assert!(consume_exact(&mut i, Modifiers::SHIFT, Key::L));
         assert!(i.events.is_empty());
     }

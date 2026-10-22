@@ -1,9 +1,9 @@
 //! Identidade visual do AIC: cores, letreiro e nomes dos estados. Inspirado no grunge de
 //! Seattle e em Alice in Chains; nada de logos ou capas oficiais.
 
+use aic_core::SessionState;
 use egui::epaint::TextShape;
 use egui::{FontFamily, FontId, Pos2, Rect, Stroke, Ui, pos2, vec2};
-use aic_core::SessionState;
 
 use crate::theme::{Theme, c, term_from};
 
@@ -33,7 +33,11 @@ pub fn theme() -> Theme {
         warn: c("#c9a227"),
         err: c("#b0362b"),
         attention: c("#9b7bb0"),
-        agents: ["#b5522b", "#8a9a4e", "#c9a227", "#9b7bb0", "#5f8b99", "#b0362b", "#a08a70"].map(c).to_vec(),
+        agents: [
+            "#b5522b", "#8a9a4e", "#c9a227", "#9b7bb0", "#5f8b99", "#b0362b", "#a08a70",
+        ]
+        .map(c)
+        .to_vec(),
         radius: 2,
         hard_shadow: Some(2.0),
         term: term_from(
@@ -42,8 +46,9 @@ pub fn theme() -> Theme {
             "#d06a3d",
             "#4a2414",
             [
-                "#241d16", "#b0362b", "#8a9a4e", "#c9a227", "#5f8b99", "#9b7bb0", "#6f9a88", "#d6c8b0",
-                "#65574a", "#d04a3c", "#a6b862", "#e3bc3c", "#7eaabb", "#b899cc", "#8bb8a4", "#f6ead6",
+                "#241d16", "#b0362b", "#8a9a4e", "#c9a227", "#5f8b99", "#9b7bb0", "#6f9a88",
+                "#d6c8b0", "#65574a", "#d04a3c", "#a6b862", "#e3bc3c", "#7eaabb", "#b899cc",
+                "#8bb8a4", "#f6ead6",
             ],
         ),
     }
@@ -65,7 +70,11 @@ pub fn state_label(s: SessionState) -> &'static str {
 pub fn wordmark(ui: &Ui, pos: Pos2, size: f32, theme: &Theme) -> Rect {
     let p = ui.painter();
     let font = FontId::new(size * 1.3, FontFamily::Monospace);
-    let letters = [('A', -0.09f32, 1.0f32), ('I', 0.06, -1.5), ('C', -0.04, 0.5)];
+    let letters = [
+        ('A', -0.09f32, 1.0f32),
+        ('I', 0.06, -1.5),
+        ('C', -0.04, 0.5),
+    ];
     let mut x = pos.x;
     let mut h: f32 = 0.0;
     let ghost = theme.err.gamma_multiply(0.55);
@@ -75,22 +84,46 @@ pub fn wordmark(ui: &Ui, pos: Pos2, size: f32, theme: &Theme) -> Rect {
         h = h.max(g.size().y);
         let at = pos2(x, pos.y + dy);
         // impressão fantasma desalinhada
-        p.add(TextShape::new(at + vec2(1.5, 1.0), g.clone(), ghost).with_override_text_color(ghost).with_angle(ang * 1.4));
+        p.add(
+            TextShape::new(at + vec2(1.5, 1.0), g.clone(), ghost)
+                .with_override_text_color(ghost)
+                .with_angle(ang * 1.4),
+        );
         // bold "na mão": a mesma letra 3x com meio pixel de diferença
         for d in [vec2(0.0, 0.0), vec2(0.6, 0.0), vec2(0.0, 0.5)] {
-            p.add(TextShape::new(at + d, g.clone(), theme.accent_hi).with_override_text_color(theme.accent_hi).with_angle(ang));
+            p.add(
+                TextShape::new(at + d, g.clone(), theme.accent_hi)
+                    .with_override_text_color(theme.accent_hi)
+                    .with_angle(ang),
+            );
         }
         x += w * 1.02;
     }
     let r = Rect::from_min_size(pos, vec2(x - pos.x, h));
     // riscos e falhas de tinta (na cor do fundo)
     let scratch = Stroke::new(1.0, theme.bg);
-    p.line_segment([pos2(r.left() - 1.0, r.top() + h * 0.42), pos2(r.right() + 1.0, r.top() + h * 0.36)], scratch);
-    p.line_segment([pos2(r.left() + r.width() * 0.3, r.top() + h * 0.75), pos2(r.right() - 2.0, r.top() + h * 0.80)], Stroke::new(0.8, theme.bg));
+    p.line_segment(
+        [
+            pos2(r.left() - 1.0, r.top() + h * 0.42),
+            pos2(r.right() + 1.0, r.top() + h * 0.36),
+        ],
+        scratch,
+    );
+    p.line_segment(
+        [
+            pos2(r.left() + r.width() * 0.3, r.top() + h * 0.75),
+            pos2(r.right() - 2.0, r.top() + h * 0.80),
+        ],
+        Stroke::new(0.8, theme.bg),
+    );
     for i in 0..14 {
         let fx = rnd(i as f32 * 3.3 + 0.7);
         let fy = 0.2 + 0.65 * rnd(i as f32 * 5.1 + 0.2);
-        p.circle_filled(pos2(r.left() + fx * r.width(), r.top() + fy * h), 0.5 + rnd(i as f32 * 1.7) * 0.6, theme.bg);
+        p.circle_filled(
+            pos2(r.left() + fx * r.width(), r.top() + fy * h),
+            0.5 + rnd(i as f32 * 1.7) * 0.6,
+            theme.bg,
+        );
     }
     r
 }
