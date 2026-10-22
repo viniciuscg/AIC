@@ -318,12 +318,15 @@ fn modais_toasts_e_abas() {
         ("Aba Worktrees", View::Worktrees),
         ("Aba Tokens", View::Usage),
         ("Aba Config", View::Settings),
-        ("Aba Ajuda", View::Help),
         ("Aba Sessões", View::Sessions),
     ] {
         click(&mut h, label);
         assert_eq!(app(&mut h).view, view, "aba {label}");
     }
+    assert!(!exists(&h, "Aba Ajuda"), "a Ajuda fica fora da barra");
+    key(&mut h, Modifiers::NONE, Key::F1);
+    assert_eq!(app(&mut h).view, View::Help, "F1 abre a Ajuda");
+    click(&mut h, "Aba Sessões");
 
     // toasts: clique fecha
     app(&mut h).toasts.clear();

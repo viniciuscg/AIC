@@ -7,12 +7,12 @@
 //! - **workspaces** à esquerda e em destaque: o atual aceso na cor de destaque, os que têm
 //!   alguém precisando de você em roxo (o "urgent" do i3). O número é o de `Ctrl+B N`;
 //! - **PREFIXO** acende enquanto o `Ctrl+B` espera a próxima tecla (o modo do i3);
-//! - **abas** com a tecla de prefixo de cada uma;
+//! - **abas** (só texto) com a tecla de prefixo de cada uma; a Ajuda fica fora da barra (F1);
 //! - à direita, **a janela em foco**: estado, nome, modelo, contexto, branch e custo da sessão
 //!   (o que a statusline do Claude mostrava dentro do terminal), e o ícone do Layne.
 
 use egui::text::LayoutJob;
-use egui::{Color32, CornerRadius, FontId, Rect, RichText, Sense, Stroke, Ui, Vec2};
+use egui::{Color32, CornerRadius, FontId, Rect, Sense, Stroke, Ui, Vec2};
 use aic_core::{SessionKind, SessionState};
 
 use super::widgets::{self, I_AGENTS, I_BRANCH, I_CTX, push};
@@ -85,10 +85,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             if !key.is_empty() {
                 push(&mut job, &format!("{key} "), if active { theme.accent } else { theme.faint }, 11.5);
             }
-            let color = if active { theme.accent_hi } else { theme.dim };
-            push(&mut job, &format!("{} {}", view.icon(), view.label()), color, 12.5);
-            let fill = if active { theme.bg3 } else { Color32::TRANSPARENT };
-            let resp = block(ui, &format!("Aba {}", view.label()), job, fill, Stroke::NONE, active.then_some(theme.accent));
+            push(&mut job, view.label(), if active { theme.accent_hi } else { theme.dim }, 12.5);
+            let resp = block(ui, &format!("Aba {}", view.label()), job, Color32::TRANSPARENT, Stroke::NONE, active.then_some(theme.accent));
             if resp.on_hover_text(app.keymap.tip(view.action(), view.action().meta().name)).clicked() {
                 app.set_view(view);
             }
@@ -187,7 +185,6 @@ fn layne_button(app: &mut App, ui: &mut Ui, theme: &Theme) {
 
 /// Um bloco por workspace: `1 Principal`, o atual aceso; quem tem alguém esperando fica roxo.
 fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme) {
-    ui.label(RichText::new(widgets::I_WS).font(widgets::mono(12.0)).color(theme.faint)).on_hover_text("Workspaces: as sessões mostradas são só as do workspace aceso");
     let mut pick = None;
     let names: Vec<(String, usize)> = app.workspaces.iter().map(|w| (w.name.clone(), w.sessions.len())).collect();
     for (i, (name, n)) in names.iter().enumerate() {
@@ -199,7 +196,7 @@ fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme) {
         } else if urgent > 0 {
             (theme.attention, theme.ink, theme.attention.gamma_multiply(0.18), Stroke::new(1.0, theme.attention))
         } else {
-            (theme.faint, theme.dim, theme.bg3, Stroke::new(1.0, theme.border))
+            (theme.faint, theme.dim, Color32::TRANSPARENT, Stroke::NONE)
         };
         let size = if current { 13.5 } else { 12.5 };
         if i < 9 {
@@ -208,8 +205,6 @@ fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme) {
         job.append(name, 0.0, egui::TextFormat { font_id: FontId::monospace(size), color: name_c, ..Default::default() });
         if urgent > 0 && !current {
             push(&mut job, &format!(" ●{urgent}"), theme.attention, 11.5);
-        } else if *n > 0 {
-            push(&mut job, &format!(" {n}"), if current { theme.bg.gamma_multiply(0.7) } else { theme.faint }, 11.0);
         }
         let resp = block(ui, &format!("Workspace {} {name}", i + 1), job, fill, stroke, None);
         let key = app.keymap.prefix_keys(Action::GotoWorkspace((i + 1).min(9) as u8)).first().cloned();
@@ -235,10 +230,5 @@ fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme) {
     }
     if let Some(i) = pick {
         app.switch_ws(i);
-    }
-    let mut job = LayoutJob::default();
-    push(&mut job, widgets::I_PLUS, theme.faint, 11.0);
-    if block(ui, "Novo workspace", job, Color32::TRANSPARENT, Stroke::NONE, None).on_hover_text(app.keymap.tip(Action::NewWorkspace, "Novo workspace")).clicked() {
-        app.run_action(ui.ctx(), Action::NewWorkspace);
     }
 }

@@ -24,7 +24,6 @@ pub const I_KEY: &str = "\u{f11c}";
 pub const I_GEAR: &str = "\u{f013}";
 pub const I_TERM: &str = "\u{f120}";
 pub const I_CHART: &str = "\u{f080}";
-pub const I_HELP: &str = "\u{f059}";
 pub const I_WS: &str = "\u{f009}";
 pub const I_LINK: &str = "\u{f0c1}";
 pub const I_RESTART: &str = "\u{f021}";

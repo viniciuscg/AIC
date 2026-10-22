@@ -43,17 +43,6 @@ impl View {
         }
     }
 
-    pub fn icon(self) -> &'static str {
-        match self {
-            View::Sessions => ui::widgets::I_TERM,
-            View::Worktrees => ui::widgets::I_WORKTREE,
-            View::Changes => ui::widgets::I_DIFF,
-            View::Usage => ui::widgets::I_CHART,
-            View::Settings => ui::widgets::I_GEAR,
-            View::Help => ui::widgets::I_HELP,
-        }
-    }
-
     /// Ação que abre a aba (a tecla de prefixo dela aparece na barra).
     pub fn action(self) -> Action {
         match self {
@@ -1194,9 +1183,9 @@ impl App {
         self.term_focus = v == View::Sessions;
     }
 
-    /// Abas visíveis na barra (as de módulos desligados somem).
+    /// Abas visíveis na barra (as de módulos desligados somem; a Ajuda abre pelo F1).
     pub fn tabs(&self) -> Vec<View> {
-        View::ALL.into_iter().filter(|v| v.action().enabled(&self.cfg)).collect()
+        View::ALL.into_iter().filter(|v| *v != View::Help && v.action().enabled(&self.cfg)).collect()
     }
 
     /// Próxima/anterior aba da barra, dando a volta.
