@@ -133,13 +133,13 @@ fn focus_status(app: &App, ui: &mut Ui, theme: &Theme) {
             push(&mut job, &format!("$ {}", widgets::truncate(c.lines().next().unwrap_or(""), 24)), theme.dim, 12.0);
         }
     }
-    if let Some(g) = &rt.git {
-        if let Some(b) = &g.branch {
-            dot(&mut job);
-            push(&mut job, &format!("{I_BRANCH} {}", widgets::truncate(b, 32)), theme.dim, 12.0);
-            if g.dirty > 0 {
-                push(&mut job, &format!(" ±{}", g.dirty), theme.warn, 12.0);
-            }
+    if let Some(g) = &rt.git
+        && let Some(b) = &g.branch
+    {
+        dot(&mut job);
+        push(&mut job, &format!("{I_BRANCH} {}", widgets::truncate(b, 32)), theme.dim, 12.0);
+        if g.dirty > 0 {
+            push(&mut job, &format!(" ±{}", g.dirty), theme.warn, 12.0);
         }
     }
     if let Some(s) = rt.snap.as_ref().filter(|s| s.cost_usd > 0.0) {

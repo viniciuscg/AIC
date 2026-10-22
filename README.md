@@ -2,7 +2,7 @@
 
 > down in a hole, up in the stack
 
-Uma central desktop para quem trabalha com vários [Claude Code](https://claude.com/claude-code) ao mesmo tempo. Substitui o tmux: cada contexto de trabalho (um card, um bug, uma ideia) vira um **bloco** com seus terminais, notas, tarefas e o card do Notion, e o AIC mostra de relance quem está trabalhando, quem terminou e quem precisa de você.
+Uma central desktop para quem trabalha com vários [Claude Code](https://claude.com/claude-code) ao mesmo tempo. Substitui o tmux: cada contexto de trabalho (um card, um bug, uma ideia) vira um **bloco** com seus terminais e tarefas, cada sessão tem a sua nota, e o AIC mostra de relance quem está trabalhando, quem terminou e quem precisa de você. Leve e direto: parado, só redesenha duas vezes por segundo; na tela, só o necessário.
 
 Feito em Rust com [egui](https://github.com/emilk/egui). Roda no Linux (X11 e Wayland).
 
@@ -10,28 +10,28 @@ Feito em Rust com [egui](https://github.com/emilk/egui). Roda no Linux (X11 e Wa
 
 ## O que faz
 
-- **Blocos**: terminais (Claude ou shell), notas em Markdown, tarefas e card agrupados por contexto. Quatro visualizações: blocos, abas, foco e grade.
+- **Blocos**: terminais (Claude ou shell) e tarefas agrupados por contexto. Quatro visualizações: blocos, abas, foco e grade.
+- **Notas por sessão**: `Ctrl+B e` abre um painel com a nota em Markdown da sessão em foco, salva sozinha; trocar de sessão troca a nota.
 - **tmux por baixo**: os terminais rodam num servidor tmux próprio. Fechou a janela, o app caiu? Os Claudes continuam rodando e o AIC reconecta ao abrir.
 - **Estado de cada sessão** pelos hooks do Claude Code: trabalhando, esperando você, terminou, morreu. Um atalho pula para a próxima que precisa de você; som e notificação avisam quando termina.
-- **Prefixo estilo tmux** (`Ctrl+B`): `Ctrl+B c` abre um Claude, `Ctrl+B x` fecha o que está em foco, `Ctrl+B n/p` troca de aba, `Ctrl+B 1-9` troca de workspace. Funciona com o terminal focado.
+- **Prefixo estilo tmux** (`Ctrl+B`): `Ctrl+B c` abre um Claude, `Ctrl+B x` fecha o que está em foco, `Ctrl+B e` abre as notas, `Ctrl+B n/p` troca de aba, `Ctrl+B 1-9` troca de workspace. Funciona com o terminal focado.
 - **Catálogo de atalhos** (`Ctrl+Space` ou `Ctrl+B ?`): todos os atalhos agrupados, com o atalho direto e o acorde do prefixo de cada um.
-- **Barra no estilo i3**: workspaces numerados em destaque, abas com a tecla do prefixo e status (quem espera você, custo, limites, relógio) à direita.
+- **Uma barra só, no estilo i3**: workspaces numerados, abas com a tecla do prefixo e, à direita, a janela em foco (estado, modelo, contexto, branch e custo da sessão). Sem barra de status embaixo, e o Claude dentro do AIC roda sem a statusline dele: os dados ficam na barra de cima.
 - **Workspaces como contexto**: a tela mostra só o workspace aceso na barra; pra ver outro, troca de workspace.
-- **Captura rápida**: uma linha vira tarefa, com marcadores (`#repo @hoje !alta ^DEV-142`).
-- **Layne**: um assistente (Claude sempre aberto no painel lateral, aberto pelo ícone no canto da barra) que você usa por texto ou voz pra criar workspaces, anotar tarefas e abrir sessões e cards por você.
-- **Abrir card**: cole o link de um card e o AIC monta o bloco com um worktree e um Claude por repositório.
+- **Captura rápida**: uma linha vira tarefa local, com marcadores (`#repo @hoje !alta ^DEV-142`). As tarefas aparecem no painel Tarefas do bloco e no `aic tasks`.
+- **Layne**: um assistente (Claude sempre aberto no painel lateral, aberto pelo ícone no canto da barra) que você usa por texto ou voz pra criar workspaces, anotar tarefas e abrir sessões por você.
 - **Changes**: arquivos mudados do repo e o diff de cada um, como o Source Control do VS Code (stage, descartar, commit). Segue o terminal em foco.
-- **Board** kanban com tarefas locais e cards do Notion, **worktrees** por card e uma aba de **tokens** com limites da conta e custo por sessão.
+- **Worktrees** por card e uma aba de **Tokens** com limites da conta e custo por sessão.
 - **Módulos**: tudo além dos terminais liga e desliga.
-- **Config com busca**: `Ctrl+B /` e digita (`fonte`, `som`, `notion`…).
-- Visual inspirado no grunge de Seattle: mascote animado (um pote de moscas), nomes de música para os estados, granulação de filme.
+- **Config com busca**: `Ctrl+B /` e digita (`fonte`, `som`, `prefixo`…).
+- Visual sóbrio, com o tema Alice in Chains: a paleta de terra e ferrugem, nomes de música para os estados das sessões e o letreiro AIC.
 
 ![Prefixo armado](docs/aic-prefixo.png)
 
 | | |
 | --- | --- |
-| ![Board](docs/aic-board.png) | ![Captura rápida](docs/aic-captura.png) |
-| Board | Captura rápida |
+| ![Notas da sessão](docs/aic-notas.png) | ![Captura rápida](docs/aic-captura.png) |
+| Notas da sessão | Captura rápida |
 
 ![Tokens](docs/aic-tokens.png)
 
@@ -70,7 +70,7 @@ aic --fresh                  # começa sem reabrir as sessões salvas
 aic add "revisar PR #api !alta @amanha"   # cria tarefa pelo terminal
 aic tasks [--all] [--json]   # lista tarefas
 aic done <id>                # conclui
-aic ws new 'Pessoal' --go    # workspaces, sessões e cards no app aberto (veja Layne)
+aic ws new 'Pessoal' --go    # workspaces e sessões no app aberto (veja Layne)
 aic voz                      # liga/desliga a gravação pro Layne
 ```
 
@@ -83,13 +83,14 @@ Aperte `Ctrl+B`, solte e aperte a tecla. A barra de cima acende enquanto o prefi
 | Tecla | Ação |
 | --- | --- |
 | `c` / `%` | novo Claude / shell ao lado |
+| `e` | notas da sessão em foco (abre já escrevendo; de novo fecha) |
 | `L` / `m` | painel do Layne / falar com ele |
-| `x` | fecha o que está em foco (terminal, bloco vazio, cartão aberto ou a aba) |
+| `x` | fecha o que está em foco (terminal, bloco vazio ou a aba) |
 | `h j k l`, setas | move o foco |
 | `z` | maximiza o terminal |
 | `a` | próxima sessão que precisa de você |
-| `n` / `p` | próxima / anterior aba (Sessões → Board → Worktrees → Tokens → Config → Ajuda) |
-| `s` `b` `g` `u` `,` | vai direto pra aba |
+| `n` / `p` | próxima / anterior aba (Sessões → Worktrees → Changes → Tokens → Config) |
+| `s` `g` `G` `u` `,` | vai direto pra aba (a Ajuda abre no `F1`) |
 | `1`-`9`, `(` `)`, `Tab` | workspace N, anterior/próximo, voltar pro de antes |
 | `w` `W` `$` | lista, novo e renomear workspace |
 | `/` | pesquisar nas configurações |
@@ -124,18 +125,18 @@ corrigir cálculo de juros #api !alta @hoje +sprint ^DEV-142 ~backend
 | `@hoje` `@sexta` `@12/10` | prazo |
 | `!alta` `!!` `!!!` `!baixa` | prioridade |
 | `+workspace` | workspace |
-| `^DEV-142` | card do Notion |
+| `^DEV-142` | chave do card (vira o começo do nome da branch) |
 | `~tag` | etiqueta livre |
 
 Dentro de uma sessão aberta pelo AIC, `/aic:tarefa texto` cria a tarefa já vinculada à sessão.
 
-### Abrir card
+### Notas da sessão
 
-`Ctrl+Shift+J`, cole o link do card. O AIC cria um worktree por repositório (`<repo>.worktrees/<branch>`, branch com o nome do card), abre um Claude em cada, um shell e as notas. O plugin `aic` dá ao Claude as skills para puxar o contexto do card e da thread do Slack, quebrar o trabalho entre repositórios e fechar a entrega.
+`Ctrl+B e` (ou `Ctrl+Shift+E`) abre à direita a nota da sessão em foco, já com o cursor nela. É Markdown, salvo sozinho a cada tecla junto da sessão. Trocar de sessão troca a nota; `Esc` devolve o teclado pro terminal; `Ctrl+B e` de novo fecha o painel.
 
 ### Layne (assistente)
 
-O Layne é um Claude sempre aberto num painel à direita (`Ctrl+B L` ou `Ctrl+Alt+L`). Você pede em português, digitando ou falando, e ele mexe no AIC por você: cria workspaces, anota tarefas, abre sessões do Claude num repo ou worktree com a primeira mensagem já escrita, abre um card do Notion montando o bloco.
+O Layne é um Claude sempre aberto num painel à direita (`Ctrl+B L` ou `Ctrl+Alt+L`). Você pede em português, digitando ou falando, e ele mexe no AIC por você: cria workspaces, anota tarefas, abre sessões do Claude num repo ou worktree com a primeira mensagem já escrita.
 
 > "cria um workspace pessoal e anota pra eu lembrar: renovar a CNH sexta, comprar ração"
 > "abre uma sessão com o card DEV-142 no projeto api"
@@ -150,7 +151,6 @@ aic ws new 'Pessoal' --go              # cria workspace (e vai pra ele)
 aic ws go pess                          # troca (nome ou começo)
 aic add --ws Pessoal 'renovar CNH @sexta'
 aic session --repo api --branch fix/juros -- 'corrija o cálculo de juros'
-aic card DEV-142 --auto --repos api     # monta o bloco sem perguntar
 aic sessions | aic ws ls | aic repos    # o que está aberto
 aic layne --send 'o que tenho pra hoje?'
 ```
@@ -165,7 +165,7 @@ Ao terminar uma sessão o AIC toca um som (e, se quiser, outro quando ela pede p
 
 ### Módulos
 
-Em Config → Módulos: tmux, workspaces, Layne, abrir card, board, notas, worktrees, tokens, Notion, Slack, barra de status, dicas de atalho, mascote, fundo animado, som e notificações.
+Em Config → Módulos: tmux, workspaces, Layne, tarefas, notas, worktrees, Changes, tokens, catálogo de atalhos, som e notificações.
 
 O manual completo, com todos os atalhos, fica dentro do app (`F1`) e em [`docs/MANUAL.md`](docs/MANUAL.md).
 
@@ -175,8 +175,8 @@ O manual completo, com todos os atalhos, fica dentro do app (`F1`) e em [`docs/M
 | --- | --- |
 | `~/.config/aic/config.toml` | preferências (visualização, prefixo, fonte, módulos, sons…). Tudo tem padrão; o app grava nele pela tela de Config. |
 | `~/.config/aic/keybinds.toml` | seus atalhos (`acao = "Ctrl+Shift+N"`, vazio desliga) e as teclas do prefixo (tabela `[prefix]`) |
-| `~/.config/aic/.env` | tokens e ids das integrações (veja abaixo) |
-| `~/.local/share/aic/` | banco de dados, sons, plugin, tmux.conf |
+| `~/.config/aic/.env` | pastas de repositórios e chaves da transcrição (veja abaixo) |
+| `~/.local/share/aic/` | banco de dados (sessões, notas, tarefas), sons, plugin, tmux.conf |
 | `~/.local/state/aic/` | eventos dos hooks e snapshots da statusline |
 
 ### `.env`
@@ -191,32 +191,26 @@ chmod 600 ~/.config/aic/.env
 
 | Variável | Para quê |
 | --- | --- |
-| `NOTION_TOKEN` | token de integração do Notion (só para o conector "Token") |
-| `AIC_NOTION_TASKS_DB` | id da database de cards |
-| `AIC_NOTION_SPRINTS_DB` | id da database de sprints |
-| `AIC_NOTION_ME` | você no Notion (e-mail ou id), para "só meus cards" |
-| `AIC_NOTION_KEY_PREFIX` | prefixo da chave dos cards (ex: `DEV`) |
 | `AIC_REPOS_DIRS` | pastas com repositórios, separadas por `:` (aceita `~`) |
-| `SLACK_WORKSPACE_URL` | URL do workspace do Slack |
+| `OPENAI_API_KEY` / `GROQ_API_KEY` | transcrição de voz do Layne por API |
 
 O arquivo é lido ao abrir o app; variáveis que já estão no ambiente têm prioridade sobre ele, e ele tem prioridade sobre o `config.toml`.
-
-Notion e Slack funcionam de dois jeitos: pelo **conector Claude** (padrão: usa os conectores já ligados na sua conta do Claude, sem token) ou pelo **conector Token** (API direta do Notion, mais rápido).
 
 ## Desenvolvimento
 
 ```bash
 cargo run -p aic-app                         # roda do código
+cargo run --release -- --fresh               # sem reabrir as sessões salvas
 cargo test --workspace                       # testes
 cargo test -p aic-app --test snapshots       # renderiza as telas sem janela em target/snapshots/
 ```
 
-Estrutura: `crates/aic-core` (modelo, store SQLite, captura rápida, git, Notion, uso), `crates/aic-term` (terminal embutido), `crates/aic-app` (UI, visual em `brand.rs`, CLI), `claude/` (plugin do Claude Code), `docs/MANUAL.md` (o manual que aparece no app).
+Estrutura: `crates/aic-core` (modelo, store SQLite, captura rápida, git, uso), `crates/aic-term` (terminal embutido), `crates/aic-app` (UI, visual em `brand.rs`, CLI), `claude/` (plugin do Claude Code), `docs/MANUAL.md` (o manual que aparece no app).
 
 ## Créditos
 
 - O terminal embutido (`crates/aic-term`) é derivado do [egui_term](https://github.com/Harzu/egui_term) (MIT, © 2024 Ilia Shvyrialkin; licença em [`crates/aic-term/LICENSE-egui_term`](crates/aic-term/LICENSE-egui_term)), sobre o [alacritty_terminal](https://github.com/alacritty/alacritty).
-- O visual do AIC é só **inspirado** no grunge de Seattle e em Alice in Chains: desenho, mascote e sons sintetizados são originais, sem logos, capas ou gravações da banda. Não há relação com a banda.
+- O visual do AIC é só **inspirado** no grunge de Seattle e em Alice in Chains: desenho, ícone e sons sintetizados são originais, sem logos, capas ou gravações da banda. Não há relação com a banda.
 - Fonte recomendada: [JetBrainsMono Nerd Font](https://www.nerdfonts.com/) (OFL).
 
 ## Licença

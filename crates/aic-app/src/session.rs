@@ -123,11 +123,11 @@ impl Runtime {
 
     /// Atualiza git (a cada 5s, numa thread) e snapshot da statusline (a cada 2s).
     pub fn refresh(&mut self) {
-        if let Some(rx) = &self.git_rx {
-            if let Ok(st) = rx.try_recv() {
-                self.git = st;
-                self.git_rx = None;
-            }
+        if let Some(rx) = &self.git_rx
+            && let Ok(st) = rx.try_recv()
+        {
+            self.git = st;
+            self.git_rx = None;
         }
         if self.git_rx.is_none() && self.git_at.is_none_or(|t| t.elapsed() > Duration::from_secs(5)) {
             self.git_at = Some(Instant::now());

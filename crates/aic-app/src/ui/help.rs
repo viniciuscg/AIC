@@ -26,6 +26,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         for a in [
             Action::NewSession,
             Action::NewShell,
+            Action::ToggleNotes,
             Action::CloseFocused,
             Action::NextView,
             Action::GotoWorkspace(1),

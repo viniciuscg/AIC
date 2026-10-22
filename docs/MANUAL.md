@@ -2,9 +2,9 @@
 
 > down in a hole, up in the stack
 
-O AIC é uma central para trabalhar com vários Claude Code ao mesmo tempo. Cada contexto de trabalho (um card, um bug, uma ideia) vira um **bloco** com seus terminais, notas, tarefas e o card do Notion. Por baixo, os terminais rodam num **tmux** próprio: fechar a janela não mata nada.
+O AIC é uma central para trabalhar com vários Claude Code ao mesmo tempo. Cada contexto de trabalho (um card, um bug, uma ideia) vira um **bloco** com seus terminais e tarefas, e cada sessão tem a sua nota. Por baixo, os terminais rodam num **tmux** próprio: fechar a janela não mata nada.
 
-O visual é inspirado no grunge de Seattle e em Alice in Chains. É só inspiração: o desenho é original, sem logos nem capas da banda.
+O visual é sóbrio e inspirado no grunge de Seattle e em Alice in Chains (a paleta, os nomes de música nos estados). É só inspiração: o desenho é original, sem logos nem capas da banda.
 
 ## Primeiros passos
 
@@ -15,7 +15,7 @@ O visual é inspirado no grunge de Seattle e em Alice in Chains. É só inspira�
 
 ## O prefixo (o jeito tmux)
 
-Aperte **Ctrl+B**, solte e aperte a tecla da ação. Nada de menu: a barra de cima acende **Ctrl+B** em amarelo enquanto espera, e a barra de dicas mostra o que dá pra apertar.
+Aperte **Ctrl+B**, solte e aperte a tecla da ação. Nada de menu: a barra de cima acende **Ctrl+B** em amarelo enquanto espera. Esqueceu a tecla? **Ctrl+B ?** mostra todas.
 
 | Tecla | Ação |
 | --- | --- |
@@ -32,11 +32,11 @@ Aperte **Ctrl+B**, solte e aperte a tecla da ação. Nada de menu: a barra de ci
 | `r` / `R` | renomeia o terminal / o bloco |
 | `B` | novo bloco |
 | `{` / `}` | sobe / desce o bloco |
-| `i` / `e` | painel do bloco / escrever nas notas |
-| `C` | abrir card |
-| `t` / `T` | nova tarefa / vincular tarefa ao terminal |
+| `e` | notas da sessão em foco (abre já escrevendo; de novo fecha) |
+| `i` | painel do bloco (tarefas) |
+| `t` | nova tarefa |
 | `n` / `p` | próxima / anterior aba da barra |
-| `s` `b` `g` `u` `,` | abas Sessões, Board, Worktrees, Tokens, Config |
+| `s` `g` `G` `u` `,` | abas Sessões, Worktrees, Changes, Tokens, Config |
 | `/` | pesquisar nas configurações |
 | `1` a `9` | workspace N |
 | `(` / `)` | workspace anterior / próximo |
@@ -51,7 +51,7 @@ Aperte **Ctrl+B**, solte e aperte a tecla da ação. Nada de menu: a barra de ci
 
 ### Fechar o que está em foco
 
-**Ctrl+B x** fecha a coisa mais específica que estiver em foco: no board, o cartão aberto; numa aba que não é Sessões, a própria aba (volta pras sessões); nas sessões, o terminal em foco (pede confirmação) ou, se o bloco estiver vazio, o bloco.
+**Ctrl+B x** fecha a coisa mais específica que estiver em foco: numa aba que não é Sessões, a própria aba (volta pras sessões); nas sessões, o terminal em foco (pede confirmação) ou, se o bloco estiver vazio, o bloco.
 
 ### Mudar o prefixo e as teclas
 
@@ -65,16 +65,18 @@ focus_left = ["h", "←"]
 
 ## A barra de cima
 
-Uma linha, no espírito do i3bar:
+Uma linha só, no espírito do i3bar (não há barra embaixo):
 
 - **workspaces** à esquerda, numerados: o atual fica aceso; os que têm alguém esperando você ficam roxos e mostram quantos. Clique pra trocar, clique direito pra renomear;
 - **Ctrl+B** em amarelo quando o prefixo está armado;
-- **abas** com a tecla do prefixo de cada uma (`s Sessões`, `b Board`…);
-- à direita, em blocos: quem está aguardando, quem está trabalhando, custo de hoje, limites de 5h e da semana, e o relógio.
+- **abas** com a tecla do prefixo de cada uma (`s Sessões`, `g Worktrees`…); a Ajuda abre no **F1**;
+- à direita, **a janela em foco**: o estado (com nome de música), o nome, o modelo, quanto do contexto já foi usado, a branch (e `±N` arquivos mudados) e o custo da sessão; e o ícone do Layne.
+
+Esses dados vêm da statusline do Claude Code: o AIC injeta nas sessões dele uma statusline que só grava os números e não imprime nada, então o terminal do Claude fica limpo. Fora do AIC, a sua statusline continua igual. Os limites da conta (5h e semana) ficam na aba **Tokens**.
 
 ## Layne (assistente)
 
-O Layne é um Claude sempre aberto num painel à direita (`Ctrl+B L` ou `Ctrl+Alt+L`). Você pede em português, digitando ou falando, e ele mexe no AIC por você: cria workspaces, anota tarefas, abre sessões do Claude num repo ou worktree com a primeira mensagem já escrita, abre um card do Notion montando o bloco.
+O Layne é um Claude sempre aberto num painel à direita (`Ctrl+B L` ou `Ctrl+Alt+L`). Você pede em português, digitando ou falando, e ele mexe no AIC por você: cria workspaces, anota tarefas, abre sessões do Claude num repo ou worktree com a primeira mensagem já escrita.
 
 > "cria um workspace pessoal e anota pra eu lembrar: renovar a CNH sexta, comprar ração"
 > "abre uma sessão com o card DEV-142 no projeto api"
@@ -89,29 +91,31 @@ aic ws new 'Pessoal' --go              # cria workspace (e vai pra ele)
 aic ws go pess                          # troca (nome ou começo)
 aic add --ws Pessoal 'renovar CNH @sexta'
 aic session --repo api --branch fix/juros -- 'corrija o cálculo de juros'
-aic card DEV-142 --auto --repos api     # monta o bloco sem perguntar
 aic sessions | aic ws ls | aic repos    # o que está aberto
 aic layne --send 'o que tenho pra hoje?'
 ```
 
 ## Workspaces
 
-Um workspace é um contexto inteiro: blocos, terminais, layout e tarefas. O que aparece na tela é sempre só o do workspace aceso na barra, inclusive o board e a paleta. Para ver outra coisa, troque de workspace: **Ctrl+B 1..9**, **Ctrl+B ( )**, **Ctrl+B Tab** pra voltar pro anterior, ou clique na barra.
-
-Tarefas sem workspace (como os cards que vêm do Notion) aparecem em todos.
+Um workspace é um contexto inteiro: blocos, terminais, layout e tarefas. O que aparece na tela é sempre só o do workspace aceso na barra, inclusive a paleta. Para ver outra coisa, troque de workspace: **Ctrl+B 1..9**, **Ctrl+B ( )**, **Ctrl+B Tab** pra voltar pro anterior, ou clique na barra. **Ctrl+B W** cria um.
 
 ## Blocos
 
-Um bloco é um contexto: vários terminais (Claude ou shell), notas em Markdown, tarefas e, se houver, o card do Notion e a thread do Slack.
+Um bloco é um contexto: vários terminais (Claude ou shell) e as tarefas ligadas a eles.
 
 - **Ctrl+B B** cria, **Ctrl+B R** renomeia, **Ctrl+B &** fecha (com todos os terminais dele).
 - **Ctrl+B Space** troca o arranjo dos terminais: lado a lado → principal → empilhado → grade.
-- **Ctrl+B i** mostra o painel do bloco (card, notas, tarefas); **Ctrl+B e** vai direto para as notas.
+- **Ctrl+B i** mostra o painel do bloco, com as tarefas dele (e um campo pra criar mais).
 - **Alt+1** a **Alt+9** pulam para o bloco N.
 
-### Abrir card
+## Notas da sessão
 
-**Ctrl+B C**: cole o link de um card (Notion) e o AIC monta o bloco sozinho: um worktree por repositório envolvido, um Claude em cada, um shell e as notas. O Claude recebe o contexto do card pela skill `aic:contexto`.
+Cada sessão (Claude ou terminal) tem a sua nota em Markdown. **Ctrl+B e** (ou **Ctrl+Shift+E**) abre o painel à direita já com o cursor na nota da sessão em foco; **Ctrl+B e** de novo fecha.
+
+- Salva sozinha, a cada tecla, junto da sessão. Reabrindo as sessões salvas, as notas voltam com elas; fechar uma sessão, ou sair sem salvar o cache, apaga a nota junto.
+- Trocar de sessão troca a nota.
+- **Esc** devolve o teclado pro terminal (o painel continua aberto).
+- Notas de bloco de versões antigas passam pra sessão em foco de cada bloco ao reabrir.
 
 ## Visualizações
 
@@ -126,20 +130,20 @@ Troque com **Ctrl+B v** (ou em Config):
 
 ## Estados das sessões
 
-O AIC acompanha cada Claude pelos hooks do Claude Code. Os estados têm nomes de música e o mascote é um pote de vidro com moscas:
+O AIC acompanha cada Claude pelos hooks do Claude Code. Os estados têm nomes de música:
 
-| Estado | Nome | O que acontece no pote |
+| Estado | Nome | Quando |
 | --- | --- | --- |
-| BOOT | ROOSTER | o pote surge do chão |
-| WORKING | THEM BONES | moscas zunindo rápido, deixando rastro |
-| IDLE | NUTSHELL | poucas moscas, devagar; uma pousada no vidro |
-| WAITING | WOULD? | elas batem no vidro e o pote treme |
-| DONE | NO EXCUSES | a tampa salta e as moscas escapam |
-| GAME OVER | DOWN IN A HOLE | moscas caídas no fundo, vidro rachado |
+| BOOT | ROOSTER | abrindo |
+| WORKING | THEM BONES | o Claude está trabalhando |
+| IDLE | NUTSHELL | esperando você digitar |
+| WAITING | WOULD? | pediu permissão ou fez uma pergunta |
+| DONE | NO EXCUSES | terminou e você ainda não olhou |
+| GAME OVER | DOWN IN A HOLE | o processo morreu |
 
-**Ctrl+B a** pula para a próxima sessão que precisa de você (WAITING ou DONE), mesmo que esteja em outro workspace. A barra de baixo mostra a statusline da sessão em foco: modelo, contexto, branch, limites da conta e custo.
+Quem precisa de você (WAITING ou DONE) ganha um anel em volta da bolinha e a moldura do terminal na cor do estado. **Ctrl+B a** pula para a próxima, mesmo que esteja em outro workspace. A barra de cima mostra o estado e os números da sessão em foco.
 
-Os hooks, a statusline e o plugin `aic` só valem nas sessões abertas pelo AIC: o seu `~/.claude` não é alterado.
+Os hooks, a statusline (que só grava os números, sem imprimir no terminal) e o plugin `aic` só valem nas sessões abertas pelo AIC: o seu `~/.claude` não é alterado.
 
 ## tmux por baixo
 
@@ -159,18 +163,20 @@ corrigir cálculo de juros #api !alta @hoje +sprint ^DEV-142 ~backend
 | `@hoje` `@sexta` `@12/10` | prazo |
 | `!alta` `!!` `!!!` `!baixa` | prioridade |
 | `+workspace` | workspace (por prefixo do nome) |
-| `^DEV-142` | card do Notion |
+| `^DEV-142` | chave do card (vira o começo do nome da branch) |
 | `~tag` | etiqueta livre |
 
-Pelo terminal: `aic add "texto #repo @hoje"`, `aic tasks`, `aic done <id>`. Dentro de uma sessão do AIC, o comando `/aic:tarefa` cria a tarefa já vinculada. **Ctrl+B T** vincula uma tarefa à sessão em foco.
+Na captura, `Alt+L` vincula (ou não) a tarefa ao terminal em foco. As tarefas aparecem no painel do bloco (**Ctrl+B i**), onde um clique marca como feita.
 
-## Board
-
-Kanban **A fazer → Fazendo → Revisão → Feito** (**Ctrl+B b**), com as tarefas do workspace atual e os cards do Notion. Tudo no teclado: `j/k` e `h/l` navegam, `Shift+H/L` movem o cartão, `Enter` abre a sessão da tarefa no worktree certo, `e` edita, `x` conclui, `Shift+P` promove para o Notion, `/` busca. **Ctrl+B x** fecha o cartão aberto.
+Pelo terminal: `aic add "texto #repo @hoje"`, `aic tasks`, `aic done <id>`. Dentro de uma sessão do AIC, o comando `/aic:tarefa` cria a tarefa já vinculada.
 
 ## Worktrees
 
 Aba **Ctrl+B g**. Os worktrees ficam em `<repo>.worktrees/<branch>`, ao lado do repo. `n` cria, `Enter` abre uma sessão nele, `Delete` remove (a branch fica). Tarefas com card geram branch com o nome do card (`DEV-142-corrigir-juros`).
+
+## Changes
+
+Aba **Ctrl+B G**: os arquivos mudados do repo do terminal em foco e o diff de cada um, como o Source Control do VS Code. `j/k` escolhe o arquivo, `s`/`u` faz stage/unstage, `r` atualiza; o commit sai da caixa de mensagem no topo.
 
 ## Tokens
 
@@ -178,7 +184,7 @@ Aba **Ctrl+B u**: limites da conta (janela de 5h e semana), uso por sessão e hi
 
 ## Config
 
-**Ctrl+B ,** abre; **Ctrl+B /** (ou `/` dentro da Config) vai direto pra busca. Digite parte do nome (`fonte`, `som`, `notion`, `workspace 3`) e só aparece o que bate, inclusive os atalhos. Acento não importa; `Esc` limpa.
+**Ctrl+B ,** abre; **Ctrl+B /** (ou `/` dentro da Config) vai direto pra busca. Digite parte do nome (`fonte`, `som`, `prefixo`, `workspace 3`) e só aparece o que bate, inclusive os atalhos. Acento não importa; `Esc` limpa.
 
 ## Sons e notificações
 
@@ -188,7 +194,7 @@ Sons disponíveis: os **sintetizados** (Acorde grunge, o padrão; Microfonia; Si
 
 ## Módulos
 
-Tudo além dos terminais é um módulo que liga e desliga em Config → Módulos: tmux, workspaces, abrir card, board, notas, worktrees, tokens, Notion, Slack, barra de status, dicas de atalho, mascote, fundo animado, som e notificações. Desligar um módulo some com a aba, os atalhos e as ações dele.
+Tudo além dos terminais é um módulo que liga e desliga em Config → Módulos: tmux, workspaces, Layne, tarefas, notas, worktrees, Changes, tokens, catálogo de atalhos, som e notificações. Desligar um módulo some com a aba, os atalhos e as ações dele.
 
 ## Fechar e reabrir
 
@@ -218,20 +224,18 @@ Quem prefere uma combinação só continua tendo os atalhos diretos:
 | Ctrl+Shift+X | Fechar bloco |
 | Ctrl+Shift+F2 | Renomear bloco |
 | Ctrl+Shift+\\ | Arranjo dos terminais do bloco |
-| Ctrl+Shift+I | Painel do bloco (card, notas, tarefas) |
-| Ctrl+Shift+E | Escrever nas notas do bloco |
-| Ctrl+Shift+J | Abrir card |
+| Ctrl+Shift+I | Painel do bloco (tarefas) |
+| Ctrl+Shift+E | Notas da sessão em foco (abre/fecha) |
 | Ctrl+Shift+Space | Nova tarefa (captura rápida) |
-| Ctrl+Shift+K | Vincular tarefa à sessão |
 | Ctrl+Shift+O | Lista de workspaces |
 | Ctrl+Shift+PageDown / PageUp | Próximo / anterior workspace |
-| Ctrl+Shift+S / B / G / U | Abas Sessões / Board / Worktrees / Tokens |
+| Ctrl+Shift+S / G / U | Abas Sessões / Worktrees / Tokens |
+| Ctrl+Alt+G | Aba Changes |
 | Ctrl+, | Configurações e atalhos |
 | F1 | Este manual |
 | Ctrl+Shift+P | Paleta de comandos |
 | Ctrl+Shift+= / - / 0 | Aumentar / diminuir / restaurar a fonte |
 | Ctrl+Shift+D | Mostrar/esconder a lista lateral |
-| Ctrl+Shift+H | Mostrar/esconder a barra de dicas |
 | Ctrl+Shift+Q | Sair |
 
 No terminal: **Ctrl+Shift+C / Ctrl+Shift+V** copiam e colam, **Shift+Enter** quebra linha no prompt do Claude, **Ctrl+clique** abre link.
@@ -240,4 +244,4 @@ Todos os atalhos são editáveis em **Config › Atalhos** (ou em `~/.config/aic
 
 ## Créditos
 
-Visual e mascote: **Vinicius**. A trilha sonora fica por sua conta.
+Visual: **Vinicius**. A trilha sonora fica por sua conta.
