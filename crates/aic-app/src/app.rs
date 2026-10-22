@@ -143,7 +143,6 @@ pub struct App {
     db_checked: Instant,
     events_checked: Instant,
     next_term_id: u64,
-    pub start: Instant,
     fonts_dirty: bool,
     pub quitting: bool,
     pending_restore: bool,
@@ -214,7 +213,6 @@ impl App {
             db_checked: Instant::now(),
             events_checked: Instant::now(),
             next_term_id: 1,
-            start: Instant::now(),
             fonts_dirty: false,
             quitting: false,
             pending_restore: had_cache && !fresh,
@@ -903,10 +901,6 @@ impl App {
 
     pub fn toast(&mut self, text: &str, kind: ToastKind) {
         self.toasts.push(Toast { text: text.to_string(), kind, until: Instant::now() + Duration::from_secs(4) });
-    }
-
-    pub fn t(&self) -> f64 {
-        self.start.elapsed().as_secs_f64()
     }
 
     /// Trabalho de fundo de cada frame: banco, eventos, git, sons.

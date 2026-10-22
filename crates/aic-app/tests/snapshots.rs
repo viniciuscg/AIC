@@ -30,7 +30,7 @@ fn sandbox(name: &str) -> PathBuf {
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
     }
     std::fs::create_dir_all(dir.join("claude/projects")).unwrap();
-    std::fs::write(dir.join("config/config.toml"), "setup_done = true\nanimations = true\n\n[modules]\ntmux = false\nlayne = false\n").unwrap();
+    std::fs::write(dir.join("config/config.toml"), "setup_done = true\n\n[modules]\ntmux = false\nlayne = false\n").unwrap();
     dir
 }
 
@@ -349,47 +349,3 @@ fn splash() {
     shot(&mut h, "assistente");
 }
 
-/// Folha do mascote em cada estado e nos tamanhos reais da UI
-/// (22 cabeçalho, 24 topbar, 34 card, 64, 150 splash), mais o fundo e o wordmark.
-/// Gera `mascotes.png` (instante t=1.3) e `mascotes-b.png` (t=2.05, outro quadro).
-#[test]
-fn mascotes() {
-    use egui::{Align2, FontId, Pos2, Rect, Vec2};
-    use aic_app::brand;
-    use aic_core::SessionState;
-
-    const STATES: [SessionState; 6] =
-        [SessionState::Boot, SessionState::Working, SessionState::Idle, SessionState::Waiting, SessionState::Done, SessionState::GameOver];
-    const SIZES: [f32; 5] = [22.0, 24.0, 34.0, 64.0, 150.0];
-    let col_w = 170.0;
-    let label_w = 120.0;
-    let height: f32 = 70.0 + SIZES.iter().map(|s| s + 16.0).sum::<f32>();
-    let width = label_w + col_w * STATES.len() as f32;
-    for (name, t) in [("mascotes", 1.3f64), ("mascotes-b", 2.05)] {
-        let mut h = Harness::builder().with_size(egui::vec2(width, height)).build_ui(move |ui| {
-            let th = brand::theme();
-            let block = Rect::from_min_size(Pos2::ZERO, Vec2::new(width, height));
-            ui.painter().rect_filled(block, 0.0, th.bg);
-            brand::background(ui, block, t, &th);
-            let wm = brand::wordmark(ui, Pos2::new(12.0, 12.0), 18.0, &th);
-            ui.painter().text(Pos2::new(wm.right() + 16.0, 16.0), Align2::LEFT_TOP, brand::TAGLINE, FontId::proportional(13.0), th.dim);
-            let mut y = 60.0;
-            for s in SIZES {
-                ui.painter().text(Pos2::new(12.0, y + s / 2.0), Align2::LEFT_CENTER, format!("{s}px"), FontId::monospace(11.0), th.dim);
-                for (si, st) in STATES.iter().enumerate() {
-                    let x = label_w + si as f32 * col_w;
-                    if s == SIZES[0] {
-                        ui.painter().text(Pos2::new(x + col_w / 2.0, 44.0), Align2::CENTER_CENTER, brand::state_label(*st), FontId::monospace(11.0), th.state_color(*st));
-                    }
-                    let r = Rect::from_min_size(Pos2::new(x + (col_w - s) / 2.0, y), Vec2::splat(s));
-                    ui.painter().rect_filled(r, 0.0, th.bg2);
-                    brand::mascot(ui, r, *st, t, &th);
-                }
-                y += s + 16.0;
-            }
-        });
-        h.run_steps(2);
-        let img = h.render().expect("render");
-        img.save(out(name)).unwrap();
-    }
-}

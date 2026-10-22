@@ -23,10 +23,6 @@ pub enum Module {
     Tmux,
     /// Vários workspaces.
     Workspaces,
-    /// Mascote animado.
-    Mascot,
-    /// Efeito animado de fundo.
-    Background,
     /// Som quando uma sessão termina / precisa de você.
     Sound,
     /// Notificação do sistema.
@@ -60,8 +56,6 @@ pub const ALL: &[ModuleInfo] = &[
     ModuleInfo { module: Changes, id: "changes", name: "Changes", desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Usage, id: "usage", name: "Tokens e custo", desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Hints, id: "hints", name: "Catálogo de atalhos", desc: "Tecla líder (Ctrl+Space) com todos os atalhos agrupados.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Mascot, id: "mascot", name: "Mascote", desc: "O pote de moscas, animado conforme o estado de cada sessão.", group: "Interface", default: true, requires: &[] },
-    ModuleInfo { module: Background, id: "background", name: "Fundo animado", desc: "Grão de película e poeira na luz, atrás de tudo.", group: "Interface", default: true, requires: &[] },
     ModuleInfo { module: Sound, id: "sound", name: "Som", desc: "Toca um som quando uma sessão termina ou pede permissão.", group: "Avisos", default: true, requires: &[] },
     ModuleInfo { module: Notifications, id: "notifications", name: "Notificações", desc: "Notificação do sistema quando uma sessão termina ou precisa de você.", group: "Avisos", default: true, requires: &[] },
 ];

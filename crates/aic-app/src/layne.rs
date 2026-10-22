@@ -429,19 +429,14 @@ fn new_session(
 
 pub fn panel(app: &mut App, ui: &mut Ui) {
     let theme = app.theme.clone();
-    let t = app.t();
     let state = app.layne.state();
 
     // cabeçalho: nome, estado, microfone, reiniciar, fechar
     ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(Vec2::splat(22.0), Sense::hover());
-        if app.cfg.on(Module::Mascot) {
-            crate::brand::mascot(ui, r, state, t, &theme);
-        } else {
-            widgets::state_dot(ui, r.center(), 5.0, state, &theme, t);
-        }
+        let (r, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
+        widgets::state_dot(ui, r.center(), 5.0, state, &theme);
         ui.label(RichText::new(NAME).font(FontId::monospace(16.0)).color(theme.accent_hi));
-        widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, t);
+        widgets::state_badge(ui, crate::brand::state_label(state), state, &theme);
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if widgets::icon_button(ui, I_CLOSE, "", &app.keymap.tip(Action::ToggleLayne, "Fechar o painel")).clicked() {
                 app.layne.open = false;
@@ -459,8 +454,7 @@ pub fn panel(app: &mut App, ui: &mut Ui) {
     let rec = app.layne.rec.as_ref().map(|r| (r.elapsed(), r.mic.clone()));
     if let Some((el, _)) = rec {
         ui.horizontal(|ui| {
-            let pulse = 0.5 + 0.5 * (t * 4.0).sin() as f32;
-            ui.label(RichText::new(format!("● gravando {}s", el.as_secs())).color(theme.err.gamma_multiply(0.5 + 0.5 * pulse)));
+            ui.label(RichText::new(format!("● gravando {}s", el.as_secs())).color(theme.err));
             ui.label(widgets::subtle(format!("{} para · Esc descarta", app.keymap.label(Action::LayneVoice)), &theme).small());
             if ui.small_button("descartar").clicked() {
                 cancel_voice(app);

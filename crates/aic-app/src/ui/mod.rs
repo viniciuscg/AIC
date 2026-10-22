@@ -70,9 +70,6 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
 
     let rect = ui.max_rect();
     ui.painter().rect_filled(rect, 0.0, app.theme.bg);
-    if app.cfg.animations && app.cfg.on(aic_core::Module::Background) {
-        crate::brand::background(ui, rect, app.t(), &app.theme);
-    }
 
     egui::Panel::top("topbar")
         .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::symmetric(6, 4)).stroke(egui::Stroke::new(1.0, app.theme.border)))

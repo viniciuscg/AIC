@@ -52,12 +52,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
 pub fn empty(app: &mut App, ui: &mut Ui) {
     let theme = app.theme.clone();
-    let t = app.t();
     ui.vertical_centered(|ui| {
-        ui.add_space(ui.available_height() * 0.12);
-        let (rect, _) = ui.allocate_exact_size(Vec2::splat(180.0), Sense::hover());
-        crate::brand::mascot(ui, rect, SessionState::Idle, t, &theme);
-        ui.add_space(8.0);
+        ui.add_space(ui.available_height() * 0.25);
         ui.label(RichText::new(crate::brand::NAME).font(FontId::monospace(26.0)).color(theme.accent_hi));
         ui.label(widgets::subtle(crate::brand::TAGLINE, &theme));
         ui.add_space(18.0);
@@ -103,7 +99,7 @@ fn now_list(app: &mut App, ui: &mut Ui, width: f32) {
                 match state {
                     Some(s) => {
                         let (r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
-                        widgets::state_dot(ui, r.center(), 4.0, s, &theme, app.t());
+                        widgets::state_dot(ui, r.center(), 4.0, s, &theme);
                     }
                     None => {
                         ui.label(RichText::new("○").color(theme.faint));
@@ -123,7 +119,6 @@ fn now_list(app: &mut App, ui: &mut Ui, width: f32) {
 
 fn sidebar(app: &mut App, ui: &mut Ui, ids: &[Id]) {
     let theme = app.theme.clone();
-    let t = app.t();
     let focused = app.focused();
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -155,12 +150,8 @@ fn sidebar(app: &mut App, ui: &mut Ui, ids: &[Id]) {
             let resp = widgets::card(ui, &theme, active, color, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    let (r, _) = ui.allocate_exact_size(Vec2::splat(34.0), Sense::hover());
-                    if app.cfg.on(aic_core::Module::Mascot) {
-                        crate::brand::mascot(ui, r, state, t + i as f64 * 0.7, &theme);
-                    } else {
-                        widgets::state_dot(ui, r.center(), 6.0, state, &theme, t);
-                    }
+                    let (r, _) = ui.allocate_exact_size(Vec2::splat(18.0), Sense::hover());
+                    widgets::state_dot(ui, r.center(), 5.0, state, &theme);
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(format!("{}", i + 1)).font(FontId::monospace(10.0)).color(theme.faint));
@@ -170,7 +161,7 @@ fn sidebar(app: &mut App, ui: &mut Ui, ids: &[Id]) {
                             }
                         });
                         ui.horizontal(|ui| {
-                            widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, t);
+                            widgets::state_badge(ui, crate::brand::state_label(state), state, &theme);
                             if agents > 0 {
                                 ui.label(RichText::new(format!("{I_AGENTS} {agents}")).small().color(theme.attention));
                             }
@@ -227,7 +218,6 @@ fn grid(app: &mut App, ui: &mut Ui, ids: &[Id]) {
 /// Uma sessão: cabeçalho + terminal dentro de `rect`.
 pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
     let theme = app.theme.clone();
-    let t = app.t();
     let is_focused = app.focused() == Some(id);
     let Some(rt) = app.sessions.get(&id) else { return };
     let state = rt.state();
@@ -239,7 +229,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
         ui.painter().rect_filled(rect.translate(Vec2::splat(o)), theme.radius(), Color32::from_black_alpha(220));
     }
     ui.painter().rect_filled(rect, theme.radius(), theme.term.background);
-    let glow = if state.needs_attention() { theme.state_color(state).gamma_multiply(0.5 + 0.5 * ((t * 3.0).sin() as f32 * 0.5 + 0.5)) } else { border };
+    let glow = if state.needs_attention() { theme.state_color(state) } else { border };
     ui.painter().rect_stroke(rect, theme.radius(), Stroke::new(if is_focused || state.needs_attention() { 2.0 } else { 1.0 }, glow), egui::StrokeKind::Inside);
 
     let mut inner = rect.shrink(2.0);
@@ -251,7 +241,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
         // registrado por último ganha o clique, então assim os botões continuam funcionando.
         let resp = ui.interact(hrect, egui::Id::new(("pane-head", id)), Sense::click());
         let mut child = ui.new_child(UiBuilder::new().max_rect(hrect.shrink2(Vec2::new(6.0, 3.0))).layout(ELayout::left_to_right(Align::Center)));
-        header_row(app, &mut child, id, state, color, t);
+        header_row(app, &mut child, id, state, color);
         if resp.clicked() {
             app.focus(id);
         }
@@ -284,9 +274,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
         let over = Rect::from_center_size(inner.center(), Vec2::new(340.0, 150.0).min(inner.size()));
         ui.painter().rect_filled(over, theme.radius(), theme.bg2.gamma_multiply(0.95));
         ui.painter().rect_stroke(over, theme.radius(), Stroke::new(1.0, theme.err), egui::StrokeKind::Inside);
-        let mascot = Rect::from_min_size(over.min + Vec2::new(10.0, 10.0), Vec2::splat(64.0));
-        crate::brand::mascot(ui, mascot, SessionState::GameOver, t, &theme);
-        let mut c = ui.new_child(UiBuilder::new().max_rect(Rect::from_min_max(over.min + Vec2::new(84.0, 16.0), over.max - Vec2::new(10.0, 10.0))));
+        let mut c = ui.new_child(UiBuilder::new().max_rect(Rect::from_min_max(over.min + Vec2::new(16.0, 16.0), over.max - Vec2::new(10.0, 10.0))));
         c.label(RichText::new(crate::brand::state_label(SessionState::GameOver)).font(FontId::monospace(18.0)).color(theme.err));
         c.label(widgets::subtle("O processo terminou.", &theme));
         c.horizontal(|ui| {
@@ -301,7 +289,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: Id, rect: Rect, header: bool) {
     }
 }
 
-fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Color32, t: f64) {
+fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Color32) {
     let theme = app.theme.clone();
     let Some(rt) = app.sessions.get(&id) else { return };
     let name = rt.s.name.clone();
@@ -310,14 +298,10 @@ fn header_row(app: &mut App, ui: &mut Ui, id: Id, state: SessionState, color: Co
     let branch = rt.git.as_ref().and_then(|g| g.branch.clone());
     let task = app.task_of(id).cloned();
 
-    let (r, _) = ui.allocate_exact_size(Vec2::splat(22.0), Sense::hover());
-    if app.cfg.on(aic_core::Module::Mascot) {
-        crate::brand::mascot(ui, r, state, t, &theme);
-    } else {
-        widgets::state_dot(ui, r.center(), 5.0, state, &theme, t);
-    }
+    let (r, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
+    widgets::state_dot(ui, r.center(), 5.0, state, &theme);
     ui.label(RichText::new(&name).strong().color(color));
-    widgets::state_badge(ui, crate::brand::state_label(state), state, &theme, t);
+    widgets::state_badge(ui, crate::brand::state_label(state), state, &theme);
     if agents > 0 {
         ui.label(RichText::new(format!("{I_AGENTS} {agents}")).color(theme.attention));
     }

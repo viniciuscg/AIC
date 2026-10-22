@@ -33,7 +33,7 @@ fn sandbox(name: &str, extra_config: &str) -> PathBuf {
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
     }
     let cfg = format!(
-        "setup_done = true\nanimations = false\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nlayne = false\nsound = false\nnotifications = false\n",
+        "setup_done = true\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nlayne = false\nsound = false\nnotifications = false\n",
         dir.join("repos").display()
     );
     std::fs::write(dir.join("config/config.toml"), cfg).unwrap();

@@ -1,7 +1,7 @@
 //! Diálogos. Todos fecham com Esc e funcionam só no teclado.
 
 use chrono::Local;
-use egui::{Align, Context, FontId, Key, Layout, RichText, Sense, TextEdit, Ui, Vec2};
+use egui::{Align, Context, FontId, Key, Layout, RichText, TextEdit, Ui, Vec2};
 use aic_core::quickadd::{self, ChipKind};
 use aic_core::{Id, SessionKind, Task, TaskStatus, git};
 
@@ -737,23 +737,16 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
 
 fn restore(app: &mut App, ctx: &Context) -> Option<Modal> {
     let theme = app.theme.clone();
-    let t = app.t();
     let n = app.store.sessions().map(|s| s.len()).unwrap_or(0);
     let ws = app.store.workspaces().map(|w| w.len()).unwrap_or(0);
     let mut choice = None;
     egui::Modal::new(egui::Id::new("restore")).show(ctx, |ui| {
         ui.set_width(520.0);
-        ui.horizontal(|ui| {
-            let (r, _) = ui.allocate_exact_size(Vec2::splat(84.0), Sense::hover());
-            crate::brand::mascot(ui, r, aic_core::SessionState::Waiting, t, &theme);
-            ui.vertical(|ui| {
-                ui.label(RichText::new("Reabrir a última sessão?").size(18.0).strong());
-                ui.label(widgets::subtle(format!("{n} sessões em {ws} workspace(s) ficaram salvas."), &theme));
-                ui.add_space(4.0);
-                ui.label(RichText::new("Se não reabrir, uma sessão nova começa e a antiga será perdida.").color(theme.warn));
-                ui.label(widgets::subtle("(as tarefas nunca se perdem, só as sessões e o layout)", &theme).small());
-            });
-        });
+        ui.label(RichText::new("Reabrir a última sessão?").size(18.0).strong());
+        ui.label(widgets::subtle(format!("{n} sessões em {ws} workspace(s) ficaram salvas."), &theme));
+        ui.add_space(4.0);
+        ui.label(RichText::new("Se não reabrir, uma sessão nova começa e a antiga será perdida.").color(theme.warn));
+        ui.label(widgets::subtle("(as tarefas nunca se perdem, só as sessões, as notas delas e o layout)", &theme).small());
         ui.add_space(12.0);
         ui.horizontal(|ui| {
             if ui.add(egui::Button::new(RichText::new("Reabrir  ⏎").strong()).fill(theme.accent_lo)).clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
@@ -779,18 +772,11 @@ fn restore(app: &mut App, ctx: &Context) -> Option<Modal> {
 
 fn confirm_quit(app: &mut App, ctx: &Context) -> Option<Modal> {
     let theme = app.theme.clone();
-    let t = app.t();
     let mut choice: Option<u8> = None;
     let closed = frame(ctx, "quit", 560.0, |ui| {
-        ui.horizontal(|ui| {
-            let (r, _) = ui.allocate_exact_size(Vec2::splat(72.0), Sense::hover());
-            crate::brand::mascot(ui, r, aic_core::SessionState::GameOver, t, &theme);
-            ui.vertical(|ui| {
-                ui.label(RichText::new("Tem certeza que quer fechar?").size(18.0).strong());
-                ui.label(widgets::subtle(format!("{} sessões abertas serão encerradas.", app.sessions.len()), &theme));
-                ui.label(widgets::subtle("Salvando o cache, da próxima vez o AIC pergunta se quer reabrir tudo (as conversas do Claude voltam com --resume).", &theme).small());
-            });
-        });
+        ui.label(RichText::new("Tem certeza que quer fechar?").size(18.0).strong());
+        ui.label(widgets::subtle(format!("{} sessões abertas serão encerradas.", app.sessions.len()), &theme));
+        ui.label(widgets::subtle("Salvando o cache, da próxima vez o AIC pergunta se quer reabrir tudo (as conversas do Claude voltam com --resume).", &theme).small());
         ui.add_space(12.0);
         ui.horizontal(|ui| {
             if ui.add(egui::Button::new(RichText::new("Sim e salvar cache  (S)").strong()).fill(theme.accent_lo)).clicked() || ui.input(|i| i.key_pressed(Key::S) || i.key_pressed(Key::Enter)) {

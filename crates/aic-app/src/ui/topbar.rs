@@ -17,7 +17,7 @@ use aic_core::{SessionKind, SessionState};
 
 use super::widgets::{self, I_AGENTS, I_BRANCH, I_CTX, push};
 use crate::actions::Action;
-use crate::app::{App, View};
+use crate::app::App;
 use crate::theme::Theme;
 
 const H: f32 = 24.0;
@@ -47,30 +47,12 @@ fn sep(ui: &mut Ui, theme: &Theme) {
 }
 
 pub fn show(app: &mut App, ui: &mut Ui) {
-    let t = app.t();
     let theme = app.theme.clone();
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
         ui.set_min_height(H);
 
-        // ── marca: mascote reflete o "humor geral" ──
-        let states: Vec<SessionState> = app.sessions.values().map(|r| r.state()).collect();
-        let mood = if states.contains(&SessionState::Waiting) {
-            SessionState::Waiting
-        } else if states.contains(&SessionState::Working) {
-            SessionState::Working
-        } else if app.sessions.values().any(|r| r.unseen) {
-            SessionState::Done
-        } else {
-            SessionState::Idle
-        };
-        if app.cfg.on(aic_core::Module::Mascot) {
-            let (rect, resp) = ui.allocate_exact_size(Vec2::splat(H), Sense::click());
-            crate::brand::mascot(ui, rect, mood, t, &theme);
-            if resp.on_hover_text(app.keymap.tip(Action::ViewHelp, "Manual")).clicked() {
-                app.set_view(View::Help);
-            }
-        }
+        // ── marca ──
         let pos = ui.cursor().min + Vec2::new(3.0, 0.0);
         let wm = crate::brand::wordmark(ui, pos, 15.0, &theme);
         ui.allocate_rect(Rect::from_min_size(wm.min, wm.size() + Vec2::new(6.0, 0.0)), Sense::hover());
@@ -78,7 +60,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 
         // ── workspaces ──
         if app.cfg.on(aic_core::Module::Workspaces) {
-            workspaces(app, ui, &theme, t);
+            workspaces(app, ui, &theme);
         } else if let Some(w) = app.current_ws() {
             let mut job = LayoutJob::default();
             push(&mut job, &w.name, theme.dim, 12.5);
@@ -88,10 +70,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         // ── modo: prefixo armado ──
         if app.prefix_pending {
             ui.add_space(4.0);
-            let a = 0.75 + 0.25 * ((t * 6.0).sin() as f32 * 0.5 + 0.5);
             let mut job = LayoutJob::default();
             push(&mut job, &format!("{} {}", widgets::I_KEY, super::prefix::label(app)), theme.bg, 12.5);
-            block(ui, "Prefixo armado", job, theme.warn.gamma_multiply(a), Stroke::NONE, None)
+            block(ui, "Prefixo armado", job, theme.warn, Stroke::NONE, None)
                 .on_hover_text("Prefixo armado: aperte a tecla da ação (Esc cancela, ? mostra todas)");
         }
         sep(ui, &theme);
@@ -117,7 +98,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 3.0;
             if app.cfg.on(aic_core::Module::Layne) {
-                layne_button(app, ui, &theme, t);
+                layne_button(app, ui, &theme);
                 sep(ui, &theme);
             }
             focus_status(app, ui, &theme);
@@ -176,14 +157,13 @@ fn focus_status(app: &App, ui: &mut Ui, theme: &Theme) {
 }
 
 /// Ícone do Layne (o assistente): clica e abre/fecha o painel. A cor diz o estado dele:
-/// aceso com o painel aberto, pulsando quando ele precisa de você ou está gravando.
-fn layne_button(app: &mut App, ui: &mut Ui, theme: &Theme, t: f64) {
+/// aceso com o painel aberto, em destaque quando ele precisa de você ou está gravando.
+fn layne_button(app: &mut App, ui: &mut Ui, theme: &Theme) {
     let state = app.layne.state();
-    let pulse = 0.55 + 0.45 * ((t * 4.0).sin() as f32 * 0.5 + 0.5);
     let (color, fill, tip) = if app.layne.recording() {
-        (theme.bg, theme.err.gamma_multiply(pulse), "Layne: gravando (clique pra abrir o painel)")
+        (theme.bg, theme.err, "Layne: gravando (clique pra abrir o painel)")
     } else if state == SessionState::Waiting {
-        (theme.attention.gamma_multiply(pulse), theme.attention.gamma_multiply(0.18), "Layne precisa de você")
+        (theme.attention, theme.attention.gamma_multiply(0.18), "Layne precisa de você")
     } else if app.layne.open {
         (theme.bg, theme.accent, "Fechar o Layne")
     } else if state == SessionState::Working {
@@ -206,7 +186,7 @@ fn layne_button(app: &mut App, ui: &mut Ui, theme: &Theme, t: f64) {
 }
 
 /// Um bloco por workspace: `1 Principal`, o atual aceso; quem tem alguém esperando fica roxo.
-fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme, t: f64) {
+fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme) {
     ui.label(RichText::new(widgets::I_WS).font(widgets::mono(12.0)).color(theme.faint)).on_hover_text("Workspaces: as sessões mostradas são só as do workspace aceso");
     let mut pick = None;
     let names: Vec<(String, usize)> = app.workspaces.iter().map(|w| (w.name.clone(), w.sessions.len())).collect();
@@ -217,8 +197,7 @@ fn workspaces(app: &mut App, ui: &mut Ui, theme: &Theme, t: f64) {
         let (num_c, name_c, fill, stroke) = if current {
             (theme.bg, theme.bg, theme.accent, Stroke::NONE)
         } else if urgent > 0 {
-            let a = 0.55 + 0.45 * ((t * 3.0).sin() as f32 * 0.5 + 0.5);
-            (theme.attention, theme.ink, theme.attention.gamma_multiply(0.18 * a), Stroke::new(1.0, theme.attention.gamma_multiply(a)))
+            (theme.attention, theme.ink, theme.attention.gamma_multiply(0.18), Stroke::new(1.0, theme.attention))
         } else {
             (theme.faint, theme.dim, theme.bg3, Stroke::new(1.0, theme.border))
         };

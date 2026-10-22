@@ -84,7 +84,6 @@ const GERAL: &[(&str, &str)] = &[
     ("Assistente", "primeiro uso setup"),
     ("Fonte do terminal", "font tamanho zoom"),
     ("Escala da interface", "zoom ui tamanho"),
-    ("Animações", "mascote efeitos fundo"),
     ("Pastas de projetos", "repos repositórios diretórios git"),
 ];
 const SOM: &[(&str, &str)] = &[
@@ -193,13 +192,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     ui.end_row();
                 }
                 if row(4) {
-                    ui.label("Animações");
-                    if ui.checkbox(&mut app.cfg.animations, "mascote animado e efeitos de fundo").changed() {
-                        let _ = app.cfg.save();
-                    }
-                    ui.end_row();
-                }
-                if row(5) {
                     ui.label("Pastas de projetos");
                     ui.vertical(|ui| {
                         let mut s = app.cfg.repos_dirs.iter().map(|p| aic_core::paths::pretty(p)).collect::<Vec<_>>().join("\n");

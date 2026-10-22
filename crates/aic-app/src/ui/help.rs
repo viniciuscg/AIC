@@ -1,6 +1,6 @@
-//! Aba Ajuda: o manual, os estados do mascote e os atalhos principais ao vivo.
+//! Aba Ajuda: o manual, os estados das sessões e os atalhos principais ao vivo.
 
-use egui::{FontId, RichText, ScrollArea, Sense, Ui, Vec2};
+use egui::{FontId, RichText, ScrollArea, Ui};
 use egui_commonmark::CommonMarkViewer;
 use aic_core::SessionState;
 
@@ -11,19 +11,13 @@ use crate::brand;
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let theme = app.theme.clone();
-    let t = app.t();
     egui::Panel::right("help-side").resizable(false).exact_size(300.0).show(ui, |ui| {
-        let (r, _) = ui.allocate_exact_size(Vec2::new(280.0, 200.0), Sense::hover());
-        let state = [SessionState::Idle, SessionState::Working, SessionState::Waiting, SessionState::Done, SessionState::GameOver][((t / 3.0) as usize) % 5];
-        ui.painter().rect_filled(r, theme.radius(), theme.bg2);
-        brand::background(ui, r, t, &theme);
-        brand::mascot(ui, r.shrink(20.0), state, t, &theme);
-        ui.label(RichText::new(brand::state_label(state)).font(FontId::monospace(14.0)).color(theme.state_color(state)));
+        ui.label(RichText::new(format!("{}  ·  {}", brand::NAME, brand::TAGLINE)).font(FontId::monospace(12.0)).color(theme.accent_hi));
         ui.add_space(8.0);
         ui.label(RichText::new("ESTADOS").font(FontId::monospace(11.0)).color(theme.dim));
         for s in [SessionState::Boot, SessionState::Working, SessionState::Idle, SessionState::Waiting, SessionState::Done, SessionState::GameOver] {
             ui.horizontal(|ui| {
-                widgets::state_badge(ui, brand::state_label(s), s, &theme, t);
+                widgets::state_badge(ui, brand::state_label(s), s, &theme);
                 ui.label(widgets::subtle(state_desc(s), &theme).small());
             });
         }

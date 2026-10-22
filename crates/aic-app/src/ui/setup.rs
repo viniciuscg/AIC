@@ -19,13 +19,9 @@ const STEPS: [&str; 3] = ["Visualização", "Módulos", "Pastas e atalhos"];
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let Phase::Setup(mut st) = std::mem::replace(&mut app.phase, Phase::Main) else { return };
-    let t = app.t();
     let theme = app.theme.clone();
     let rect = ui.max_rect();
     ui.painter().rect_filled(rect, 0.0, theme.bg);
-    if app.cfg.on(aic_core::Module::Background) {
-        crate::brand::background(ui, rect, t, &theme);
-    }
 
     let typing = ui.ctx().egui_wants_keyboard_input();
     let (left, right, enter, esc) = ui.input(|i| {

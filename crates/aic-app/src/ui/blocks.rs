@@ -125,7 +125,6 @@ fn block_section(app: &mut App, ui: &mut Ui, id: Id, index: usize, current: bool
 fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, current: bool, collapsible: bool) {
     let Some(b) = app.blocks.get(&id).cloned() else { return };
     let theme = app.theme.clone();
-    let t = app.t();
     // fundo clicável primeiro (os botões por cima continuam funcionando)
     let bg = ui.interact(hrect, egui::Id::new(("block-head", id)), Sense::click());
     if bg.clicked() {
@@ -169,7 +168,7 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
     for p in &b.panes {
         let st = app.state_of(*p);
         let (r, resp) = ui.allocate_exact_size(Vec2::splat(12.0), Sense::click());
-        widgets::state_dot(ui, r.center(), 4.0, st, &theme, t);
+        widgets::state_dot(ui, r.center(), 4.0, st, &theme);
         if resp.on_hover_text(format!("{} · {}", app.session_label(*p), crate::brand::state_label(st))).clicked() {
             app.focus(*p);
         }
@@ -356,7 +355,6 @@ pub fn tabs(app: &mut App, ui: &mut Ui) {
         return super::sessions::empty(app, ui);
     }
     let theme = app.theme.clone();
-    let t = app.t();
     let current = app.current_block().unwrap_or(blocks[0]);
 
     // barra de abas
@@ -382,7 +380,7 @@ pub fn tabs(app: &mut App, ui: &mut Ui) {
                 ui.painter().line_segment([r.left_bottom(), r.right_bottom()], Stroke::new(2.0, color));
             }
             if let Some(s) = worst {
-                widgets::state_dot(ui, r.left_center() + Vec2::new(12.0, 0.0), 4.0, s, &theme, t);
+                widgets::state_dot(ui, r.left_center() + Vec2::new(12.0, 0.0), 4.0, s, &theme);
             }
             ui.painter().galley(r.min + Vec2::new(24.0, 6.0), galley, theme.ink);
             let resp = resp.on_hover_text(format!("Alt+{} · clique direito: opções", i + 1));

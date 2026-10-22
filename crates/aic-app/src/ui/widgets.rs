@@ -75,25 +75,22 @@ pub fn chip(ui: &mut Ui, text: impl Into<String>, color: Color32, theme: &Theme)
     resp
 }
 
-pub fn state_badge(ui: &mut Ui, label: &str, state: SessionState, theme: &Theme, t: f64) -> Response {
+pub fn state_badge(ui: &mut Ui, label: &str, state: SessionState, theme: &Theme) -> Response {
     let color = theme.state_color(state);
-    let pulse = matches!(state, SessionState::Waiting | SessionState::Done);
-    let a = if pulse { 0.55 + 0.45 * ((t * 4.0).sin() as f32 * 0.5 + 0.5) } else { 1.0 };
     let font = FontId::new(10.5, FontFamily::Monospace);
     let galley = ui.painter().layout_no_wrap(label.to_string(), font, theme.bg);
     let size = galley.size() + Vec2::new(10.0, 4.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
-    ui.painter().rect_filled(rect, CornerRadius::same(theme.radius.min(4)), color.gamma_multiply(a));
+    ui.painter().rect_filled(rect, CornerRadius::same(theme.radius.min(4)), color);
     ui.painter().galley(rect.min + Vec2::new(5.0, 2.0), galley, theme.bg);
     resp
 }
 
-/// Bolinha de estado (com halo pulsando quando precisa de você).
-pub fn state_dot(ui: &Ui, center: egui::Pos2, r: f32, state: SessionState, theme: &Theme, t: f64) {
+/// Bolinha de estado (com um anel parado quando precisa de você).
+pub fn state_dot(ui: &Ui, center: egui::Pos2, r: f32, state: SessionState, theme: &Theme) {
     let color = theme.state_color(state);
     if state.needs_attention() {
-        let k = ((t * 3.0).sin() as f32 * 0.5 + 0.5) * r * 1.6;
-        ui.painter().circle_filled(center, r + k, color.gamma_multiply(0.18));
+        ui.painter().circle_stroke(center, r + 2.5, Stroke::new(1.0, color));
     }
     ui.painter().circle_filled(center, r, color);
 }

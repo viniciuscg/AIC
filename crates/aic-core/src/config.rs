@@ -64,8 +64,6 @@ pub struct Config {
     pub repos_dirs: Vec<PathBuf>,
     pub sound: SoundConfig,
     pub notify: NotifyConfig,
-    /// Mascote animado e partículas.
-    pub animations: bool,
     pub layne: LayneConfig,
 }
 
@@ -197,7 +195,6 @@ impl Default for Config {
             repos_dirs: vec![paths::home_dir()],
             sound: SoundConfig::default(),
             notify: NotifyConfig::default(),
-            animations: true,
             layne: LayneConfig::default(),
         }
     }
