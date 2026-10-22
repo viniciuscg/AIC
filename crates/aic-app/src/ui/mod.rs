@@ -5,6 +5,7 @@ pub mod changes;
 pub mod help;
 pub mod leader;
 pub mod modals;
+pub mod notes;
 pub mod prefix;
 pub mod sessions;
 pub mod settings;
@@ -89,6 +90,15 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             app.cfg.layne.width = w;
             let _ = app.cfg.save();
         }
+    }
+
+    if notes::visible(app) {
+        egui::Panel::right("notes")
+            .resizable(true)
+            .default_size(340.0)
+            .size_range(240.0..=720.0)
+            .frame(Frame::new().fill(app.theme.bg2).inner_margin(Margin::same(8)).stroke(egui::Stroke::new(1.0, app.theme.border)))
+            .show(ui, |ui| notes::show(app, ui));
     }
 
     egui::CentralPanel::default()

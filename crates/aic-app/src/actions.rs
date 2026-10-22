@@ -47,7 +47,7 @@ pub enum Action {
     CollapseBlock,
     MoveBlockUp,
     MoveBlockDown,
-    FocusNotes,
+    ToggleNotes,
     ToggleMaximize,
     ReleaseTerminal,
     // Tarefas
@@ -109,7 +109,7 @@ impl Action {
         v.extend((1..=9).map(Goto));
         v.extend([
             ToggleLayout, CycleView, ToggleMaximize, ReleaseTerminal, NewBlock, CloseBlock, RenameBlock, CycleSplit, ToggleBlockSide,
-            CollapseBlock, MoveBlockUp, MoveBlockDown, FocusNotes, QuickAdd, Workspaces, NewWorkspace,
+            CollapseBlock, MoveBlockUp, MoveBlockDown, ToggleNotes, QuickAdd, Workspaces, NewWorkspace,
             NextWorkspace, PrevWorkspace,
         ]);
         v.extend((1..=9).map(GotoWorkspace));
@@ -129,7 +129,7 @@ impl Action {
             ViewChanges => Some(Module::Changes),
             ViewUsage => Some(Module::Usage),
             Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_) | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
-            FocusNotes => Some(Module::Notes),
+            ToggleNotes => Some(Module::Notes),
             ToggleLayne | LayneVoice => Some(Module::Layne),
             Catalog => Some(Module::Hints),
             _ => None,
@@ -187,11 +187,11 @@ impl Action {
             CloseBlock => ("close_block", "Fechar o bloco e todos os terminais dele", "Blocos", ks(CS, Key::X)),
             RenameBlock => ("rename_block", "Renomear o bloco", "Blocos", ks(CS, Key::F2)),
             CycleSplit => ("cycle_split", "Mudar o arranjo dos terminais (lado a lado → principal → empilhado → grade)", "Blocos", ks(CS, Key::Backslash)),
-            ToggleBlockSide => ("toggle_block_side", "Mostrar/esconder o painel do bloco (card, notas, tarefas)", "Blocos", ks(CS, Key::I)),
+            ToggleBlockSide => ("toggle_block_side", "Mostrar/esconder o painel do bloco (tarefas)", "Blocos", ks(CS, Key::I)),
             CollapseBlock => ("collapse_block", "Recolher/expandir o bloco", "Blocos", ks(CA, Key::C)),
             MoveBlockUp => ("move_block_up", "Subir o bloco na lista", "Blocos", ks(CA, Key::ArrowUp)),
             MoveBlockDown => ("move_block_down", "Descer o bloco na lista", "Blocos", ks(CA, Key::ArrowDown)),
-            FocusNotes => ("focus_notes", "Escrever nas notas do bloco", "Blocos", ks(CS, Key::E)),
+            ToggleNotes => ("toggle_notes", "Notas da sessão em foco: abrir (e escrever) / fechar", "Sessões", ks(CS, Key::E)),
             QuickAdd => ("quick_add", "Nova tarefa (captura rápida)", "Tarefas", ks(CS, Key::Space)),
             Workspaces => ("workspaces", "Trocar de workspace", "Workspaces", ks(CS, Key::O)),
             NewWorkspace => ("new_workspace", "Criar workspace", "Workspaces", ks(CA, Key::O)),
@@ -265,7 +265,7 @@ impl Action {
             MoveBlockDown => &["}"],
             ToggleBlockSide => &["i"],
             CollapseBlock => &["-"],
-            FocusNotes => &["e"],
+            ToggleNotes => &["e"],
             QuickAdd => &["t"],
             SendContext => &["K"],
             Workspaces => &["w"],
@@ -330,6 +330,7 @@ pub const CONTEXT_KEYS: &[(&str, &str, &str)] = &[
     ("Tecla líder", "letra", "Entra no grupo / roda a ação"),
     ("Tecla líder", "Backspace", "Volta um nível"),
     ("Tecla líder", "Esc", "Fecha o menu"),
+    ("Notas", "Esc", "Devolve o teclado pro terminal (a nota se salva sozinha)"),
     ("Captura rápida", "#repo @hoje !alta +workspace ^DEV-1 ~tag", "Marcadores inline"),
     ("Captura rápida", "Enter / Esc", "Criar / cancelar"),
     ("Captura rápida", "Alt+L", "Vincular (ou não) ao terminal em foco"),

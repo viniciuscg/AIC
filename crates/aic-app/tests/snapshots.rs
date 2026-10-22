@@ -182,7 +182,7 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
         ids.push(id);
     }
     let b0 = app.block_of(ids[0]).unwrap();
-    app.update_block(b0, |b| b.notes = "## Plano\n- reproduzir com a pedido 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
+    app.set_notes(ids[0], "## Plano\n- reproduzir com a pedido 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
     let t0 = app.tasks.iter().find(|t| t.card_key.as_deref() == Some("DEV-142")).map(|t| t.id).unwrap();
     app.update_task(t0, |t| t.session = Some(ids[0]));
     app.update_block(b0, |b| b.task = Some(t0));
@@ -236,6 +236,11 @@ fn telas() {
     settle(&mut h, 200);
     shot(&mut h, "prefixo");
     h.state_mut().as_mut().unwrap().prefix_pending = false;
+    // notas da sessão em foco
+    h.state_mut().as_mut().unwrap().notes_open = true;
+    settle(&mut h, 200);
+    shot(&mut h, "notas");
+    h.state_mut().as_mut().unwrap().notes_open = false;
     // dois workspaces, um com alguém esperando (fica roxo na barra)
     {
         let app = h.state_mut().as_mut().unwrap();

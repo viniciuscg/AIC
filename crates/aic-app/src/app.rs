@@ -104,8 +104,10 @@ pub struct App {
     pub blocks: HashMap<Id, Block>,
     /// Bloco vazio selecionado (sem terminal pra focar).
     pub empty_block_focus: Option<Id>,
-    /// Pedido de foco nas notas de um bloco (atalho).
-    pub focus_notes: Option<Id>,
+    /// Painel de notas da sessão em foco aberto.
+    pub notes_open: bool,
+    /// Pedido de foco no editor de notas (abriu pelo atalho).
+    pub notes_focus: bool,
     pub tasks: Vec<Task>,
     pub repos: Vec<String>,
 
@@ -185,7 +187,8 @@ impl App {
             sessions: HashMap::new(),
             blocks: HashMap::new(),
             empty_block_focus: None,
-            focus_notes: None,
+            notes_open: false,
+            notes_focus: false,
             tasks: vec![],
             view: View::Sessions,
             modal: None,
@@ -277,6 +280,7 @@ impl App {
             w.sessions.retain(|id| self.sessions.contains_key(id));
         }
         self.fix_blocks();
+        self.migrate_block_notes();
         self.ws = 0;
         let _ = self.store.mark_cache(true);
         if alive > 0 {
@@ -364,6 +368,32 @@ impl App {
             w.blocks.retain(|b| *b != id);
         }
         self.persist_ws();
+    }
+
+    /// Notas de um bloco (de antes das notas por sessão) passam pra sessão em foco dele.
+    pub fn migrate_block_notes(&mut self) {
+        let ids: Vec<Id> = self.blocks.keys().copied().collect();
+        for bid in ids {
+            let Some(b) = self.blocks.get(&bid) else { continue };
+            if b.notes.trim().is_empty() {
+                continue;
+            }
+            let Some(sid) = b.focused.filter(|f| b.panes.contains(f)).or_else(|| b.panes.first().copied()) else { continue };
+            let notes = b.notes.clone();
+            if let Some(rt) = self.sessions.get_mut(&sid) {
+                rt.s.notes = if rt.s.notes.trim().is_empty() { notes } else { format!("{}\n\n{notes}", rt.s.notes) };
+                let _ = self.store.save_session(&rt.s);
+                self.update_block(bid, |b| b.notes.clear());
+            }
+        }
+    }
+
+    /// Notas da sessão (salvas na hora: o store é o mesmo das sessões).
+    pub fn set_notes(&mut self, id: Id, notes: String) {
+        if let Some(rt) = self.sessions.get_mut(&id) {
+            rt.s.notes = notes;
+            let _ = self.store.save_session(&rt.s);
+        }
     }
 
     /// Garante: toda sessão tem bloco do mesmo workspace; blocos listados nos workspaces.
@@ -1043,10 +1073,13 @@ impl App {
                     self.update_block(b, |x| x.side = !x.side);
                 }
             }
-            FocusNotes => {
-                if let Some(b) = self.current_block() {
-                    self.update_block(b, |x| x.side = true);
-                    self.focus_notes = Some(b);
+            ToggleNotes => {
+                if self.notes_open {
+                    self.notes_open = false;
+                    self.term_focus = self.view == View::Sessions;
+                } else {
+                    self.notes_open = true;
+                    self.notes_focus = true;
                     self.view = View::Sessions;
                 }
             }

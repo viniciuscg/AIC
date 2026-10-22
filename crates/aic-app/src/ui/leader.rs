@@ -117,7 +117,7 @@ fn tree() -> Vec<Item> {
         Run('d', "Changes (diff)", ViewChanges),
         Run('l', "Layne (assistente)", ToggleLayne),
         Run('m', "Falar com o Layne", LayneVoice),
-        Run('n', "Notas do bloco", FocusNotes),
+        Run('n', "Notas da sessão", ToggleNotes),
         Run('k', "Tokens e custo", ViewUsage),
         Run('p', "Paleta de comandos", Palette),
         Run(',', "Configurações", ViewSettings),

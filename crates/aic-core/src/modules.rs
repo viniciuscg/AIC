@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub enum Module {
     /// Tarefas locais: captura rápida e o painel Tarefas do bloco.
     Tasks,
-    /// Notas por bloco.
+    /// Notas por sessão.
     Notes,
     /// Aba de worktrees e worktree por sessão.
     Worktrees,
@@ -55,7 +55,7 @@ pub const ALL: &[ModuleInfo] = &[
     ModuleInfo { module: Workspaces, id: "workspaces", name: "Workspaces", desc: "Vários contextos de trabalho, cada um com seus blocos e layout.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Layne, id: "layne", name: "Layne (assistente)", desc: "Um Claude sempre aberto no painel lateral: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.", group: "Sessões", default: true, requires: &[] },
     ModuleInfo { module: Tasks, id: "tasks", name: "Tarefas", desc: "Tarefas locais: captura rápida com marcadores (#repo @hoje !alta) e o painel Tarefas do bloco.", group: "Organização", default: true, requires: &[] },
-    ModuleInfo { module: Notes, id: "notes", name: "Notas", desc: "Anotações em Markdown por bloco, salvas junto do bloco.", group: "Organização", default: true, requires: &[] },
+    ModuleInfo { module: Notes, id: "notes", name: "Notas", desc: "Anotações em Markdown por sessão, num painel lateral (Ctrl+B e), salvas sozinhas.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Worktrees, id: "worktrees", name: "Worktrees", desc: "Aba de worktrees e opção de isolar cada sessão num worktree.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Changes, id: "changes", name: "Changes", desc: "Aba com os arquivos mudados e o diff de cada um (como o Source Control do VS Code): stage, descartar e commit.", group: "Organização", default: true, requires: &[] },
     ModuleInfo { module: Usage, id: "usage", name: "Tokens e custo", desc: "Limites de 5h/semana e histórico de custo lido dos transcripts.", group: "Organização", default: true, requires: &[] },

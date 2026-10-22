@@ -251,6 +251,59 @@ fn captura_rapida_e_tarefas_do_bloco() {
     kill_all(&mut h);
 }
 
+// ───────────────────────── notas por sessão ─────────────────────────
+
+#[test]
+fn notas_por_sessao() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("notas", "");
+    let mut h = harness([1500.0, 900.0]);
+    let a = terminal(&mut h, "api", "sleep 60");
+    let b = terminal(&mut h, "front", "sleep 60");
+    assert_eq!(app(&mut h).focused(), Some(b));
+
+    // Ctrl+B e abre o painel já escrevendo (o terminal solta o teclado)
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::E);
+    assert!(app(&mut h).notes_open, "Ctrl+B e abre as notas");
+    frames(&mut h, 2);
+    assert!(!app(&mut h).term_focus, "o editor fica com o teclado");
+    h.event(egui::Event::Text("lembrar do CORS".into()));
+    frames(&mut h, 2);
+    assert_eq!(app(&mut h).sessions[&b].s.notes, "lembrar do CORS", "digitar grava na sessão");
+    let saved = app(&mut h).store.sessions().unwrap().into_iter().find(|s| s.id == b).unwrap();
+    assert_eq!(saved.notes, "lembrar do CORS", "salvo no banco sem pedir");
+
+    // Esc devolve o teclado pro terminal
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    assert!(app(&mut h).term_focus, "Esc volta pro terminal");
+
+    // Ctrl+B e de novo fecha
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::E);
+    assert!(!app(&mut h).notes_open, "Ctrl+B e fecha");
+    assert!(app(&mut h).term_focus);
+
+    // outra sessão, outra nota
+    app(&mut h).focus(a);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::E);
+    frames(&mut h, 2);
+    h.event(egui::Event::Text("outra".into()));
+    frames(&mut h, 2);
+    assert_eq!(app(&mut h).sessions[&a].s.notes, "outra");
+    assert_eq!(app(&mut h).sessions[&b].s.notes, "lembrar do CORS", "a nota da outra sessão não muda");
+
+    // notas de bloco (de antes) vão pra sessão em foco do bloco ao reabrir
+    let block = app(&mut h).block_of(a).unwrap();
+    app(&mut h).update_block(block, |bl| bl.notes = "nota do bloco".into());
+    app(&mut h).migrate_block_notes();
+    assert_eq!(app(&mut h).sessions[&a].s.notes, "outra\n\nnota do bloco");
+    assert!(app(&mut h).blocks[&block].notes.is_empty(), "o bloco fica sem nota");
+
+    kill_all(&mut h);
+}
+
 // ───────────────────────── modais, toasts, topbar ─────────────────────────
 
 #[test]

@@ -93,7 +93,7 @@ impl Split {
     }
 }
 
-/// Um contexto de trabalho (normalmente um card): vários terminais, notas, a tarefa vinculada.
+/// Um contexto de trabalho (normalmente um card): vários terminais e a tarefa vinculada.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Block {
     pub id: Id,
@@ -104,7 +104,7 @@ pub struct Block {
     /// Tarefa/card deste bloco.
     #[serde(default)]
     pub task: Option<Id>,
-    /// Anotações em Markdown.
+    /// Notas de antes das notas por sessão: o app passa pra sessão em foco do bloco e limpa.
     #[serde(default)]
     pub notes: String,
     /// Terminais, em ordem.
@@ -115,7 +115,7 @@ pub struct Block {
     /// Recolhido na visualização de blocos.
     #[serde(default)]
     pub collapsed: bool,
-    /// Painel lateral (card, notas, tarefas) aberto.
+    /// Painel lateral (tarefas) aberto.
     #[serde(default = "yes")]
     pub side: bool,
     /// Altura na visualização de blocos (px).
@@ -196,6 +196,9 @@ pub struct Session {
     /// Primeira mensagem pro Claude (só na criação; o app limpa depois de usar).
     #[serde(default)]
     pub initial_prompt: Option<String>,
+    /// Notas em Markdown da sessão (painel de notas, `Ctrl+B e`).
+    #[serde(default)]
+    pub notes: String,
     pub created_at: DateTime<Utc>,
 }
 
@@ -216,6 +219,7 @@ impl Session {
             color: 0,
             claude_args: vec![],
             initial_prompt: None,
+            notes: String::new(),
             created_at: Utc::now(),
         }
     }

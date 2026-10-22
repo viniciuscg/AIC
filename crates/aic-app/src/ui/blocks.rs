@@ -3,7 +3,7 @@
 //! - **Abas**: um bloco por aba, terminais divididos (o jeito tmux).
 
 use egui::{Align, Color32, CursorIcon, FontId, Layout, Pos2, Rect, RichText, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2};
-use aic_core::{Id, Module, SessionState, Split, TaskStatus};
+use aic_core::{Id, SessionState, Split, TaskStatus};
 
 use super::sessions::pane;
 use super::widgets::truncate;
@@ -184,7 +184,7 @@ fn block_header(app: &mut App, ui: &mut Ui, id: Id, hrect: Rect, index: usize, c
             app.focus_block(id);
             app.run_action(ui.ctx(), Action::CloseBlock);
         }
-        if widgets::icon_button(ui, "◧", "Painel do bloco", &app.keymap.tip(Action::ToggleBlockSide, "Painel do bloco: notas, tarefas")).clicked() {
+        if widgets::icon_button(ui, "◧", "Painel do bloco", &app.keymap.tip(Action::ToggleBlockSide, "Painel do bloco: tarefas")).clicked() {
             app.update_block(id, |b| b.side = !b.side);
         }
         if ui.small_button(format!("⊞ {}", b.split.label())).on_hover_text(app.keymap.tip(Action::CycleSplit, "Arranjo dos terminais")).clicked() {
@@ -282,67 +282,16 @@ fn empty_block(app: &mut App, ui: &mut Ui, id: Id, r: Rect) {
     });
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-enum SideTab {
-    #[default]
-    Tasks,
-    Notes,
-}
-
-/// Tarefas / Notas do bloco.
+/// Tarefas do bloco.
 fn side_panel(app: &mut App, ui: &mut Ui, id: Id, r: Rect) {
     let theme = app.theme.clone();
     ui.painter().rect_filled(r, theme.radius(), theme.bg);
     ui.painter().rect_stroke(r, theme.radius(), Stroke::new(1.0, theme.border), egui::StrokeKind::Inside);
     let mut c = ui.new_child(UiBuilder::new().max_rect(r.shrink(10.0)));
     let ui = &mut c;
-    let key = egui::Id::new(("block-side-tab", id));
-    let mut tab: SideTab = ui.data(|d| d.get_temp(key)).unwrap_or_default();
-    // notas pedidas pelo atalho
-    if app.focus_notes == Some(id) {
-        tab = SideTab::Notes;
-    }
-    ui.horizontal(|ui| {
-        for (t, label) in [(SideTab::Tasks, "Tarefas"), (SideTab::Notes, "Notas")] {
-            if (t != SideTab::Notes || app.cfg.on(Module::Notes)) && ui.selectable_label(tab == t, label).clicked() {
-                tab = t;
-            }
-        }
-    });
-    ui.data_mut(|d| d.insert_temp(key, tab));
+    ui.label(RichText::new("TAREFAS").font(FontId::monospace(11.0)).color(theme.dim));
     ui.separator();
-    match tab {
-        SideTab::Notes => notes_tab(app, ui, id),
-        SideTab::Tasks => tasks_tab(app, ui, id, &theme),
-    }
-}
-
-fn notes_tab(app: &mut App, ui: &mut Ui, id: Id) {
-    let Some(mut notes) = app.blocks.get(&id).map(|b| b.notes.clone()) else { return };
-    let r = ui.add(
-        TextEdit::multiline(&mut notes)
-            .hint_text("Anotações do bloco (Markdown). Ficam salvas com o bloco.")
-            .desired_width(f32::INFINITY)
-            .desired_rows(14)
-            .font(FontId::monospace(12.5)),
-    );
-    if app.focus_notes == Some(id) {
-        r.request_focus();
-        app.focus_notes = None;
-        app.term_focus = false;
-    }
-    if r.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-        r.surrender_focus();
-        app.term_focus = true;
-    }
-    if r.changed() {
-        if let Some(b) = app.blocks.get_mut(&id) {
-            b.notes = notes;
-        }
-    }
-    if r.lost_focus() {
-        app.save_block(id);
-    }
+    tasks_tab(app, ui, id, &theme);
 }
 
 fn tasks_tab(app: &mut App, ui: &mut Ui, id: Id, theme: &Theme) {
