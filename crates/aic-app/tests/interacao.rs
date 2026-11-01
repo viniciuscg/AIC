@@ -10,7 +10,6 @@ use std::time::Duration;
 
 use aic_app::app::{App, View};
 use aic_app::ui::modals::Modal;
-use aic_app::ui::widgets::{I_PLUS, I_TERM};
 use aic_core::{Id, SessionKind};
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
@@ -33,7 +32,7 @@ fn sandbox(name: &str, extra_config: &str) -> PathBuf {
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.join("claude"));
     }
     let cfg = format!(
-        "setup_done = true\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nlayne = false\nsound = false\nnotifications = false\n",
+        "setup_done = true\nrepos_dirs = [\"{}\"]\n{extra_config}\n[modules]\ntmux = false\nanakin = false\nsound = false\nnotifications = false\n",
         dir.join("repos").display()
     );
     std::fs::write(dir.join("config/config.toml"), cfg).unwrap();
@@ -104,14 +103,13 @@ fn terminal(h: &mut H, name: &str, cmd: &str) -> Id {
     h.step();
     let ctx = h.ctx.clone();
     let a = app(h);
-    let block = a.new_block(name, None);
+    let block = a.new_block(name);
     let id = a.create_session_in(
         &ctx,
         block,
         name.into(),
         SessionKind::Command(cmd.into()),
         std::env::temp_dir(),
-        None,
         None,
         vec![],
         None,
@@ -145,39 +143,127 @@ fn is_modal(h: &mut H, f: impl Fn(&Modal) -> bool) -> bool {
 
 // ───────────────────────── terminal ─────────────────────────
 
+/// Mais um terminal na sessão em foco.
+fn split(h: &mut H, name: &str) -> Id {
+    let ctx = h.ctx.clone();
+    let a = app(h);
+    let block = a.current_block();
+    let id = a.create_session_in(
+        &ctx,
+        block,
+        name.into(),
+        SessionKind::Command("sleep 60".into()),
+        std::env::temp_dir(),
+        None,
+        vec![],
+        None,
+    );
+    frames(h, 3);
+    id
+}
+
+/// O bug da v1: fechar um terminal jogava o foco no último terminal do workspace, e a sessão
+/// parecia ter sido fechada inteira.
 #[test]
-fn cabecalho_do_terminal() {
+fn fechar_terminal_nao_fecha_a_sessao() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("fechar", "");
+    let mut h = harness([1400.0, 900.0]);
+    let a1 = terminal(&mut h, "hermes", "sleep 60");
+    let a2 = split(&mut h, "hermes-shell");
+    let block_a = app(&mut h).block_of(a1).unwrap();
+    let b1 = terminal(&mut h, "wallet", "sleep 60");
+    let block_b = app(&mut h).block_of(b1).unwrap();
+
+    // volta pra hermes e fecha o terminal em foco pelo Ctrl+B x
+    app(&mut h).focus(a2);
+    frames(&mut h, 2);
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::X);
+    assert!(
+        is_modal(
+            &mut h,
+            |m| matches!(m, Modal::CloseSession { id, .. } if *id == a2)
+        ),
+        "pede confirmação do terminal em foco"
+    );
+    click(&mut h, "Cancelar");
+    assert!(app(&mut h).sessions.contains_key(&a2), "cancelar mantém");
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::X);
+    click(&mut h, "Fechar  ⏎");
+
+    assert!(!app(&mut h).sessions.contains_key(&a2), "o terminal fechou");
+    assert!(app(&mut h).sessions.contains_key(&a1), "o vizinho continua");
+    assert!(
+        app(&mut h).sessions.contains_key(&b1),
+        "a outra sessão continua"
+    );
+    assert_eq!(
+        app(&mut h).current_block(),
+        Some(block_a),
+        "continua na mesma sessão"
+    );
+    assert_eq!(app(&mut h).focused(), Some(a1), "foco no terminal vizinho");
+    assert_eq!(app(&mut h).blocks[&block_a].panes, vec![a1]);
+
+    // o último terminal: agora sim a sessão some da barra (como workspace vazio no i3)
+    app(&mut h).kill_session(a1, false);
+    frames(&mut h, 2);
+    assert!(!app(&mut h).blocks.contains_key(&block_a));
+    assert_eq!(
+        app(&mut h).current_block(),
+        Some(block_b),
+        "vai pra vizinha"
+    );
+    assert_eq!(app(&mut h).focused(), Some(b1));
+    kill_all(&mut h);
+}
+
+/// Fechar um terminal que NÃO está em foco não mexe no foco.
+#[test]
+fn fechar_terminal_sem_foco_mantem_o_foco() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("fechar2", "");
+    let mut h = harness([1400.0, 900.0]);
+    let a1 = terminal(&mut h, "a", "sleep 60");
+    let a2 = split(&mut h, "a2");
+    assert_eq!(app(&mut h).focused(), Some(a2));
+    app(&mut h).kill_session(a1, false);
+    frames(&mut h, 2);
+    assert_eq!(app(&mut h).focused(), Some(a2));
+    kill_all(&mut h);
+}
+
+#[test]
+fn shell_que_sai_fecha_e_claude_morto_oferece_reabrir() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = sandbox("terminal", "");
     let mut h = harness([1400.0, 900.0]);
-    let id = terminal(&mut h, "api", "sleep 60");
 
-    click(&mut h, "Maximizar terminal");
-    assert!(app(&mut h).maximized, "maximizar");
-    click(&mut h, "Restaurar terminal");
-    assert!(!app(&mut h).maximized, "restaurar");
+    // `exit` num shell: o terminal fecha sozinho, e o vizinho fica
+    let keep = terminal(&mut h, "fica", "sleep 60");
+    let block = app(&mut h).block_of(keep).unwrap();
+    let ctx = h.ctx.clone();
+    let gone = app(&mut h).create_session_in(
+        &ctx,
+        Some(block),
+        "sai".into(),
+        SessionKind::Command("exit 0".into()),
+        std::env::temp_dir(),
+        None,
+        vec![],
+        None,
+    );
+    wait_until(&mut h, "terminal fechar sozinho", |a| {
+        !a.sessions.contains_key(&gone)
+    });
+    assert_eq!(app(&mut h).focused(), Some(keep));
 
-    click(&mut h, "Fechar terminal");
-    assert!(
-        is_modal(&mut h, |m| matches!(m, Modal::CloseSession { .. })),
-        "✕ pede confirmação"
-    );
-    click(&mut h, "Cancelar");
-    assert!(
-        app(&mut h).modal.is_none() && app(&mut h).sessions.contains_key(&id),
-        "cancelar mantém o terminal"
-    );
-    click(&mut h, "Fechar terminal");
-    click(&mut h, "Fechar  ⏎");
-    assert!(
-        !app(&mut h).sessions.contains_key(&id),
-        "fechar encerra o terminal"
-    );
-
-    // reiniciar: o processo sai na 1ª vez e fica rodando na 2ª
+    // saiu com erro: fica na tela, com a opção de reabrir
     let marker = dir.join("marker");
     let cmd = format!(
-        "test -f {m} || {{ touch {m}; exit 0; }}; sleep 60",
+        "test -f {m} || {{ touch {m}; exit 3; }}; sleep 60",
         m = marker.display()
     );
     let id = terminal(&mut h, "reinicia", &cmd);
@@ -185,141 +271,286 @@ fn cabecalho_do_terminal() {
         a.sessions[&id].term.as_ref().is_some_and(|t| t.is_exited())
     });
     frames(&mut h, 2);
-    assert!(
-        exists(
-            &h,
-            &format!("{} Reabrir (Enter)", aic_app::ui::widgets::I_RESTART)
-        ),
-        "tela de processo encerrado"
-    );
-    click(&mut h, "Reiniciar terminal");
+    let reabrir = format!("{} Reabrir (Enter)", aic_app::ui::widgets::I_RESTART);
+    assert!(exists(&h, &reabrir), "tela de processo encerrado");
+    click(&mut h, &reabrir);
     wait_until(&mut h, "terminal reiniciado", |a| {
         a.sessions[&id]
             .term
             .as_ref()
             .is_some_and(|t| !t.is_exited())
     });
-
     kill_all(&mut h);
 }
 
-// ───────────────────────── bloco ─────────────────────────
+// ───────────────────────── a barra ─────────────────────────
+
+/// Sem cromo: o que estava marcado de vermelho sumiu da tela.
+#[test]
+fn tela_so_tem_terminal_e_barra() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("cromo", "");
+    let mut h = harness([1500.0, 900.0]);
+    terminal(&mut h, "hermes", "sleep 60");
+    for gone in [
+        "Aba Worktrees",
+        "Aba Changes",
+        "Aba Config",
+        "Fechar terminal",
+        "Maximizar terminal",
+        "Reiniciar terminal",
+        "Fechar bloco",
+        "Painel do bloco",
+        "TAREFAS",
+    ] {
+        assert!(!exists(&h, gone), "{gone} não devia estar na tela");
+    }
+    assert!(exists(&h, "Sessão 1 hermes"));
+    for tab in ["Aba Tarefas", "Aba Sessões", "Aba Tokens"] {
+        assert!(exists(&h, tab), "{tab}");
+    }
+    // a linha das sessões só existe na aba Sessões
+    app(&mut h).set_view(View::Tasks);
+    frames(&mut h, 2);
+    assert!(!exists(&h, "Sessão 1 hermes"));
+    app(&mut h).set_view(View::Sessions);
+    assert!(
+        !exists(&h, "Workspace 1 Principal"),
+        "um workspace só não aparece"
+    );
+    kill_all(&mut h);
+}
 
 #[test]
-fn cabecalho_do_bloco() {
+fn ctrl_tab_anda_so_entre_as_abas() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("ctrltab", "");
+    let mut h = harness([1500.0, 900.0]);
+    let a = terminal(&mut h, "a", "sleep 60");
+    let b = terminal(&mut h, "b", "sleep 60");
+    let (ba, bb) = (app(&mut h).block_of(a), app(&mut h).block_of(b));
+    assert_eq!(app(&mut h).current_block(), bb);
+
+    // Sessões → Tokens → Tarefas → Sessões, sem trocar de sessão no caminho
+    key(&mut h, ctrl(), Key::Tab);
+    assert_eq!(app(&mut h).view, View::Usage);
+    key(&mut h, ctrl(), Key::Tab);
+    assert_eq!(app(&mut h).view, View::Tasks);
+    key(&mut h, ctrl(), Key::Tab);
+    assert_eq!(app(&mut h).view, View::Sessions);
+    assert_eq!(app(&mut h).current_block(), bb, "continua na mesma sessão");
+    assert!(app(&mut h).term_focus, "o teclado vai pro terminal");
+    key(&mut h, ctrl_shift(), Key::Tab);
+    assert_eq!(app(&mut h).view, View::Tasks, "Ctrl+Shift+Tab volta");
+
+    // Alt+Tab faz o mesmo
+    key(&mut h, Modifiers::ALT, Key::Tab);
+    assert_eq!(app(&mut h).view, View::Sessions, "Alt+Tab");
+    key(&mut h, Modifiers::ALT | Modifiers::SHIFT, Key::Tab);
+    assert_eq!(app(&mut h).view, View::Tasks, "Alt+Shift+Tab");
+    app(&mut h).set_view(View::Sessions);
+    frames(&mut h, 2);
+
+    // trocar de sessão tem tecla própria
+    let ctx = h.ctx.clone();
+    app(&mut h).run_action(&ctx, aic_app::actions::Action::NextBlock);
+    assert_eq!(app(&mut h).current_block(), ba, "próxima sessão dá a volta");
+    app(&mut h).run_action(&ctx, aic_app::actions::Action::PrevBlock);
+    assert_eq!(app(&mut h).current_block(), bb);
+
+    // de uma tela fora da barra, vai pras Sessões
+    app(&mut h).set_view(View::Settings);
+    frames(&mut h, 2);
+    assert!(exists(&h, "Aba Config"), "o nome da tela aparece embaixo");
+    key(&mut h, ctrl(), Key::Tab);
+    assert_eq!(app(&mut h).view, View::Sessions);
+    kill_all(&mut h);
+}
+
+/// Reabrir com lixo salvo: workspace vazio, sessão vazia e um bloco com terminais dos outros.
+#[test]
+fn reabrir_limpa_o_que_ficou_vazio() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("reabrir", "");
+    let mut h = harness([1500.0, 900.0]);
+    let a = terminal(&mut h, "a", "sleep 60");
+    let block = app(&mut h).block_of(a).unwrap();
+    {
+        let x = app(&mut h);
+        let ws0 = x.ws;
+        x.new_workspace("Principal"); // o segundo "Principal"
+        x.switch_ws(ws0);
+        let geral = x.new_block("Geral").unwrap();
+        x.update_block(geral, |b| b.panes.push(a));
+        x.new_block("Novo bloco");
+        let saved = x.sessions[&a].s.clone();
+        let _ = x.store.save_session(&saved);
+        x.flush_ws();
+    }
+    let ctx = h.ctx.clone();
+    {
+        let x = app(&mut h);
+        if let Some(t) = x.sessions.get(&a).and_then(|r| r.term.as_ref()) {
+            t.kill();
+        }
+        x.sessions.clear();
+        x.blocks.clear();
+        x.restore(&ctx);
+    }
+    frames(&mut h, 2);
+    let x = app(&mut h);
+    assert_eq!(x.workspaces.len(), 1, "o workspace vazio some");
+    assert_eq!(x.ws_blocks(), vec![block], "as sessões vazias somem");
+    assert_eq!(x.blocks[&block].panes, vec![a]);
+    assert_eq!(x.store.workspaces().unwrap().len(), 1, "e somem do banco");
+    kill_all(&mut h);
+}
+
+/// O boneco: aparece, abre a conversa no clique e fala quando uma sessão acaba.
+#[test]
+fn anakin_no_canto() {
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("anakin", "[anakin]\nauto_start = false\n");
+    let mut h = harness([1500.0, 900.0]);
+    assert!(!exists(&h, "Anakin"), "módulo desligado: sem boneco");
+    app(&mut h).cfg.modules.remove("anakin");
+    frames(&mut h, 2);
+    assert!(exists(&h, "Anakin"));
+    assert!(!app(&mut h).anakin.open);
+    click(&mut h, "Anakin");
+    assert!(app(&mut h).anakin.open, "clicar abre a conversa");
+    assert!(exists(&h, "Fechar o Anakin"));
+    click(&mut h, "Fechar o Anakin");
+    assert!(!app(&mut h).anakin.open);
+    app(&mut h).anakin.avatar.speak("hermes acabou. Yippee!", 5);
+    frames(&mut h, 2);
+    assert_eq!(
+        app(&mut h).anakin.avatar.speech(),
+        Some("hermes acabou. Yippee!")
+    );
+
+    // o boneco some e volta pela tecla
+    let ctx = h.ctx.clone();
+    app(&mut h).run_action(&ctx, aic_app::actions::Action::ToggleAvatar);
+    frames(&mut h, 2);
+    assert!(!exists(&h, "Anakin"));
+    kill_all(&mut h);
+}
+
+#[test]
+fn sessao_nova_e_arranjo_pelo_teclado() {
+    use aic_app::actions::Action;
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _dir = sandbox("bloco", "");
     let mut h = harness([1500.0, 900.0]);
-    let id = terminal(&mut h, "bloco-a", "sleep 60");
+    let id = terminal(&mut h, "a", "sleep 60");
     let block = app(&mut h).block_of(id).unwrap();
 
-    let side = app(&mut h).blocks[&block].side;
-    click(&mut h, "Painel do bloco");
-    assert_ne!(app(&mut h).blocks[&block].side, side, "◧ alterna o painel");
+    let split_before = app(&mut h).blocks[&block].split;
+    let ctx = h.ctx.clone();
+    app(&mut h).run_action(&ctx, Action::CycleSplit);
+    assert_ne!(app(&mut h).blocks[&block].split, split_before);
 
-    let split = app(&mut h).blocks[&block].split;
-    click(&mut h, &format!("⊞ {}", split.label()));
-    assert_ne!(app(&mut h).blocks[&block].split, split, "⊞ muda o arranjo");
-
-    click(&mut h, &format!("{I_PLUS} Claude"));
-    assert!(
-        is_modal(&mut h, |m| matches!(m, Modal::NewSession(_))),
-        "+ Claude abre o diálogo"
-    );
+    // Nova sessão pelo + da barra abre o diálogo, marcando que é sessão nova
+    click(&mut h, "Nova sessão");
+    assert!(is_modal(
+        &mut h,
+        |m| matches!(m, Modal::NewSession(f) if f.new_block)
+    ));
     click(&mut h, "Cancelar");
-    assert!(app(&mut h).modal.is_none(), "cancelar fecha a nova sessão");
+    assert!(app(&mut h).modal.is_none());
 
     let n = app(&mut h).blocks[&block].panes.len();
-    click(&mut h, &format!("{I_TERM} terminal"));
+    key(&mut h, ctrl_shift(), Key::T);
     assert_eq!(
         app(&mut h).blocks[&block].panes.len(),
         n + 1,
-        "terminal abre um split no bloco"
+        "split na sessão"
     );
 
-    click(&mut h, "Recolher bloco");
-    assert!(app(&mut h).blocks[&block].collapsed, "recolher");
-    click(&mut h, "Expandir bloco");
-    assert!(!app(&mut h).blocks[&block].collapsed, "expandir");
-
-    click(&mut h, "Fechar bloco");
-    assert!(
-        is_modal(&mut h, |m| matches!(m, Modal::CloseBlock { .. })),
-        "✕ do bloco pede confirmação"
-    );
-    click(&mut h, "Cancelar  (Esc)");
-    assert!(app(&mut h).modal.is_none() && app(&mut h).blocks.contains_key(&block));
-    click(&mut h, "Fechar bloco");
+    key(&mut h, ctrl_shift(), Key::X);
+    assert!(is_modal(&mut h, |m| matches!(m, Modal::CloseBlock { .. })));
     click(&mut h, "Fechar  ⏎");
     assert!(
         !app(&mut h).blocks.contains_key(&block),
-        "fechar bloco remove o bloco"
+        "fecha a sessão inteira"
     );
-
-    // bloco novo pelo + da lista e renomear pelo diálogo
-    let b = app(&mut h).new_block("vazio", None).unwrap();
-    frames(&mut h, 3);
-    let label = format!(
-        "{I_PLUS}  Novo bloco  ({})",
-        app(&mut h).keymap.label(aic_app::actions::Action::NewBlock)
-    );
-    click(&mut h, &label);
-    assert!(
-        is_modal(&mut h, |m| matches!(m, Modal::RenameBlock { .. })),
-        "novo bloco pede o nome"
-    );
-    click(&mut h, "Cancelar  (Esc)");
-    assert!(app(&mut h).modal.is_none());
-    assert!(app(&mut h).blocks.contains_key(&b));
-
     kill_all(&mut h);
 }
 
 // ───────────────────────── tarefas ─────────────────────────
 
 #[test]
-fn captura_rapida_e_tarefas_do_bloco() {
+fn tarefas_nao_tem_vinculo_com_sessao() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _dir = sandbox("tarefas", "");
     let mut h = harness([1500.0, 900.0]);
-    let id = terminal(&mut h, "api", "sleep 60");
-    let block = app(&mut h).block_of(id).unwrap();
+    terminal(&mut h, "api", "sleep 60");
 
-    // Ctrl+Shift+Space → captura rápida → Criar
-    key(&mut h, ctrl_shift(), Key::Space);
-    assert!(
-        is_modal(&mut h, |m| matches!(m, Modal::QuickAdd { .. })),
-        "Ctrl+Shift+Space abre a captura"
-    );
-    if let Some(Modal::QuickAdd {
-        text, link_enabled, ..
-    }) = &mut app(&mut h).modal
-    {
-        *text = "tarefa criada no clique".into();
-        *link_enabled = true;
-    }
+    // Ctrl+B t abre a aba com o campo em foco, de qualquer lugar
+    key(&mut h, ctrl(), Key::B);
+    key(&mut h, Modifiers::NONE, Key::T);
+    assert_eq!(app(&mut h).view, View::Tasks);
     frames(&mut h, 2);
-    click(&mut h, "Criar  ⏎");
-    assert!(app(&mut h).modal.is_none());
+    h.key_press(Key::A); // nada de atalho: o campo pegou o teclado
+    frames(&mut h, 1);
+
+    let today = chrono::Local::now().date_naive();
+    app(&mut h).tasks_ui.input = "pagar boleto".into();
+    app(&mut h).tasks_ui.date = "amanhã".into();
+    app(&mut h).tasks_ui.focus_input = true;
+    frames(&mut h, 2);
+    h.key_press(Key::Enter);
+    frames(&mut h, 3);
     let t = app(&mut h)
         .tasks
         .iter()
-        .find(|t| t.title == "tarefa criada no clique")
+        .find(|t| t.title == "pagar boleto")
         .cloned()
-        .expect("Criar cria a tarefa");
-    assert_eq!(t.session, Some(id), "vinculada ao terminal em foco");
+        .expect("Enter cria");
+    assert_eq!(t.due, Some(today + chrono::Duration::days(1)));
+    assert_eq!(app(&mut h).tasks_ui.input, "", "o campo limpa");
+    assert!(exists(&h, "pagar boleto"), "aparece na lista");
 
-    key(&mut h, ctrl_shift(), Key::Space);
-    click(&mut h, "Cancelar");
-    assert!(app(&mut h).modal.is_none(), "Cancelar fecha a captura");
-
-    // painel Tarefas do bloco: a tarefa aparece e o check conclui
-    app(&mut h).update_block(block, |b| b.side = true);
+    // @data no texto vence o campo de data
+    app(&mut h).tasks_ui.input = "ligar pro banco @hoje".into();
+    app(&mut h).tasks_ui.focus_input = true;
+    frames(&mut h, 2);
+    h.key_press(Key::Enter);
     frames(&mut h, 3);
+    let t2 = app(&mut h)
+        .tasks
+        .iter()
+        .find(|t| t.title == "ligar pro banco")
+        .cloned()
+        .unwrap();
+    assert_eq!(t2.due, Some(today));
+
+    // no teclado: fora do campo, x conclui, u desfaz o apagar, Esc volta pros terminais
+    h.ctx
+        .memory_mut(|m| m.surrender_focus(egui::Id::new("tarefa-titulo")));
+    app(&mut h).tasks_ui.selected = Some(t.id);
+    frames(&mut h, 2);
+    h.key_press(Key::Period);
+    frames(&mut h, 1);
+    key(&mut h, Modifiers::NONE, Key::D);
+    assert!(!app(&mut h).tasks.iter().any(|x| x.id == t.id), "d apaga");
+    key(&mut h, Modifiers::NONE, Key::U);
+    assert!(app(&mut h).tasks.iter().any(|x| x.id == t.id), "u desfaz");
+    app(&mut h).tasks_ui.selected = Some(t.id);
+    frames(&mut h, 2);
+    key(&mut h, Modifiers::NONE, Key::X);
     assert!(
-        exists(&h, "tarefa criada no clique"),
-        "a tarefa aparece no painel do bloco"
+        app(&mut h)
+            .tasks
+            .iter()
+            .find(|x| x.id == t.id)
+            .unwrap()
+            .done,
+        "x conclui"
     );
+    key(&mut h, Modifiers::NONE, Key::Escape);
+    assert_eq!(app(&mut h).view, View::Sessions, "Esc volta");
 
     kill_all(&mut h);
 }
@@ -381,16 +612,6 @@ fn notas_por_sessao() {
         "a nota da outra sessão não muda"
     );
 
-    // notas de bloco (de antes) vão pra sessão em foco do bloco ao reabrir
-    let block = app(&mut h).block_of(a).unwrap();
-    app(&mut h).update_block(block, |bl| bl.notes = "nota do bloco".into());
-    app(&mut h).migrate_block_notes();
-    assert_eq!(app(&mut h).sessions[&a].s.notes, "outra\n\nnota do bloco");
-    assert!(
-        app(&mut h).blocks[&block].notes.is_empty(),
-        "o bloco fica sem nota"
-    );
-
     kill_all(&mut h);
 }
 
@@ -403,17 +624,13 @@ fn modais_toasts_e_abas() {
     let mut h = harness([1500.0, 900.0]);
     let _id = terminal(&mut h, "x", "sleep 60");
 
-    // abas da topbar
-    for (label, view) in [
-        ("Aba Worktrees", View::Worktrees),
-        ("Aba Tokens", View::Usage),
-        ("Aba Config", View::Settings),
-        ("Aba Sessões", View::Sessions),
-    ] {
+    // paradas da barra
+    for (label, view) in [("Aba Tokens", View::Usage), ("Aba Tarefas", View::Tasks)] {
         click(&mut h, label);
         assert_eq!(app(&mut h).view, view, "aba {label}");
     }
-    assert!(!exists(&h, "Aba Ajuda"), "a Ajuda fica fora da barra");
+    click(&mut h, "Aba Sessões");
+    assert_eq!(app(&mut h).view, View::Sessions);
     key(&mut h, Modifiers::NONE, Key::F1);
     assert_eq!(app(&mut h).view, View::Help, "F1 abre a Ajuda");
     click(&mut h, "Aba Sessões");
@@ -468,21 +685,19 @@ fn modais_toasts_e_abas() {
         "Salvar renomeia"
     );
 
-    // módulo desligado: aba some e atalho fica inerte (não vaza)
+    // módulo desligado: parada some e atalho fica inerte (não vaza)
     app(&mut h).cfg.modules.insert("worktrees".into(), false);
     frames(&mut h, 2);
-    assert!(
-        !exists(&h, "Aba Worktrees"),
-        "aba Worktrees some com o módulo desligado"
-    );
     key(&mut h, ctrl_shift(), Key::G);
     assert_ne!(app(&mut h).view, View::Worktrees);
     app(&mut h).cfg.modules.insert("tasks".into(), false);
-    key(&mut h, ctrl_shift(), Key::Space);
+    frames(&mut h, 2);
     assert!(
-        app(&mut h).modal.is_none(),
-        "captura rápida inerte com Tarefas desligado"
+        !exists(&h, "Aba Tarefas"),
+        "Tarefas some com o módulo desligado"
     );
+    key(&mut h, ctrl_shift(), Key::Space);
+    assert_ne!(app(&mut h).view, View::Tasks, "atalho inerte");
 
     kill_all(&mut h);
 }
@@ -603,7 +818,7 @@ fn config_alterar_atalho() {
     );
     click(
         &mut h,
-        "Tecla de prefixo padrão: Fechar o que está em foco (terminal, bloco vazio ou a aba)",
+        "Tecla de prefixo padrão: Fechar o que está em foco (o terminal, nunca a sessão inteira)",
     );
     assert_eq!(app(&mut h).keymap.prefix_keys(Action::CloseFocused), ["x"]);
     assert!(
@@ -709,27 +924,22 @@ fn prefixo_estilo_tmux() {
     key(&mut h, Modifiers::NONE, Key::Escape);
     app(&mut h).modal = None;
 
-    // n/p andam pelas abas da barra; x numa aba volta pras Sessões
+    // n/p andam pelas abas: Tarefas, Sessões, Tokens; x numa tela volta pros terminais
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::N);
-    assert_eq!(app(&mut h).view, View::Worktrees, "Ctrl+B n");
+    assert_eq!(app(&mut h).view, View::Usage, "Ctrl+B n");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::N);
-    assert_eq!(app(&mut h).view, View::Changes);
+    assert_eq!(app(&mut h).view, View::Tasks, "dá a volta");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::P);
-    assert_eq!(app(&mut h).view, View::Worktrees, "Ctrl+B p");
+    assert_eq!(app(&mut h).view, View::Usage, "Ctrl+B p");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::X);
-    assert_eq!(
-        app(&mut h).view,
-        View::Sessions,
-        "Ctrl+B x na aba volta pras sessões"
-    );
+    assert_eq!(app(&mut h).view, View::Sessions, "Ctrl+B x na tela volta");
     key(&mut h, ctrl(), Key::B);
     key(&mut h, Modifiers::NONE, Key::P);
-    let last = *app(&mut h).tabs().last().unwrap();
-    assert_eq!(app(&mut h).view, last, "p dá a volta");
+    assert_eq!(app(&mut h).view, View::Tasks, "Ctrl+B p");
     app(&mut h).set_view(View::Sessions);
 
     // workspaces: criar, Ctrl+B 1 / 2, Tab vai e volta
@@ -845,13 +1055,14 @@ fn tecla_lider() {
     key(&mut h, Modifiers::NONE, Key::Escape);
     assert!(app(&mut h).leader.is_none(), "Esc fecha");
 
-    // líder → b → n: novo bloco (abre o nome)
-    let blocks = app(&mut h).blocks.len();
+    // líder → b → n: nova sessão (abre o diálogo)
     key(&mut h, ctrl(), Key::Space);
     key(&mut h, Modifiers::NONE, Key::B);
     key(&mut h, Modifiers::NONE, Key::N);
-    assert_eq!(app(&mut h).blocks.len(), blocks + 1, "líder b n cria bloco");
-    assert!(is_modal(&mut h, |m| matches!(m, Modal::RenameBlock { .. })));
+    assert!(
+        is_modal(&mut h, |m| matches!(m, Modal::NewSession(f) if f.new_block)),
+        "líder b n abre a nova sessão"
+    );
     key(&mut h, Modifiers::NONE, Key::Escape);
 
     // clique nos itens do menu
@@ -866,13 +1077,9 @@ fn tecla_lider() {
     click(&mut h, "Fechar menu");
     assert!(app(&mut h).leader.is_none(), "Fechar menu");
 
-    // módulo desligado: o grupo Tarefas some do menu
+    // módulo desligado: a tecla dele vira inválida no menu
     app(&mut h).cfg.modules.insert("tasks".into(), false);
     key(&mut h, ctrl(), Key::Space);
-    assert!(
-        !exists(&h, "Tarefas  ›"),
-        "grupo de módulo desligado não aparece"
-    );
     key(&mut h, Modifiers::NONE, Key::T);
     assert!(
         app(&mut h).leader.as_ref().unwrap().error.is_some(),
@@ -904,9 +1111,9 @@ fn tecla_lider() {
     kill_all(&mut h);
 }
 
-/// O `aic` de linha de comando (Layne) pede ao app aberto pela caixa de entrada.
+/// O `aic` de linha de comando (Anakin) pede ao app aberto pela caixa de entrada.
 #[test]
-fn caixa_de_entrada_do_layne() {
+fn caixa_de_entrada_do_anakin() {
     use aic_core::inbox::{self, Command};
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = sandbox("inbox", "");
@@ -959,7 +1166,6 @@ fn caixa_de_entrada_do_layne() {
         shell: true,
         branch: None,
         prompt: None,
-        task: None,
     })
     .unwrap();
     wait_until(&mut h, "sessão aberta", |a| {
@@ -981,7 +1187,6 @@ fn caixa_de_entrada_do_layne() {
         shell: true,
         branch: None,
         prompt: None,
-        task: None,
     })
     .unwrap();
     frames(&mut h, 2);

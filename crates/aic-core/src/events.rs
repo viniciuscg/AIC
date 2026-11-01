@@ -78,7 +78,7 @@ fn truncate(s: &str, n: usize) -> String {
 /// O que o app deve fazer quando o estado muda.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Effect {
-    /// Terminou o turno: som do AIC + notificação.
+    /// Terminou o turno: sabre de luz + notificação.
     Finished,
     /// Precisa de você (permissão, pergunta).
     NeedsYou(String),
@@ -222,25 +222,21 @@ impl EventTail {
         self.dir.clone().unwrap_or_else(paths::events_dir)
     }
 
-    pub fn poll(&mut self) -> Vec<HookEvent> {
+    /// Eventos novos das sessões abertas. Olha só o arquivo de cada uma: a pasta guarda o
+    /// histórico de todas as sessões que já existiram, listar ela toda a cada 250 ms é desperdício.
+    pub fn poll(&mut self, sessions: impl IntoIterator<Item = Id>) -> Vec<HookEvent> {
+        let dir = self.dir();
         let mut out = Vec::new();
-        let Ok(rd) = std::fs::read_dir(self.dir()) else {
-            return out;
-        };
-        for entry in rd.flatten() {
-            let path = entry.path();
-            if path.extension().is_none_or(|x| x != "jsonl") {
-                continue;
-            }
-            let Ok(len) = entry.metadata().map(|m| m.len()) else {
+        for id in sessions {
+            let path = dir.join(format!("{id}.jsonl"));
+            let Ok(len) = std::fs::metadata(&path).map(|m| m.len()) else {
                 continue;
             };
-            let off = self.offsets.get(&path).copied().unwrap_or(0);
+            let mut off = self.offsets.get(&path).copied().unwrap_or(0);
             if len < off {
                 // arquivo truncado/recriado
-                self.offsets.insert(path.clone(), 0);
+                off = 0;
             }
-            let off = self.offsets.get(&path).copied().unwrap_or(0);
             if len == off {
                 continue;
             }
@@ -348,14 +344,15 @@ mod tests {
     fn tail_le_so_linhas_novas_e_completas() {
         let dir = std::env::temp_dir().join(format!("aic-ev-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("s.jsonl");
+        let id = Id::nil();
+        let file = dir.join(format!("{id}.jsonl"));
         let line = serde_json::to_string(&ev("Stop")).unwrap();
         std::fs::write(&file, format!("{line}\n{line}")).unwrap(); // 2ª incompleta
         let mut tail = EventTail::with_dir(dir.clone());
-        assert_eq!(tail.poll().len(), 1);
-        assert_eq!(tail.poll().len(), 0);
+        assert_eq!(tail.poll([id]).len(), 1);
+        assert_eq!(tail.poll([id]).len(), 0);
         std::fs::write(&file, format!("{line}\n{line}\n")).unwrap();
-        assert_eq!(tail.poll().len(), 1);
+        assert_eq!(tail.poll([id]).len(), 1);
         let _ = std::fs::remove_dir_all(dir);
     }
 }

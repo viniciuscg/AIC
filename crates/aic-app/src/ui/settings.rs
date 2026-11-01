@@ -1,4 +1,4 @@
-//! Aba Config: geral, som, Layne, cache e o catálogo de atalhos (editável).
+//! Aba Config: geral, som, Anakin, cache e o catálogo de atalhos (editável).
 
 use egui::{FontId, Key, KeyboardShortcut, RichText, ScrollArea, TextEdit, Ui};
 
@@ -85,7 +85,6 @@ impl Find {
 }
 
 const GERAL: &[(&str, &str)] = &[
-    ("Visualização", "blocos abas foco grade layout sessões"),
     ("Assistente", "primeiro uso setup"),
     ("Fonte do terminal", "font tamanho zoom"),
     ("Escala da interface", "zoom ui tamanho"),
@@ -93,14 +92,13 @@ const GERAL: &[(&str, &str)] = &[
 ];
 const SOM: &[(&str, &str)] = &[
     ("Som", "volume tocar"),
-    ("Quando terminar", "som terminou acabou done"),
-    ("Quando precisar de você", "som permissão atenção"),
+    ("Qual som", "sabre star wars arquivo ouvir"),
     ("Notificação", "notify-send desktop sistema foco"),
 ];
 const CLAUDE: &[(&str, &str)] = &[("Injeção por sessão", "settings plugin hooks statusline")];
-const LAYNE: &[(&str, &str)] = &[
+const ANAKIN: &[(&str, &str)] = &[
     (
-        "Sessão do Layne",
+        "Sessão do Anakin",
         "assistente agente iniciar modelo conversa",
     ),
     (
@@ -167,6 +165,13 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     );
     ui.add_space(4.0);
 
+    ui.label(
+        widgets::subtle(
+            "Tab anda entre os campos · Espaço aciona · Ctrl+B / pesquisa",
+            &theme,
+        )
+        .small(),
+    );
     let f = Find::new(&app.settings.search);
     let mut shown = 0;
     ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -178,26 +183,13 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             egui::Grid::new("geral").num_columns(2).spacing([16.0, 8.0]).show(ui, |ui| {
                 let row = |i: usize| f.row("Geral", GERAL[i].0, GERAL[i].1);
                 if row(0) {
-                    ui.label("Visualização");
-                    ui.horizontal(|ui| {
-                        for v in aic_core::SessionView::ALL {
-                            if ui.selectable_label(app.cfg.view == v, v.label()).on_hover_text(v.desc()).clicked() {
-                                app.cfg.view = v;
-                                let _ = app.cfg.save();
-                            }
-                        }
-                        ui.label(widgets::subtle(app.keymap.label(Action::CycleView), &theme).small());
-                    });
-                    ui.end_row();
-                }
-                if row(1) {
                     ui.label("Assistente");
                     if ui.button("Rodar o assistente de primeiro uso de novo").clicked() {
                         app.phase = crate::app::Phase::Setup(Default::default());
                     }
                     ui.end_row();
                 }
-                if row(2) {
+                if row(1) {
                     ui.label("Fonte do terminal");
                     ui.horizontal(|ui| {
                         let r = ui.add(TextEdit::singleline(&mut app.cfg.font_family).desired_width(260.0));
@@ -212,7 +204,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     });
                     ui.end_row();
                 }
-                if row(3) {
+                if row(2) {
                     ui.label("Escala da interface");
                     let mut scale = app.cfg.ui_scale;
                     if ui.add(egui::Slider::new(&mut scale, 0.8..=1.6).step_by(0.05)).drag_stopped() {
@@ -224,7 +216,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     }
                     ui.end_row();
                 }
-                if row(4) {
+                if row(3) {
                     ui.label("Pastas de projetos");
                     ui.vertical(|ui| {
                         let mut s = app.cfg.repos_dirs.iter().map(|p| aic_core::paths::pretty(p)).collect::<Vec<_>>().join("\n");
@@ -266,22 +258,29 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     ui.end_row();
                 }
                 if row(1) {
-                    ui.label("Quando terminar");
-                    sound_picker(app, ui, "som-done", false, crate::sounds::DEFAULT_DONE);
+                    ui.label("Qual som");
+                    ui.horizontal(|ui| {
+                        let mut f = app.cfg.sound.file.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+                        if ui.add(TextEdit::singleline(&mut f).hint_text("sabre de luz (ou o caminho de um arquivo seu)").desired_width(340.0)).lost_focus() {
+                            app.cfg.sound.file = (!f.trim().is_empty()).then(|| f.trim().replace('~', &aic_core::paths::home_dir().to_string_lossy()).into());
+                            let _ = app.cfg.save();
+                        }
+                        if ui.button("▶ ouvir").clicked() {
+                            match crate::sounds::path(&app.cfg.sound) {
+                                Some(p) => crate::notify::play(&p, app.cfg.sound.volume),
+                                None => app.toast("Não consegui gerar o som", ToastKind::Warn),
+                            }
+                        }
+                    });
                     ui.end_row();
                 }
                 if row(2) {
-                    ui.label("Quando precisar de você");
-                    sound_picker(app, ui, "som-attn", true, crate::sounds::DEFAULT_DONE);
-                    ui.end_row();
-                }
-                if row(3) {
                     ui.label("Notificação");
                     ui.vertical(|ui| {
                         ui.checkbox(&mut app.cfg.notify.desktop, "notificação do sistema (notify-send)");
                         ui.checkbox(&mut app.cfg.notify.only_when_unfocused, "só se a janela estiver sem foco ou a sessão escondida");
                         if ui.button("testar notificação").clicked() {
-                            crate::notify::desktop(&format!("{} — teste", crate::brand::NAME), "Se você está vendo isso, funciona.", crate::app::icon_path());
+                            crate::notify::desktop("hermes acabou", "Se você está vendo isso, funciona.", crate::app::icon_path());
                         }
                     });
                     ui.end_row();
@@ -317,10 +316,10 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             });
         }
 
-        if f.any("Layne (assistente)", LAYNE) {
+        if f.any("Anakin (assistente)", ANAKIN) {
             shown += 1;
-            section(ui, &theme, "Layne (assistente)");
-            crate::layne::settings(app, ui, |i| f.row("Layne (assistente)", LAYNE[i].0, LAYNE[i].1));
+            section(ui, &theme, "Anakin (assistente)");
+            crate::anakin::settings(app, ui, |i| f.row("Anakin (assistente)", ANAKIN[i].0, ANAKIN[i].1));
         }
 
         if f.any("Cache (estilo tmux)", CACHE) {
@@ -658,85 +657,6 @@ fn section(ui: &mut Ui, theme: &crate::theme::Theme, title: &str) {
             .strong(),
     );
     ui.separator();
-}
-
-/// Lista de sons com ▶ pra ouvir cada um. `attention` = campo "precisa de você" (aceita "nenhum").
-fn sound_picker(app: &mut App, ui: &mut Ui, id: &str, attention: bool, default_done: &str) {
-    let current = if attention {
-        app.cfg.sound.attention.clone()
-    } else {
-        app.cfg.sound.done.clone()
-    };
-    let label = match &current {
-        Some(id) => crate::sounds::name_of(id),
-        None if attention => "nenhum".into(),
-        None => format!("padrão ({})", crate::sounds::name_of(default_done)),
-    };
-    ui.horizontal(|ui| {
-        let mut pick: Option<Option<String>> = None;
-        egui::ComboBox::from_id_salt(id)
-            .selected_text(label)
-            .width(300.0)
-            .show_ui(ui, |ui| {
-                if attention {
-                    if ui.selectable_label(current.is_none(), "nenhum").clicked() {
-                        pick = Some(None);
-                    }
-                } else if ui
-                    .selectable_label(
-                        current.is_none(),
-                        format!("padrão ({})", crate::sounds::name_of(default_done)),
-                    )
-                    .clicked()
-                {
-                    pick = Some(None);
-                }
-                for s in crate::sounds::catalog() {
-                    let r = ui.selectable_label(
-                        current.as_deref() == Some(&s.id),
-                        format!("{}  ·  {}", s.name, s.desc),
-                    );
-                    if r.clicked() {
-                        pick = Some(Some(s.id.clone()));
-                    }
-                    if r.hovered() && ui.input(|i| i.key_pressed(egui::Key::Space)) {
-                        if let Some(p) = crate::sounds::resolve(&s.id) {
-                            crate::notify::play(&p, app.cfg.sound.volume);
-                        }
-                    }
-                }
-            });
-        if let Some(v) = pick {
-            if attention {
-                app.cfg.sound.attention = v;
-            } else {
-                app.cfg.sound.done = v;
-            }
-            let _ = app.cfg.save();
-        }
-        let play = current
-            .clone()
-            .or_else(|| (!attention).then(|| default_done.to_string()));
-        if ui
-            .add_enabled(play.is_some(), egui::Button::new("▶ ouvir"))
-            .clicked()
-        {
-            match play.as_deref().and_then(crate::sounds::resolve) {
-                Some(p) => crate::notify::play(&p, app.cfg.sound.volume),
-                None => app.toast(
-                    "Esse som não foi encontrado na pasta de sons",
-                    ToastKind::Warn,
-                ),
-            }
-        }
-        if ui
-            .button("📁 pasta")
-            .on_hover_text("Coloque .mp3/.ogg/.wav aqui e eles aparecem na lista")
-            .clicked()
-        {
-            let _ = open::that_detached(aic_core::paths::sounds_dir());
-        }
-    });
 }
 
 #[allow(dead_code)]

@@ -33,8 +33,8 @@ Escreva um rascunho curto (o que mudou, como testar, branch/PR). Mostre ao usuá
 
 ```bash
 PK="${AIC_BIN:-aic}"
-"$PK" tasks                     # ache o id (a tarefa da sessão está em $AIC_TASK)
-"$PK" done "${AIC_TASK:-<id>}"
+"$PK" tasks                     # ache o id
+"$PK" done <id>
 ```
 
 Pendências que sobraram → registre com a skill `aic:tarefas` antes de concluir. Se houver worktree aberto e o trabalho já estiver mergeado, ofereça fechá-lo (skill `aic:worktree`).

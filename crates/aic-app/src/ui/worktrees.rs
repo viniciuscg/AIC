@@ -86,6 +86,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     };
                     if ui
                         .selectable_label(app.worktrees.repo.as_deref() == Some(&r), label)
+                        .on_hover_text("[ ] troca de repo")
                         .clicked()
                     {
                         app.worktrees.repo = Some(r.clone());
@@ -139,7 +140,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if ui
                 .button("Prune")
-                .on_hover_text("git worktree prune (limpa registros de pastas que sumiram)")
+                .on_hover_text("git worktree prune: limpa registros de pastas que sumiram (p)")
                 .clicked()
             {
                 match git::prune(&path) {
@@ -175,6 +176,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 "{}  Criar worktree + sessão Claude",
                 widgets::I_PLUS
             ))
+            .on_hover_text("n escreve a branch · Enter cria")
             .clicked()
             || (r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)));
         if go && !app.worktrees.new_branch.trim().is_empty() {
@@ -190,7 +192,6 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                         SessionKind::Claude,
                         p.clone(),
                         Some(p),
-                        None,
                         vec![],
                     );
                 }
@@ -215,6 +216,26 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         }
         if key(Key::R) {
             app.worktrees.invalidate(&repo);
+        }
+        if key(Key::P) {
+            match git::prune(&path) {
+                Ok(()) => app.toast("Prune feito", ToastKind::Ok),
+                Err(e) => app.toast(&format!("{e}"), ToastKind::Err),
+            }
+            app.worktrees.invalidate(&repo);
+        }
+        let step = if key(Key::OpenBracket) {
+            -1
+        } else if key(Key::CloseBracket) {
+            1
+        } else {
+            0
+        };
+        if step != 0 && !app.repos.is_empty() {
+            let i = app.repos.iter().position(|r| *r == repo).unwrap_or(0) as i32;
+            let next = (i + step).rem_euclid(app.repos.len() as i32) as usize;
+            app.worktrees.repo = Some(app.repos[next].clone());
+            app.worktrees.selected = 0;
         }
     }
     let enter = app.modal.is_none()
@@ -296,7 +317,11 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                                 state,
                                 &theme,
                             );
-                            if ui.link(app.session_label(*u)).clicked() {
+                            if ui
+                                .link(app.session_label(*u))
+                                .on_hover_text("Ir pra este terminal")
+                                .clicked()
+                            {
                                 app.focus(*u);
                             }
                         });
@@ -322,7 +347,13 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             ui.label(widgets::subtle("A branch continua existindo. Mudanças não commitadas impedem a remoção (a menos que force).", &theme));
             ui.horizontal(|ui| {
                 for (label, force) in [("Remover", false), ("Forçar (descarta mudanças)", true)] {
-                    if ui.button(label).clicked() {
+                    let key = if force { Key::F } else { Key::Enter };
+                    if ui
+                        .button(label)
+                        .on_hover_text(if force { "F" } else { "Enter" })
+                        .clicked()
+                        || ui.input(|i| i.key_pressed(key))
+                    {
                         match git::remove_worktree(&path, &p, force) {
                             Ok(()) => app.toast("Worktree removido", ToastKind::Ok),
                             Err(e) => app.toast(&format!("{e}"), ToastKind::Err),
@@ -331,7 +362,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                         close = true;
                     }
                 }
-                if ui.button("Cancelar").clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                if ui.button("Cancelar").on_hover_text("Esc").clicked()
+                    || ui.input(|i| i.key_pressed(Key::Escape))
+                {
                     close = true;
                 }
             });
@@ -360,7 +393,6 @@ fn open_here(app: &mut App, ui: &Ui, wt: &Worktree) {
         SessionKind::Claude,
         wt.path.clone(),
         worktree,
-        None,
         vec![],
     );
 }

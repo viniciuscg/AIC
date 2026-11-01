@@ -1,21 +1,13 @@
 //! Diálogos. Todos fecham com Esc e funcionam só no teclado.
 
-use aic_core::quickadd::{self, ChipKind};
-use aic_core::{Id, SessionKind, Task, TaskStatus, git};
-use chrono::Local;
+use aic_core::{Id, SessionKind, git};
 use egui::{Align, Context, FontId, Key, Layout, RichText, TextEdit, Ui, Vec2};
 
-use super::widgets::{self, I_TASK, I_WORKTREE};
+use super::widgets::{self, I_WORKTREE};
 use crate::actions::Action;
 use crate::app::App;
 
 pub enum Modal {
-    QuickAdd {
-        text: String,
-        status: TaskStatus,
-        link: Option<Id>,
-        link_enabled: bool,
-    },
     NewSession(NewSessionForm),
     CloseSession {
         id: Id,
@@ -61,7 +53,8 @@ pub struct NewSessionForm {
     pub repo_sel: usize,
     pub worktree: bool,
     pub branch: String,
-    pub task: Option<Id>,
+    /// Abre numa sessão nova da barra (senão, um terminal a mais na sessão atual).
+    pub new_block: bool,
     pub perm: usize,
     pub model: usize,
     pub first: bool,
@@ -101,24 +94,11 @@ impl NewSessionForm {
             repo_sel: 0,
             worktree: false,
             branch: String::new(),
-            task: None,
+            new_block: false,
             perm: 0,
             model: 0,
             first: true,
         }
-    }
-
-    pub fn for_task(app: &App, t: &Task) -> Self {
-        let mut f = Self::new(app, SessionKind::Claude);
-        f.name = t
-            .card_key
-            .clone()
-            .unwrap_or_else(|| widgets::truncate(&t.title, 24));
-        f.repo_query = t.repo.clone().unwrap_or_default();
-        f.worktree = t.repo.is_some();
-        f.branch = git::branch_slug(t.card_key.as_deref(), &t.title);
-        f.task = Some(t.id);
-        f
     }
 }
 
@@ -178,12 +158,6 @@ pub fn show(app: &mut App, ctx: &Context) {
     };
     let esc = ctx.input(|i| i.key_pressed(Key::Escape));
     let keep = match modal {
-        Modal::QuickAdd {
-            text,
-            status,
-            link,
-            link_enabled,
-        } => quick_add(app, ctx, text, status, link, link_enabled),
         Modal::NewSession(f) => new_session(app, ctx, f),
         Modal::CloseSession {
             id,
@@ -254,108 +228,6 @@ fn list_nav(ui: &Ui, selected: &mut usize, len: usize) -> bool {
     enter
 }
 
-// ───────────────────────── captura rápida ─────────────────────────
-
-fn quick_add(
-    app: &mut App,
-    ctx: &Context,
-    mut text: String,
-    mut status: TaskStatus,
-    link: Option<Id>,
-    mut link_enabled: bool,
-) -> Option<Modal> {
-    let theme = app.theme.clone();
-    let mut submit = false;
-    let mut close = false;
-    let ws_names: Vec<String> = app.workspaces.iter().map(|w| w.name.clone()).collect();
-    let parsed = quickadd::parse(&text, Local::now().date_naive(), &app.repos, &ws_names);
-    let closed = frame(ctx, "quick-add", 620.0, |ui| {
-        ui.horizontal(|ui| {
-            ui.label(
-                RichText::new(format!("{I_TASK}  Nova tarefa"))
-                    .font(FontId::monospace(16.0))
-                    .color(theme.accent_hi),
-            );
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                for s in TaskStatus::ALL.iter().rev() {
-                    if ui.selectable_label(status == *s, s.label()).clicked() {
-                        status = *s;
-                    }
-                }
-            });
-        });
-        ui.add_space(6.0);
-        let edit = ui.add(
-            TextEdit::singleline(&mut text)
-                .hint_text("o que precisa ser feito?  #repo @hoje !alta +workspace ^DEV-123 ~tag")
-                .font(FontId::proportional(17.0))
-                .desired_width(f32::INFINITY)
-                .margin(Vec2::new(10.0, 10.0)),
-        );
-        edit.request_focus();
-        if ui.input(|i| i.key_pressed(Key::Enter)) {
-            submit = true;
-        }
-        ui.add_space(6.0);
-        ui.horizontal_wrapped(|ui| {
-            if parsed.chips.is_empty() {
-                ui.label(
-                    widgets::subtle(
-                        "Enter cria · Esc cancela · marcadores são opcionais",
-                        &theme,
-                    )
-                    .small(),
-                );
-            }
-            for c in &parsed.chips {
-                let (icon, color) = match c.kind {
-                    ChipKind::Repo => ("", theme.accent),
-                    ChipKind::Due => ("󰃭", theme.warn),
-                    ChipKind::Priority => ("󰈻", theme.err),
-                    ChipKind::Workspace => ("󰕰", theme.attention),
-                    ChipKind::Card => ("󰈙", theme.accent_hi),
-                    ChipKind::Tag => ("󰓹", theme.dim),
-                    ChipKind::Unknown => ("?", theme.faint),
-                };
-                widgets::chip(ui, format!("{icon} {}", c.label), color, &theme);
-            }
-        });
-        if let Some(sid) = link {
-            ui.add_space(4.0);
-            ui.checkbox(
-                &mut link_enabled,
-                format!("vincular à sessão \"{}\"", app.session_label(sid)),
-            );
-        }
-        if ui.input(|i| i.modifiers.alt && i.key_pressed(Key::L)) {
-            link_enabled = !link_enabled;
-        }
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            if ui.button("Criar  ⏎").clicked() {
-                submit = true;
-            }
-            if ui.button("Cancelar").clicked() {
-                close = true;
-            }
-        });
-    });
-    if submit && !text.trim().is_empty() {
-        let l = if link_enabled { link } else { None };
-        app.quick_add(&text, status, l);
-        return None;
-    }
-    if closed || close {
-        return None;
-    }
-    Some(Modal::QuickAdd {
-        text,
-        status,
-        link,
-        link_enabled,
-    })
-}
-
 // ───────────────────────── nova sessão ─────────────────────────
 
 fn new_session(app: &mut App, ctx: &Context, mut f: NewSessionForm) -> Option<Modal> {
@@ -365,14 +237,26 @@ fn new_session(app: &mut App, ctx: &Context, mut f: NewSessionForm) -> Option<Mo
     let mut cancel = false;
     let closed = frame(ctx, "new-session", 640.0, |ui| {
         ui.label(
-            RichText::new(format!("{}  Nova sessão", widgets::I_TERM))
-                .font(FontId::monospace(16.0))
-                .color(theme.accent_hi),
+            RichText::new(format!(
+                "{}  {}",
+                widgets::I_TERM,
+                if f.new_block {
+                    "Nova sessão"
+                } else {
+                    "Novo terminal nesta sessão"
+                }
+            ))
+            .font(FontId::monospace(16.0))
+            .color(theme.accent_hi),
         );
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             for (i, k) in KINDS.iter().enumerate() {
-                if ui.selectable_label(f.kind == i, *k).clicked() {
+                if ui
+                    .selectable_label(f.kind == i, *k)
+                    .on_hover_text(format!("Alt+{}", i + 1))
+                    .clicked()
+                {
                     f.kind = i;
                 }
             }
@@ -460,51 +344,42 @@ fn new_session(app: &mut App, ctx: &Context, mut f: NewSessionForm) -> Option<Mo
                 ui.end_row();
 
                 if f.kind == 0 {
-                    ui.label("Permissões");
+                    ui.label("Permissões").on_hover_text("Alt+P troca");
                     ui.horizontal(|ui| {
                         for (i, (l, _)) in PERMS.iter().enumerate() {
-                            if ui.selectable_label(f.perm == i, *l).clicked() {
+                            if ui
+                                .selectable_label(f.perm == i, *l)
+                                .on_hover_text("Alt+P troca")
+                                .clicked()
+                            {
                                 f.perm = i;
                             }
                         }
                     });
                     ui.end_row();
-                    ui.label("Modelo");
+                    ui.label("Modelo").on_hover_text("Alt+M troca");
                     ui.horizontal(|ui| {
                         for (i, (l, _)) in MODELS.iter().enumerate() {
-                            if ui.selectable_label(f.model == i, *l).clicked() {
+                            if ui
+                                .selectable_label(f.model == i, *l)
+                                .on_hover_text("Alt+M troca")
+                                .clicked()
+                            {
                                 f.model = i;
                             }
                         }
                     });
                     ui.end_row();
                 }
-
-                ui.label("Tarefa");
-                let label = f
-                    .task
-                    .and_then(|id| app.tasks.iter().find(|t| t.id == id))
-                    .map(|t| t.title.clone())
-                    .unwrap_or_else(|| "nenhuma".into());
-                egui::ComboBox::from_id_salt("ns-task")
-                    .selected_text(widgets::truncate(&label, 50))
-                    .width(420.0)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut f.task, None, "nenhuma");
-                        for t in app.tasks.iter().filter(|t| {
-                            !matches!(t.status, TaskStatus::Done | TaskStatus::Archived)
-                        }) {
-                            ui.selectable_value(
-                                &mut f.task,
-                                Some(t.id),
-                                widgets::truncate(&t.title, 60),
-                            );
-                        }
-                    });
-                ui.end_row();
             });
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::ALT, Key::W)) {
             f.worktree = !f.worktree;
+        }
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::ALT, Key::P)) {
+            f.perm = (f.perm + 1) % PERMS.len();
+        }
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::ALT, Key::M)) {
+            f.model = (f.model + 1) % MODELS.len();
         }
         let enter = list_nav(ui, &mut f.repo_sel, options.len().min(40));
         if enter {
@@ -515,7 +390,7 @@ fn new_session(app: &mut App, ctx: &Context, mut f: NewSessionForm) -> Option<Mo
             if ui.button("Abrir  ⏎").clicked() {
                 create = true;
             }
-            if ui.button("Cancelar").clicked() {
+            if ui.button("Cancelar").on_hover_text("Esc").clicked() {
                 cancel = true;
             }
             ui.label(widgets::subtle("↑↓ escolhe a pasta · Enter abre", &theme).small());
@@ -576,7 +451,11 @@ fn new_session(app: &mut App, ctx: &Context, mut f: NewSessionForm) -> Option<Mo
                 args.extend(["--model".to_string(), MODELS[f.model].1.to_string()]);
             }
         }
-        app.create_session(ctx, name, kind, cwd, worktree, f.task, args);
+        if f.new_block {
+            app.create_session_in(ctx, None, name, kind, cwd, worktree, args, None);
+        } else {
+            app.create_session(ctx, name, kind, cwd, worktree, args);
+        }
         return None;
     }
     if closed || cancel {
@@ -619,7 +498,7 @@ fn close_session(
             {
                 done = Some(true);
             }
-            if ui.button("Cancelar").clicked() {
+            if ui.button("Cancelar").on_hover_text("Esc").clicked() {
                 done = Some(false);
             }
         });
@@ -643,7 +522,7 @@ fn rename(app: &mut App, ctx: &Context, id: Id, mut text: String, first: bool) -
     let mut done = false;
     let mut cancel = false;
     let closed = frame(ctx, "rename", 380.0, |ui| {
-        ui.label("Renomear sessão");
+        ui.label("Renomear terminal");
         let r = ui.add(TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
         if first {
             r.request_focus();
@@ -711,7 +590,7 @@ fn rename_block(
     let mut done = false;
     let mut cancel = false;
     let closed = frame(ctx, "rename-block", 420.0, |ui| {
-        ui.label("Nome do bloco (ex: o card ou o assunto)");
+        ui.label("Nome da sessão (ex: hermes, wallet)");
         let r = ui.add(TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
         if first {
             r.request_focus();
@@ -759,8 +638,11 @@ fn close_block(
         .unwrap_or_default();
     let mut done = None;
     let closed = frame(ctx, "close-block", 460.0, |ui| {
-        ui.label(RichText::new(format!("Fechar o bloco \"{name}\"?")).size(16.0));
-        ui.label(widgets::subtle(format!("{n} terminal(is) serão encerrados. As conversas do Claude ficam salvas; notas e tarefas também."), &theme));
+        ui.label(RichText::new(format!("Fechar a sessão \"{name}\" inteira?")).size(16.0));
+        ui.label(widgets::subtle(
+            format!("{n} terminal(is) serão encerrados. As conversas do Claude ficam salvas."),
+            &theme,
+        ));
         if has_wt {
             ui.checkbox(
                 &mut remove_wt,
@@ -828,7 +710,7 @@ fn workspaces(
         );
         ui.label(
             widgets::subtle(
-                "Um workspace agrupa sessões, tarefas e layout. Trocar não mata processos.",
+                "Um workspace agrupa sessões. Trocar não mata processos.",
                 &theme,
             )
             .small(),
@@ -840,6 +722,12 @@ fn workspaces(
         );
         r.request_focus();
         let enter = list_nav(ui, &mut selected, list.len() + 1);
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::ALT, Key::D))
+            && app.workspaces.len() > 1
+            && let Some((i, _, _)) = list.get(selected)
+        {
+            delete = Some(*i);
+        }
         for (k, (i, name, n)) in list.iter().enumerate() {
             ui.horizontal(|ui| {
                 let current = *i == app.ws;
@@ -859,7 +747,7 @@ fn workspaces(
                             ui,
                             "🗑",
                             &format!("Apagar workspace {name}"),
-                            "Apagar (fecha as sessões dele)",
+                            "Apagar (fecha as sessões dele) · Alt+D apaga o selecionado",
                         )
                         .clicked()
                     {
@@ -927,10 +815,10 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
             ));
         }
     }
-    // só as sessões do workspace atual: as de outro aparecem quando você troca pra ele
+    // só os terminais do workspace atual: os de outro aparecem quando você troca pra ele
     for id in app.ws_sessions() {
         if let Some(rt) = app.sessions.get(&id) {
-            let label = format!("Sessão › {}", rt.s.name);
+            let label = format!("Terminal › {}", rt.s.name);
             if matches(&label) {
                 items.push((
                     label,
@@ -940,21 +828,14 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
             }
         }
     }
-    for t in app
-        .tasks
-        .iter()
-        .filter(|t| !matches!(t.status, TaskStatus::Archived))
-    {
-        let label = format!(
-            "Tarefa › {}{}",
-            t.card_key
-                .as_ref()
-                .map(|k| format!("{k} · "))
-                .unwrap_or_default(),
-            t.title
-        );
+    for t in app.tasks.iter().filter(|t| !t.done) {
+        let label = format!("Tarefa › {}", t.title);
         if !q.is_empty() && matches(&label) {
-            items.push((label, t.status.label().to_string(), PaletteItem::Task(t.id)));
+            let hint = t
+                .due
+                .map(|d| d.format("%d/%m").to_string())
+                .unwrap_or_default();
+            items.push((label, hint, PaletteItem::Task(t.id)));
         }
     }
     let mut run = None;
@@ -962,7 +843,7 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
     let closed = frame(ctx, "palette", 600.0, |ui| {
         let r = ui.add(
             TextEdit::singleline(&mut query)
-                .hint_text("ação, sessão ou tarefa…")
+                .hint_text("ação, terminal ou tarefa…")
                 .font(FontId::proportional(16.0))
                 .desired_width(f32::INFINITY)
                 .margin(Vec2::new(8.0, 8.0)),
@@ -1001,7 +882,10 @@ fn palette(app: &mut App, ctx: &Context, mut query: String, mut selected: usize)
             match item {
                 PaletteItem::Action(a) => app.run_action(ctx, a),
                 PaletteItem::Session(id) => app.focus(id),
-                PaletteItem::Task(id) => app.open_task(id),
+                PaletteItem::Task(id) => {
+                    app.set_view(crate::app::View::Tasks);
+                    app.tasks_ui.selected = Some(id);
+                }
             }
         }
         return app.modal.take();
@@ -1034,7 +918,7 @@ fn restore(app: &mut App, ctx: &Context) -> Option<Modal> {
         );
         ui.label(
             widgets::subtle(
-                "(as tarefas nunca se perdem, só as sessões, as notas delas e o layout)",
+                "(as tarefas nunca se perdem, só as sessões e as notas delas)",
                 &theme,
             )
             .small(),
@@ -1079,7 +963,7 @@ fn confirm_quit(app: &mut App, ctx: &Context) -> Option<Modal> {
             format!("{} sessões abertas serão encerradas.", app.sessions.len()),
             &theme,
         ));
-        ui.label(widgets::subtle("Salvando o cache, da próxima vez o AIC pergunta se quer reabrir tudo (as conversas do Claude voltam com --resume).", &theme).small());
+        ui.label(widgets::subtle("Salvando o cache, da próxima vez ele pergunta se quer reabrir tudo (as conversas do Claude voltam com --resume).", &theme).small());
         ui.add_space(12.0);
         ui.horizontal(|ui| {
             if ui

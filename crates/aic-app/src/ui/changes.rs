@@ -208,6 +208,7 @@ fn repo_picker(app: &mut App, ui: &mut Ui, theme: &Theme, root: Option<&Path>) {
         .show_ui(ui, |ui| {
             if ui
                 .selectable_label(app.changes.pinned.is_none(), "seguir o terminal em foco")
+                .on_hover_text("f")
                 .clicked()
             {
                 pick = Some(None);
@@ -329,7 +330,7 @@ fn files(app: &mut App, ui: &mut Ui, theme: &Theme, root: &Path) {
                                 ui,
                                 I_UNSTAGE,
                                 "Unstage tudo",
-                                "Tirar tudo de Staged",
+                                "Tirar tudo de Staged (Shift+U)",
                             )
                             .clicked()
                             {
@@ -339,7 +340,7 @@ fn files(app: &mut App, ui: &mut Ui, theme: &Theme, root: &Path) {
                             ui,
                             I_STAGE,
                             "Stage tudo",
-                            "Mandar tudo pra Staged",
+                            "Mandar tudo pra Staged (Shift+S)",
                         )
                         .clicked()
                         {
@@ -440,7 +441,8 @@ fn file_row(app: &mut App, ui: &mut Ui, theme: &Theme, root: &Path, c: &Change, 
                 if widgets::icon_button(ui, I_STAGE, "Stage", "Mandar pra Staged (s)").clicked() {
                     run(app, git::stage(root, &[&c.path]));
                 }
-                if widgets::icon_button(ui, I_DISCARD, "Descartar", "Descartar a mudança").clicked()
+                if widgets::icon_button(ui, I_DISCARD, "Descartar", "Descartar a mudança (d)")
+                    .clicked()
                 {
                     app.changes.confirm_discard = Some(c.clone());
                 }
@@ -499,7 +501,7 @@ fn diff_view(app: &mut App, ui: &mut Ui, theme: &Theme, root: &Path) {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if ui
                 .small_button(format!("{I_OPEN} abrir no terminal"))
-                .on_hover_text("Abre um shell na pasta do arquivo")
+                .on_hover_text("Abre um shell na pasta do arquivo (o)")
                 .clicked()
             {
                 let dir = root
@@ -509,15 +511,7 @@ fn diff_view(app: &mut App, ui: &mut Ui, theme: &Theme, root: &Path) {
                     .unwrap_or_else(|| root.to_path_buf());
                 let ctx = ui.ctx().clone();
                 let name = format!("{} (shell)", label_of(app, root));
-                app.create_session(
-                    &ctx,
-                    name,
-                    aic_core::SessionKind::Shell,
-                    dir,
-                    None,
-                    None,
-                    vec![],
-                );
+                app.create_session(&ctx, name, aic_core::SessionKind::Shell, dir, None, vec![]);
                 app.set_view(crate::app::View::Sessions);
             }
         });
@@ -607,6 +601,45 @@ fn keyboard(app: &mut App, ui: &mut Ui, root: &Path) {
             run(app, git::unstage(root, &[&c.path]));
         }
     }
+    if let Some((c, _)) = cur.map(|i| rows[i].clone())
+        && key(Key::D)
+    {
+        app.changes.confirm_discard = Some(c);
+    }
+    let shift = |k: Key| ui.input_mut(|i| consume_exact(i, Modifiers::SHIFT, k));
+    if shift(Key::S) {
+        let paths: Vec<&str> = rows
+            .iter()
+            .filter(|(_, s)| !s)
+            .map(|(c, _)| c.path.as_str())
+            .collect();
+        run(app, git::stage(root, &paths));
+    }
+    if shift(Key::U) {
+        let paths: Vec<&str> = rows
+            .iter()
+            .filter(|(_, s)| *s)
+            .map(|(c, _)| c.path.as_str())
+            .collect();
+        run(app, git::unstage(root, &paths));
+    }
+    if key(Key::F) {
+        app.changes.pinned = None;
+        app.changes.invalidate();
+    }
+    if let Some((c, _)) = cur.map(|i| rows[i].clone())
+        && key(Key::O)
+    {
+        let dir = root
+            .join(&c.path)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| root.to_path_buf());
+        let ctx = ui.ctx().clone();
+        let name = format!("{} (shell)", label_of(app, root));
+        app.create_session(&ctx, name, aic_core::SessionKind::Shell, dir, None, vec![]);
+        app.set_view(crate::app::View::Sessions);
+    }
     if key(Key::R) {
         app.changes.invalidate();
     }
@@ -658,12 +691,16 @@ fn discard_modal(app: &mut App, ui: &mut Ui, theme: &Theme, root: &Path) {
         ui.horizontal(|ui| {
             if ui
                 .button(RichText::new("Descartar").color(theme.err))
+                .on_hover_text("Enter")
                 .clicked()
+                || ui.input(|i| i.key_pressed(Key::Enter))
             {
                 run(app, git::discard(root, &c));
                 close = true;
             }
-            if ui.button("Cancelar").clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+            if ui.button("Cancelar").on_hover_text("Esc").clicked()
+                || ui.input(|i| i.key_pressed(Key::Escape))
+            {
                 close = true;
             }
         });

@@ -1,17 +1,18 @@
 //! Estado do app e tudo que não é desenho: sessões, tarefas, eventos, ações, cache.
 
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use aic_core::claude::{Injection, StatusSnapshot};
 use aic_core::events::{Effect, EventTail};
 use aic_core::{
-    Block, Config, Id, Layout, Module, Session, SessionKind, SessionState, SessionView, Store,
-    Task, TaskStatus, Workspace, git, paths,
+    Block, Config, Id, Module, Session, SessionKind, SessionState, Store, Task, Workspace, git,
+    paths,
 };
 use aic_term::{BindingsLayout, TerminalFont};
-use chrono::Local;
 use egui::Context;
 
 use crate::actions::{Action, Keymap};
@@ -21,10 +22,12 @@ use crate::session::Runtime;
 use crate::theme::Theme;
 use crate::ui;
 
-/// Abas da barra superior, na ordem em que aparecem (e em que `Ctrl+B n/p` anda).
+/// O que ocupa a tela. Tarefas, Sessões e Tokens são as abas da barra (`Ctrl+Tab`); o resto abre
+/// pelo prefixo ou pela paleta e não fica à vista.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Sessions,
+    Tasks,
     Worktrees,
     Changes,
     Usage,
@@ -33,35 +36,15 @@ pub enum View {
 }
 
 impl View {
-    pub const ALL: [View; 6] = [
-        View::Sessions,
-        View::Worktrees,
-        View::Changes,
-        View::Usage,
-        View::Settings,
-        View::Help,
-    ];
-
     pub fn label(self) -> &'static str {
         match self {
             View::Sessions => "Sessões",
+            View::Tasks => "Tarefas",
             View::Worktrees => "Worktrees",
             View::Changes => "Changes",
             View::Usage => "Tokens",
             View::Settings => "Config",
             View::Help => "Ajuda",
-        }
-    }
-
-    /// Ação que abre a aba (a tecla de prefixo dela aparece na barra).
-    pub fn action(self) -> Action {
-        match self {
-            View::Sessions => Action::ViewSessions,
-            View::Worktrees => Action::ViewWorktrees,
-            View::Changes => Action::ViewChanges,
-            View::Usage => Action::ViewUsage,
-            View::Settings => Action::ViewSettings,
-            View::Help => Action::ViewHelp,
         }
     }
 }
@@ -89,7 +72,8 @@ pub enum Phase {
 pub struct App {
     pub cfg: Config,
     pub store: Store,
-    pub theme: Theme,
+    /// `Arc`: as telas copiam o tema a cada frame.
+    pub theme: Arc<Theme>,
     pub font: TerminalFont,
     pub term_bindings: BindingsLayout,
     pub keymap: Keymap,
@@ -101,13 +85,14 @@ pub struct App {
     pub last_ws: Option<Id>,
     pub sessions: HashMap<Id, Runtime>,
     pub blocks: HashMap<Id, Block>,
-    /// Bloco vazio selecionado (sem terminal pra focar).
+    /// Sessão vazia selecionada (sem terminal pra focar).
     pub empty_block_focus: Option<Id>,
     /// Painel de notas da sessão em foco aberto.
     pub notes_open: bool,
     /// Pedido de foco no editor de notas (abriu pelo atalho).
     pub notes_focus: bool,
     pub tasks: Vec<Task>,
+    pub tasks_ui: ui::tasks::TasksState,
     pub repos: Vec<String>,
 
     pub view: View,
@@ -118,7 +103,6 @@ pub struct App {
     /// Teclado vai pro terminal da sessão focada.
     pub term_focus: bool,
     pub maximized: bool,
-    pub sidebar: bool,
     pub window_focused: bool,
 
     pub worktrees: ui::worktrees::WorktreeState,
@@ -132,7 +116,7 @@ pub struct App {
     /// Histórico de tokens/custo lido dos transcripts numa thread.
     pub usage_history: crate::usage_history::UsageHistory,
     /// O assistente (painel à direita, sessão sempre aberta).
-    pub layne: crate::layne::LayneState,
+    pub anakin: crate::anakin::AnakinState,
 
     pub account: Option<StatusSnapshot>,
     pub md_cache: egui_commonmark::CommonMarkCache,
@@ -141,6 +125,11 @@ pub struct App {
     db_version: i64,
     db_checked: Instant,
     events_checked: Instant,
+    /// Workspaces mudaram e faltam ir pro banco (junta as trocas de foco numa escrita só).
+    ws_dirty: Cell<bool>,
+    ws_saved: Instant,
+    /// Último som tocado (várias sessões acabando juntas soam uma vez só).
+    sound_at: Option<Instant>,
     next_term_id: u64,
     fonts_dirty: bool,
     pub quitting: bool,
@@ -150,12 +139,11 @@ pub struct App {
 impl App {
     pub fn new(ctx: &Context, fresh: bool) -> anyhow::Result<Self> {
         paths::ensure_dirs()?;
-        egui_extras::install_image_loaders(ctx);
         let cfg = Config::load();
         let store = Store::open(&paths::db_path())?;
 
         let needs_setup = !cfg.setup_done;
-        let theme = crate::brand::theme();
+        let theme = Arc::new(crate::brand::theme());
         theme.apply(ctx, cfg.ui_scale);
         let font = aic_term::fonts::install(ctx, &cfg.font_family, None, cfg.font_size);
 
@@ -188,6 +176,7 @@ impl App {
             notes_open: false,
             notes_focus: false,
             tasks: vec![],
+            tasks_ui: Default::default(),
             view: View::Sessions,
             modal: None,
             toasts: vec![],
@@ -198,7 +187,6 @@ impl App {
             },
             term_focus: true,
             maximized: false,
-            sidebar: true,
             window_focused: true,
             worktrees: Default::default(),
             changes: Default::default(),
@@ -207,7 +195,7 @@ impl App {
             prefix_pending: false,
             usage: Default::default(),
             usage_history: Default::default(),
-            layne: Default::default(),
+            anakin: Default::default(),
             account: StatusSnapshot::latest(),
             md_cache: Default::default(),
             account_at: None,
@@ -215,6 +203,9 @@ impl App {
             db_version: 0,
             db_checked: Instant::now(),
             events_checked: Instant::now(),
+            ws_dirty: Cell::new(false),
+            ws_saved: Instant::now(),
+            sound_at: None,
             next_term_id: 1,
             fonts_dirty: false,
             quitting: false,
@@ -252,11 +243,6 @@ impl App {
         self.workspaces = vec![ws];
         self.ws = 0;
         let _ = self.store.mark_cache(true);
-        let prefix = self.cfg.prefix.clone();
-        self.toast(
-            &format!("Sessão nova. {prefix} c abre um Claude, {prefix} ? mostra os atalhos."),
-            ToastKind::Info,
-        );
     }
 
     /// Reabre workspaces e sessões do cache (`claude --resume`).
@@ -290,7 +276,7 @@ impl App {
             w.sessions.retain(|id| self.sessions.contains_key(id));
         }
         self.fix_blocks();
-        self.migrate_block_notes();
+        self.prune_empty();
         self.ws = 0;
         let _ = self.store.mark_cache(true);
         if alive > 0 {
@@ -305,6 +291,34 @@ impl App {
         }
     }
 
+    /// Sessão sem terminal e workspace sem sessão não voltam ao reabrir (como no i3, vazio some).
+    fn prune_empty(&mut self) {
+        let empty: Vec<Id> = self
+            .blocks
+            .values()
+            .filter(|b| b.panes.is_empty())
+            .map(|b| b.id)
+            .collect();
+        for id in empty {
+            self.blocks.remove(&id);
+            let _ = self.store.delete_block(id);
+        }
+        for w in &mut self.workspaces {
+            w.blocks.retain(|b| self.blocks.contains_key(b));
+        }
+        if self.workspaces.iter().any(|w| !w.sessions.is_empty()) {
+            let store = &self.store;
+            self.workspaces.retain(|w| {
+                let keep = !w.sessions.is_empty();
+                if !keep {
+                    let _ = store.delete_workspace(w.id);
+                }
+                keep
+            });
+        }
+        self.persist_ws();
+    }
+
     /// Id do próximo terminal (cada `TerminalBackend` tem o seu).
     pub fn alloc_term_id(&mut self) -> u64 {
         let id = self.next_term_id;
@@ -313,10 +327,6 @@ impl App {
     }
 
     fn spawn(&mut self, ctx: &Context, rt: &mut Runtime) {
-        let task =
-            rt.s.task
-                .and_then(|id| self.tasks.iter().find(|t| t.id == id))
-                .cloned();
         let id = self.next_term_id;
         self.next_term_id += 1;
         rt.spawn(
@@ -324,7 +334,6 @@ impl App {
             id,
             &self.inj,
             &self.theme.term,
-            task.as_ref(),
             self.cfg.on(Module::Tmux),
         );
         // prompt inicial só vale na criação
@@ -361,17 +370,16 @@ impl App {
             .or_else(|| ws.first().copied())
     }
 
-    pub fn new_block(&mut self, name: &str, task: Option<Id>) -> Option<Id> {
+    pub fn new_block(&mut self, name: &str) -> Option<Id> {
         let ws = self.current_ws()?.id;
         let mut b = Block::new(
             ws,
             if name.trim().is_empty() {
-                "Novo bloco"
+                "nova"
             } else {
                 name.trim()
             },
         );
-        b.task = task;
         b.color = (self.blocks.len() % self.theme.agents.len().max(1)) as u8;
         let id = b.id;
         let _ = self.store.save_block(&b);
@@ -396,7 +404,7 @@ impl App {
         self.save_block(id);
     }
 
-    /// Fecha o bloco inteiro (todos os terminais).
+    /// Fecha a sessão inteira (todos os terminais).
     pub fn kill_block(&mut self, id: Id, remove_worktrees: bool) {
         let panes = self
             .blocks
@@ -412,36 +420,6 @@ impl App {
             w.blocks.retain(|b| *b != id);
         }
         self.persist_ws();
-    }
-
-    /// Notas de um bloco (de antes das notas por sessão) passam pra sessão em foco dele.
-    pub fn migrate_block_notes(&mut self) {
-        let ids: Vec<Id> = self.blocks.keys().copied().collect();
-        for bid in ids {
-            let Some(b) = self.blocks.get(&bid) else {
-                continue;
-            };
-            if b.notes.trim().is_empty() {
-                continue;
-            }
-            let Some(sid) = b
-                .focused
-                .filter(|f| b.panes.contains(f))
-                .or_else(|| b.panes.first().copied())
-            else {
-                continue;
-            };
-            let notes = b.notes.clone();
-            if let Some(rt) = self.sessions.get_mut(&sid) {
-                rt.s.notes = if rt.s.notes.trim().is_empty() {
-                    notes
-                } else {
-                    format!("{}\n\n{notes}", rt.s.notes)
-                };
-                let _ = self.store.save_session(&rt.s);
-                self.update_block(bid, |b| b.notes.clear());
-            }
-        }
     }
 
     /// Notas da sessão (salvas na hora: o store é o mesmo das sessões).
@@ -466,7 +444,7 @@ impl App {
             let bid = if ok {
                 block.unwrap()
             } else {
-                // bloco "Geral" do workspace
+                // sessão "Geral" do workspace
                 let existing = self
                     .blocks
                     .values()
@@ -495,7 +473,10 @@ impl App {
         }
         for b in self.blocks.values_mut() {
             let before = b.panes.len();
-            b.panes.retain(|p| self.sessions.contains_key(p));
+            // um terminal só fica na sessão a que ele pertence
+            let id = b.id;
+            b.panes
+                .retain(|p| self.sessions.get(p).is_some_and(|r| r.s.block == Some(id)));
             if b.panes.len() != before {
                 let _ = self.store.save_block(b);
             }
@@ -556,7 +537,7 @@ impl App {
                 bl.focused = Some(id);
             }
         }
-        self.layne.focus = false;
+        self.anakin.focus = false;
         if let Some(rt) = self.sessions.get_mut(&id) {
             rt.live.seen();
             rt.unseen = false;
@@ -642,9 +623,17 @@ impl App {
         self.ws = self.ws.min(self.workspaces.len() - 1);
     }
 
+    /// Marca os workspaces pra salvar: quem grava é o `tick` (no máximo uma vez por segundo).
     pub fn persist_ws(&self) {
-        for w in &self.workspaces {
-            let _ = self.store.save_workspace(w);
+        self.ws_dirty.set(true);
+    }
+
+    pub fn flush_ws(&mut self) {
+        if self.ws_dirty.replace(false) {
+            self.ws_saved = Instant::now();
+            for w in &self.workspaces {
+                let _ = self.store.save_workspace(w);
+            }
         }
     }
 
@@ -659,21 +648,10 @@ impl App {
         kind: SessionKind,
         cwd: PathBuf,
         worktree: Option<PathBuf>,
-        task: Option<Id>,
         claude_args: Vec<String>,
     ) -> Id {
         let block = self.current_block();
-        self.create_session_in(
-            ctx,
-            block,
-            name,
-            kind,
-            cwd,
-            worktree,
-            task,
-            claude_args,
-            None,
-        )
+        self.create_session_in(ctx, block, name, kind, cwd, worktree, claude_args, None)
     }
 
     /// Novo terminal num bloco específico (`None` = bloco novo com o nome da sessão).
@@ -686,7 +664,6 @@ impl App {
         kind: SessionKind,
         cwd: PathBuf,
         worktree: Option<PathBuf>,
-        task: Option<Id>,
         claude_args: Vec<String>,
         initial_prompt: Option<String>,
     ) -> Id {
@@ -695,7 +672,7 @@ impl App {
         };
         let block = match block.filter(|b| self.blocks.contains_key(b)) {
             Some(b) => b,
-            None => match self.new_block(&name, task) {
+            None => match self.new_block(&name) {
                 Some(b) => b,
                 None => return Id::nil(),
             },
@@ -705,7 +682,6 @@ impl App {
         s.initial_prompt = initial_prompt;
         s.repo = self.cfg.repo_of(&cwd);
         s.worktree = worktree;
-        s.task = task;
         s.claude_args = claude_args;
         s.color = (self.sessions.len() % self.theme.agents.len().max(1)) as u8;
         let id = s.id;
@@ -722,35 +698,33 @@ impl App {
         self.update_block(block, |b| {
             b.panes.push(id);
             b.focused = Some(id);
-            if b.task.is_none() {
-                b.task = task;
-            }
         });
-        if let Some(tid) = task {
-            self.update_task(tid, |t| {
-                t.session = Some(id);
-                if t.status == TaskStatus::Todo {
-                    t.status = TaskStatus::Doing;
-                }
-            });
-        }
         self.focus(id);
         id
     }
 
-    /// Fecha a sessão. `remove_worktree` remove a pasta do worktree (a branch fica).
+    /// Fecha UM terminal. O foco fica na mesma sessão, no terminal vizinho; só quando ela fica sem
+    /// nenhum terminal é que some da barra (como um workspace vazio do i3).
     pub fn kill_session(&mut self, id: Id, remove_worktree: bool) {
+        let mut emptied = None;
+        let mut neighbor = None;
         if let Some(rt) = self.sessions.remove(&id) {
             if let Some(t) = &rt.term {
                 t.kill();
             }
             crate::tmux::kill(id);
             if let Some(b) = rt.s.block.and_then(|b| self.blocks.get_mut(&b)) {
+                let pos = b.panes.iter().position(|p| *p == id).unwrap_or(0);
                 b.panes.retain(|p| *p != id);
+                neighbor = b.panes.get(pos.saturating_sub(1)).copied();
                 if b.focused == Some(id) {
-                    b.focused = b.panes.last().copied();
+                    b.focused = neighbor;
                 }
-                let _ = self.store.save_block(b);
+                if b.panes.is_empty() {
+                    emptied = Some(b.id);
+                } else {
+                    let _ = self.store.save_block(b);
+                }
             }
             if remove_worktree {
                 if let Some(wt) = &rt.s.worktree {
@@ -770,22 +744,41 @@ impl App {
         for w in &mut self.workspaces {
             w.sessions.retain(|s| *s != id);
             if w.focused == Some(id) {
-                w.focused = w.sessions.last().copied();
+                w.focused = neighbor;
             }
         }
-        let linked: Vec<Id> = self
-            .tasks
-            .iter()
-            .filter(|t| t.session == Some(id))
-            .map(|t| t.id)
-            .collect();
-        for t in linked {
-            self.update_task(t, |t| t.session = None);
+        if let Some(b) = emptied {
+            self.remove_empty_block(b);
         }
         let _ = self.store.delete_session(id);
         self.tail.forget(id);
         let _ = std::fs::remove_file(StatusSnapshot::path_for(&id.to_string()));
         self.persist_ws();
+    }
+
+    /// Tira da barra uma sessão sem terminais; se era a da tela, vai pra vizinha.
+    fn remove_empty_block(&mut self, id: Id) {
+        let was_current = self.current_ws().is_some_and(|w| w.focused.is_none());
+        self.blocks.remove(&id);
+        let _ = self.store.delete_block(id);
+        let mut next = None;
+        for (i, w) in self.workspaces.iter_mut().enumerate() {
+            if let Some(pos) = w.blocks.iter().position(|b| *b == id) {
+                w.blocks.remove(pos);
+                if i == self.ws {
+                    next = w.blocks.get(pos.saturating_sub(1)).copied();
+                }
+            }
+        }
+        if self.empty_block_focus == Some(id) {
+            self.empty_block_focus = None;
+        }
+        if was_current
+            && let Some(b) = next
+            && self.view == View::Sessions
+        {
+            self.focus_block(b);
+        }
     }
 
     pub fn restart_session(&mut self, ctx: &Context, id: Id) {
@@ -818,45 +811,15 @@ impl App {
             .unwrap_or(SessionState::GameOver)
     }
 
+    /// ←/→ andam entre os terminais da sessão, ↑/↓ trocam de sessão.
     pub fn move_focus(&mut self, dx: i32, dy: i32) {
-        if matches!(self.cfg.view, SessionView::Blocks | SessionView::Tabs) {
-            return self.move_focus_blocks(dx, dy);
-        }
-        let ids = self.ws_sessions();
-        if ids.is_empty() {
-            return;
-        }
-        let cur = self
-            .focused()
-            .and_then(|f| ids.iter().position(|i| *i == f))
-            .unwrap_or(0) as i32;
-        let n = ids.len() as i32;
-        let next = match self.current_ws().map(|w| w.layout) {
-            Some(Layout::Grid) => {
-                let cols = (n as f32).sqrt().ceil() as i32;
-                let (r, c) = (cur / cols, cur % cols);
-                let (r, c) = (r + dy, c + dx);
-                let i = r * cols + c;
-                if (0..n).contains(&i) && (0..cols).contains(&c) {
-                    i
-                } else {
-                    cur
-                }
-            }
-            _ => (cur + dx + dy).rem_euclid(n),
-        };
-        self.focus(ids[next as usize]);
-    }
-
-    /// Blocos/abas: ←/→ andam entre os terminais do bloco, ↑/↓ trocam de bloco.
-    fn move_focus_blocks(&mut self, dx: i32, dy: i32) {
         let blocks = self.ws_blocks();
         let Some(cur_b) = self.current_block() else {
             return;
         };
         if dy != 0 {
             let i = blocks.iter().position(|b| *b == cur_b).unwrap_or(0) as i32;
-            let n = blocks.len() as i32;
+            let n = blocks.len().max(1) as i32;
             let next = blocks[((i + dy).rem_euclid(n)) as usize];
             return self.focus_block(next);
         }
@@ -886,7 +849,7 @@ impl App {
         match target {
             Some(s) => self.focus(s),
             None => {
-                // bloco vazio: guarda como "atual" mexendo no foco do workspace
+                // sessão vazia: guarda como "atual" mexendo no foco do workspace
                 if let Some(w) = self.current_ws_mut() {
                     w.focused = None;
                 }
@@ -963,122 +926,6 @@ impl App {
         self.tasks.retain(|t| t.id != id);
     }
 
-    /// Captura rápida → tarefa salva. `status`: coluna onde entra.
-    pub fn quick_add(
-        &mut self,
-        text: &str,
-        status: TaskStatus,
-        link_session: Option<Id>,
-    ) -> Option<Id> {
-        let ws_names: Vec<String> = self.workspaces.iter().map(|w| w.name.clone()).collect();
-        let parsed =
-            aic_core::quickadd::parse(text, Local::now().date_naive(), &self.repos, &ws_names);
-        if parsed.title.trim().is_empty() {
-            self.toast(
-                "Escreve alguma coisa além dos marcadores 😉",
-                ToastKind::Warn,
-            );
-            return None;
-        }
-        let ws_name = parsed.workspace.clone();
-        let mut t = parsed.into_task();
-        t.status = status;
-        t.workspace = ws_name
-            .and_then(|n| self.workspaces.iter().find(|w| w.name == n).map(|w| w.id))
-            .or_else(|| self.current_ws().map(|w| w.id));
-        if let Some(s) = link_session {
-            t.session = Some(s);
-            if t.repo.is_none() {
-                t.repo = self.sessions.get(&s).and_then(|r| r.s.repo.clone());
-            }
-            if let Some(rt) = self.sessions.get_mut(&s) {
-                rt.s.task = Some(t.id);
-                let _ = self.store.save_session(&rt.s);
-            }
-        }
-        let id = t.id;
-        let title = t.title.clone();
-        self.save_task(t);
-        self.toast(&format!("✓ {title}"), ToastKind::Ok);
-        Some(id)
-    }
-
-    pub fn task_of(&self, session: Id) -> Option<&Task> {
-        let rt = self.sessions.get(&session)?;
-        rt.s.task
-            .and_then(|id| self.tasks.iter().find(|t| t.id == id))
-            .or_else(|| self.tasks.iter().find(|t| t.session == Some(session)))
-    }
-
-    /// Abre (ou foca) a sessão de uma tarefa. Sem sessão: abre o diálogo já preenchido.
-    pub fn open_task(&mut self, id: Id) {
-        let Some(t) = self.tasks.iter().find(|t| t.id == id).cloned() else {
-            return;
-        };
-        if let Some(s) = t.session.filter(|s| self.sessions.contains_key(s)) {
-            return self.focus(s);
-        }
-        self.modal = Some(ui::modals::Modal::NewSession(
-            ui::modals::NewSessionForm::for_task(self, &t),
-        ));
-    }
-
-    /// Escreve `.aic/context.md` no diretório da sessão com a tarefa e as notas dela.
-    pub fn write_context(&mut self, session: Id) {
-        let Some(rt) = self.sessions.get(&session) else {
-            return;
-        };
-        let Some(t) = self.task_of(session).cloned() else {
-            return self.toast("Essa sessão não tem tarefa vinculada", ToastKind::Warn);
-        };
-        let dir = rt.s.cwd.join(".aic");
-        let mut md = format!("# {}\n\n", t.title);
-        if let Some(k) = &t.card_key {
-            md.push_str(&format!("- Card: {k}\n"));
-        }
-        if let Some(r) = &t.repo {
-            md.push_str(&format!("- Repo: {r}\n"));
-        }
-        md.push_str(&format!(
-            "- Status: {} · prioridade {}\n",
-            t.status.label(),
-            t.priority.label()
-        ));
-        if !t.notes.trim().is_empty() {
-            md.push_str(&format!("\n## Notas\n\n{}\n", t.notes.trim()));
-        }
-        if !t.subtasks.is_empty() {
-            md.push_str("\n## Subtarefas\n\n");
-            for s in &t.subtasks {
-                md.push_str(&format!(
-                    "- [{}] {}\n",
-                    if s.done { "x" } else { " " },
-                    s.text
-                ));
-            }
-        }
-        md.push_str("\n> Gerado pelo AIC.\n");
-        let result =
-            std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("context.md"), md));
-        // .aic/ fora do git sem mexer no .gitignore do repo
-        let _ = ensure_git_exclude(&rt.s.cwd);
-        match result {
-            Ok(()) => {
-                if let Some(term) = &self.sessions.get(&session).and_then(|r| r.term.as_ref()) {
-                    term.paste("@.aic/context.md ");
-                }
-                self.toast(
-                    "Contexto escrito em .aic/context.md e citado no prompt",
-                    ToastKind::Ok,
-                );
-            }
-            Err(e) => self.toast(
-                &format!("Não deu pra escrever o contexto: {e}"),
-                ToastKind::Err,
-            ),
-        }
-    }
-
     // ───────────────────────── loop ─────────────────────────
 
     pub fn toast(&mut self, text: &str, kind: ToastKind) {
@@ -1092,6 +939,7 @@ impl App {
     /// Trabalho de fundo de cada frame: banco, eventos, git, sons.
     pub fn tick(&mut self, ctx: &Context) {
         self.window_focused = ctx.input(|i| i.viewport().focused.unwrap_or(true));
+        aic_term::set_window_focused(self.window_focused);
 
         if self.db_checked.elapsed() > Duration::from_millis(800) {
             self.db_checked = Instant::now();
@@ -1100,9 +948,18 @@ impl App {
             }
         }
 
+        if self.ws_dirty.get() && self.ws_saved.elapsed() > Duration::from_secs(1) {
+            self.flush_ws();
+        }
+
         if self.events_checked.elapsed() > Duration::from_millis(250) {
             self.events_checked = Instant::now();
-            let events = self.tail.poll();
+            let open = self
+                .sessions
+                .keys()
+                .copied()
+                .chain(self.anakin.session_id());
+            let events = self.tail.poll(open);
             for e in events {
                 let target = e
                     .aic_session
@@ -1114,7 +971,7 @@ impl App {
                             .map(|r| r.s.id)
                     });
                 let Some(id) = target else {
-                    crate::layne::on_event(self, &e);
+                    crate::anakin::on_event(self, &e);
                     continue;
                 };
                 let effect = self.sessions.get_mut(&id).and_then(|rt| rt.live.apply(&e));
@@ -1125,9 +982,20 @@ impl App {
         }
 
         let visible = self.visible_sessions();
+        let focused = self.focused();
+        let on_usage = self.view == View::Usage;
+        let on_git_view = matches!(self.view, View::Changes | View::Worktrees);
+        let mut finished = Vec::new();
         for (id, rt) in self.sessions.iter_mut() {
-            rt.refresh();
+            let shown = visible.contains(id);
+            // git e statusline: quem está na tela; a aba Tokens lista os snapshots de todas
+            rt.refresh(
+                shown || (on_git_view && focused == Some(*id)),
+                shown || on_usage,
+            );
             if let Some(t) = &rt.term {
+                // terminal escondido não pede redesenho: saída nele não custa frame nenhum
+                t.set_visible(shown);
                 // tmux/programas copiando via OSC 52 → clipboard do sistema
                 if let Some(text) = t.shared.clipboard.lock().unwrap().take() {
                     ctx.copy_text(text);
@@ -1135,16 +1003,25 @@ impl App {
                 let bells = t.shared.bells.load(std::sync::atomic::Ordering::Relaxed);
                 if bells > rt.bells_seen {
                     rt.bells_seen = bells;
-                    if !visible.contains(id) {
+                    if !shown {
                         rt.unseen = true;
                     }
                 }
+                // shell que saiu sozinho (`exit`, Ctrl+D): o terminal fecha, como no tmux
+                if t.clean_exit() && !matches!(rt.s.kind, SessionKind::Claude) {
+                    finished.push(*id);
+                }
             }
         }
+        for id in finished {
+            self.kill_session(id, false);
+        }
 
-        if self
-            .account_at
-            .is_none_or(|t| t.elapsed() > Duration::from_secs(5))
+        // limites da conta: só a aba Tokens mostra
+        if on_usage
+            && self
+                .account_at
+                .is_none_or(|t| t.elapsed() > Duration::from_secs(5))
         {
             self.account_at = Some(Instant::now());
             if let Some(s) = StatusSnapshot::latest() {
@@ -1153,8 +1030,10 @@ impl App {
         }
 
         self.usage_history.poll();
-        crate::layne::tick(self, ctx);
-        self.toasts.retain(|t| t.until > Instant::now());
+        crate::anakin::tick(self, ctx);
+        if !self.toasts.is_empty() {
+            self.toasts.retain(|t| t.until > Instant::now());
+        }
 
         if self.fonts_dirty {
             self.fonts_dirty = false;
@@ -1163,15 +1042,41 @@ impl App {
         }
     }
 
-    pub fn visible_sessions(&self) -> HashSet<Id> {
+    /// Terminais na tela agora.
+    pub fn visible_sessions(&self) -> Vec<Id> {
         if self.view != View::Sessions || matches!(self.phase, Phase::Setup(_)) {
-            return HashSet::new();
+            return vec![];
         }
-        match self.current_ws() {
-            Some(w) if w.layout == Layout::Grid && !self.maximized => {
-                w.sessions.iter().copied().collect()
-            }
-            _ => self.focused().into_iter().collect(),
+        if self.maximized {
+            return self.focused().into_iter().collect();
+        }
+        self.current_block()
+            .and_then(|b| self.blocks.get(&b))
+            .map(|b| b.panes.clone())
+            .unwrap_or_default()
+    }
+
+    /// Nome que a notificação cita: o da sessão na barra (`hermes`, `wallet`).
+    fn notify_name(&self, id: Id) -> String {
+        self.block_of(id)
+            .and_then(|b| self.blocks.get(&b))
+            .map(|b| b.name.clone())
+            .unwrap_or_else(|| self.session_label(id))
+    }
+
+    fn play_sound(&mut self) {
+        if !self.cfg.sound.enabled || !self.cfg.on(Module::Sound) {
+            return;
+        }
+        if self
+            .sound_at
+            .is_some_and(|t| t.elapsed() < Duration::from_millis(800))
+        {
+            return;
+        }
+        if let Some(p) = crate::sounds::path(&self.cfg.sound) {
+            self.sound_at = Some(Instant::now());
+            notify::play(&p, self.cfg.sound.volume);
         }
     }
 
@@ -1184,56 +1089,41 @@ impl App {
         } else if let Some(rt) = self.sessions.get_mut(&id) {
             rt.unseen = true;
         }
-        let quiet = visible && self.cfg.notify.only_when_unfocused;
-        if quiet {
+        if visible && self.cfg.notify.only_when_unfocused {
             return;
         }
-        let name = self.session_label(id);
-        let task = self.task_of(id).map(|t| t.title.clone());
-        match effect {
+        self.play_sound();
+        let who = self.notify_name(id);
+        match &effect {
             Effect::Finished => {
-                if self.cfg.sound.enabled && self.cfg.on(aic_core::Module::Sound) {
-                    if let Some(p) = crate::sounds::resolve(
-                        self.cfg
-                            .sound
-                            .done
-                            .as_deref()
-                            .unwrap_or(crate::sounds::DEFAULT_DONE),
-                    ) {
-                        notify::play(&p, self.cfg.sound.volume);
-                    }
-                }
-                if self.cfg.notify.desktop {
-                    let body = match task {
-                        Some(t) => format!("{name} terminou: {t}"),
-                        None => format!("{name} terminou e está te esperando."),
-                    };
-                    notify::desktop(
-                        &format!(
-                            "{} — {}",
-                            crate::brand::NAME,
-                            crate::brand::state_label(SessionState::Done)
-                        ),
-                        &body,
-                        icon_path(),
-                    );
-                }
+                self.anakin
+                    .avatar
+                    .speak(format!("{who} acabou. Yippee!"), 6);
+                self.anakin.avatar.jump();
             }
+            Effect::NeedsYou(_) => self.anakin.avatar.speak(
+                format!("{who} precisa de você. I've got a bad feeling about this."),
+                8,
+            ),
+        }
+        if !self.cfg.notify.desktop || !self.cfg.on(Module::Notifications) {
+            return;
+        }
+        let name = self.notify_name(id);
+        let last = self
+            .sessions
+            .get(&id)
+            .and_then(|r| r.live.last_message.as_deref())
+            .and_then(|m| m.lines().find(|l| !l.trim().is_empty()))
+            .map(|l| ui::widgets::truncate(l.trim(), 140));
+        match effect {
+            Effect::Finished => notify::desktop(
+                &format!("{name} acabou"),
+                last.as_deref().unwrap_or_default(),
+                icon_path(),
+            ),
             Effect::NeedsYou(msg) => {
-                if self.cfg.sound.enabled {
-                    if let Some(p) = self
-                        .cfg
-                        .sound
-                        .attention
-                        .as_deref()
-                        .and_then(crate::sounds::resolve)
-                    {
-                        notify::play(&p, self.cfg.sound.volume);
-                    }
-                }
-                if self.cfg.notify.desktop {
-                    notify::desktop(&format!("{} precisa de você", name), &msg, icon_path());
-                }
+                notify::desktop(&format!("{name} precisa de você"), &msg, icon_path())
             }
         }
     }
@@ -1274,20 +1164,14 @@ impl App {
                     SessionKind::Shell,
                     cwd,
                     None,
-                    None,
                     vec![],
                     None,
                 );
             }
             NewBlock => {
-                if let Some(b) = self.new_block("", None) {
-                    self.focus_block(b);
-                    self.modal = Some(ui::modals::Modal::RenameBlock {
-                        id: b,
-                        text: "Novo bloco".into(),
-                        first: true,
-                    });
-                }
+                let mut form = ui::modals::NewSessionForm::new(self, SessionKind::Claude);
+                form.new_block = true;
+                self.modal = Some(ui::modals::Modal::NewSession(form));
             }
             CloseBlock => {
                 if let Some(b) = self.current_block() {
@@ -1328,11 +1212,6 @@ impl App {
                     self.toast(&format!("Arranjo: {label}"), ToastKind::Info);
                 }
             }
-            ToggleBlockSide => {
-                if let Some(b) = self.current_block() {
-                    self.update_block(b, |x| x.side = !x.side);
-                }
-            }
             ToggleNotes => {
                 if self.notes_open {
                     self.notes_open = false;
@@ -1370,19 +1249,9 @@ impl App {
                     self.restart_session(ctx, id);
                 }
             }
-            SendContext => {
-                if let Some(id) = self.focused() {
-                    self.write_context(id);
-                }
-            }
-            CollapseBlock => {
-                if let Some(b) = self.current_block() {
-                    self.update_block(b, |x| x.collapsed = !x.collapsed);
-                }
-            }
             MoveBlockUp | MoveBlockDown => {
                 if let Some(b) = self.current_block() {
-                    ui::blocks::move_block(self, b, if a == MoveBlockUp { -1 } else { 1 });
+                    ui::sessions::move_block(self, b, if a == MoveBlockUp { -1 } else { 1 });
                 }
             }
             NextSession => self.cycle_session(1),
@@ -1393,48 +1262,26 @@ impl App {
             FocusUp => self.move_focus(0, -1),
             FocusDown => self.move_focus(0, 1),
             Goto(n) => {
-                if matches!(self.cfg.view, SessionView::Blocks | SessionView::Tabs) {
-                    if let Some(b) = self.ws_blocks().get(n as usize - 1).copied() {
-                        self.focus_block(b);
-                        self.view = View::Sessions;
-                    }
-                } else if let Some(id) = self.ws_sessions().get(n as usize - 1).copied() {
-                    self.focus(id);
+                if let Some(b) = self.ws_blocks().get(n as usize - 1).copied() {
+                    self.focus_block(b);
+                    self.set_view(View::Sessions);
                 }
-            }
-            ToggleLayout => {
-                if let Some(w) = self.current_ws_mut() {
-                    w.layout = if w.layout == Layout::Grid {
-                        Layout::Focus
-                    } else {
-                        Layout::Grid
-                    };
-                }
-                self.maximized = false;
-                self.persist_ws();
-            }
-            CycleView => {
-                let all = aic_core::SessionView::ALL;
-                let i = all.iter().position(|v| *v == self.cfg.view).unwrap_or(0);
-                self.cfg.view = all[(i + 1) % all.len()];
-                let _ = self.cfg.save();
-                self.toast(
-                    &format!(
-                        "Visualização: {} — {}",
-                        self.cfg.view.label(),
-                        self.cfg.view.desc()
-                    ),
-                    ToastKind::Info,
-                );
             }
             ToggleMaximize => self.maximized = !self.maximized,
             ReleaseTerminal => {
                 self.term_focus = false;
-                self.layne.focus = false;
+                self.anakin.focus = false;
             }
-            ToggleLayne => crate::layne::toggle(self, ctx),
-            LayneVoice => crate::layne::toggle_voice(self, ctx),
-            QuickAdd => self.open_quick_add(None),
+            ToggleAnakin => crate::anakin::toggle(self, ctx),
+            RestartAnakin => crate::anakin::restart(self, ctx),
+            ToggleAvatar => {
+                self.cfg.anakin.avatar = !self.cfg.anakin.avatar;
+                let _ = self.cfg.save();
+            }
+            NextBlock => self.cycle_block(1),
+            PrevBlock => self.cycle_block(-1),
+            AnakinVoice => crate::anakin::toggle_voice(self, ctx),
+            ViewTasks => ui::tasks::open(self),
             Workspaces => {
                 self.modal = Some(ui::modals::Modal::Workspaces {
                     query: String::new(),
@@ -1501,7 +1348,6 @@ impl App {
             ZoomIn => self.set_font_size(self.cfg.font_size + 1.0),
             ZoomOut => self.set_font_size(self.cfg.font_size - 1.0),
             ZoomReset => self.set_font_size(14.0),
-            ToggleSidebar => self.sidebar = !self.sidebar,
             Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
         }
     }
@@ -1511,24 +1357,46 @@ impl App {
         self.term_focus = v == View::Sessions;
     }
 
-    /// Abas visíveis na barra (as de módulos desligados somem; a Ajuda abre pelo F1).
+    /// As abas do `Ctrl+Tab`, na ordem da barra.
     pub fn tabs(&self) -> Vec<View> {
-        View::ALL
-            .into_iter()
-            .filter(|v| *v != View::Help && v.action().enabled(&self.cfg))
-            .collect()
+        let mut v = vec![];
+        if self.cfg.on(Module::Tasks) {
+            v.push(View::Tasks);
+        }
+        v.push(View::Sessions);
+        if self.cfg.on(Module::Usage) {
+            v.push(View::Usage);
+        }
+        v
     }
 
-    /// Próxima/anterior aba da barra, dando a volta.
+    /// Próxima/anterior aba, dando a volta. Numa tela fora da barra (Config…), vai pras Sessões.
     pub fn cycle_view(&mut self, delta: i32) {
         let tabs = self.tabs();
-        let i = tabs.iter().position(|v| *v == self.view).unwrap_or(0) as i32;
-        let next = tabs[(i + delta).rem_euclid(tabs.len() as i32) as usize];
+        let next = match tabs.iter().position(|v| *v == self.view) {
+            Some(i) => tabs[(i as i32 + delta).rem_euclid(tabs.len() as i32) as usize],
+            None => View::Sessions,
+        };
         self.set_view(next);
     }
 
+    /// Próxima/anterior sessão da barra, dando a volta.
+    pub fn cycle_block(&mut self, delta: i32) {
+        let blocks = self.ws_blocks();
+        if blocks.is_empty() {
+            return;
+        }
+        let i = self
+            .current_block()
+            .and_then(|c| blocks.iter().position(|b| *b == c))
+            .unwrap_or(0) as i32;
+        let next = blocks[(i + delta).rem_euclid(blocks.len() as i32) as usize];
+        self.focus_block(next);
+        self.set_view(View::Sessions);
+    }
+
     /// Fecha o que está em foco, do mais específico pro mais geral:
-    /// aba que não é Sessões → terminal em foco → bloco vazio.
+    /// tela que não é de terminal → terminal em foco → sessão vazia.
     pub fn close_focused(&mut self) {
         match self.view {
             View::Sessions => {
@@ -1565,18 +1433,6 @@ impl App {
         }
     }
 
-    pub fn open_quick_add(&mut self, status: Option<TaskStatus>) {
-        let link = (self.view == View::Sessions)
-            .then(|| self.focused())
-            .flatten();
-        self.modal = Some(ui::modals::Modal::QuickAdd {
-            text: String::new(),
-            status: status.unwrap_or_default(),
-            link,
-            link_enabled: false,
-        });
-    }
-
     pub fn set_font_size(&mut self, size: f32) {
         self.cfg.font_size = size.clamp(8.0, 32.0);
         self.font.regular.size = self.cfg.font_size;
@@ -1602,7 +1458,7 @@ impl App {
                 }
                 let _ = self.store.save_session(&rt.s);
             }
-            self.persist_ws();
+            self.flush_ws();
             let _ = self.store.mark_cache(true);
         } else {
             let _ = self.store.clear_cache();
@@ -1613,7 +1469,7 @@ impl App {
         let _ = self.cfg.save();
         let _ = self.keymap.save();
         self.quitting = true;
-        crate::layne::quit(self);
+        crate::anakin::quit(self);
         aic_core::inbox::clear_running();
         for rt in self.sessions.values() {
             if let Some(t) = &rt.term {
@@ -1624,79 +1480,10 @@ impl App {
     }
 }
 
-pub fn repo_name(cwd: &Path, repos_dir: &Path) -> Option<String> {
-    // dentro de repos/ → primeiro componente; worktree `<repo>.worktrees/x` → `<repo>`
-    let rel = cwd.strip_prefix(repos_dir).ok()?;
-    let first = rel
-        .components()
-        .next()?
-        .as_os_str()
-        .to_string_lossy()
-        .to_string();
-    Some(first.trim_end_matches(".worktrees").to_string())
-}
-
-pub(crate) fn ensure_git_exclude(cwd: &Path) -> std::io::Result<()> {
-    let Some(top) = git::toplevel(cwd) else {
-        return Ok(());
-    };
-    let out = std::process::Command::new("git")
-        .arg("-C")
-        .arg(&top)
-        .args(["rev-parse", "--git-path", "info/exclude"])
-        .output()?;
-    let rel = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if rel.is_empty() {
-        return Ok(());
-    }
-    let path = if Path::new(&rel).is_absolute() {
-        PathBuf::from(rel)
-    } else {
-        top.join(rel)
-    };
-    let current = std::fs::read_to_string(&path).unwrap_or_default();
-    if !current.lines().any(|l| l.trim() == ".aic/") {
-        if let Some(d) = path.parent() {
-            std::fs::create_dir_all(d)?;
-        }
-        std::fs::write(
-            &path,
-            format!(
-                "{current}{}.aic/\n",
-                if current.ends_with('\n') || current.is_empty() {
-                    ""
-                } else {
-                    "\n"
-                }
-            ),
-        )?;
-    }
-    Ok(())
-}
-
 /// Ícone instalado pelo `install.sh` (pra notificação do sistema).
 pub fn icon_path() -> Option<PathBuf> {
     let p = paths::data_dir()
         .parent()?
         .join("icons/hicolor/128x128/apps/aic.png");
     p.exists().then_some(p)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn nome_do_repo_e_do_worktree() {
-        let base = Path::new("/h/dev");
-        assert_eq!(
-            repo_name(Path::new("/h/dev/api-pagamentos/src"), base).as_deref(),
-            Some("api-pagamentos")
-        );
-        assert_eq!(
-            repo_name(Path::new("/h/dev/notificador.worktrees/DEV-1"), base).as_deref(),
-            Some("notificador")
-        );
-        assert_eq!(repo_name(Path::new("/tmp"), base), None);
-    }
 }

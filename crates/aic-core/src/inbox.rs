@@ -1,4 +1,4 @@
-//! Caixa de entrada de comandos: o `aic` de linha de comando (usado pelo Layne, por você ou por
+//! Caixa de entrada de comandos: o `aic` de linha de comando (usado pelo Anakin, por você ou por
 //! um atalho do i3) pede coisas ao app aberto.
 //!
 //! Cada pedido é um `.json` em `~/.local/state/aic/inbox/`; o app lê a pasta a cada ~300ms,
@@ -45,19 +45,18 @@ pub enum Command {
         /// Primeira mensagem pro Claude.
         #[serde(default)]
         prompt: Option<String>,
-        /// Tarefa pra vincular (prefixo do id, como no `aic done`).
-        #[serde(default)]
-        task: Option<String>,
     },
-    /// Escreve no terminal do Layne (e manda, se `send`).
+    /// Escreve no terminal do Anakin (e manda, se `send`).
     Say {
         text: String,
         #[serde(default)]
         send: bool,
     },
-    /// Liga/desliga a gravação de voz pro Layne.
+    /// Liga/desliga a gravação de voz pro Anakin.
     Voice,
-    /// Mostra o painel do Layne (traz a janela pra frente).
+    /// Traz a janela pra frente.
+    Focus,
+    /// Mostra o painel do Anakin (traz a janela pra frente).
     Show,
 }
 
@@ -195,6 +194,19 @@ pub fn app_running() -> bool {
         return false;
     };
     Path::new(&format!("/proc/{pid}")).exists()
+}
+
+/// Outro `aic` com janela aberta? Confere o nome do processo: o pid guardado pode ter sido
+/// reaproveitado pelo sistema depois de uma queda, e isso não pode impedir o app de abrir.
+pub fn other_instance() -> bool {
+    let Some(pid) = std::fs::read_to_string(pid_path())
+        .ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+    else {
+        return false;
+    };
+    pid != std::process::id()
+        && std::fs::read_to_string(format!("/proc/{pid}/comm")).is_ok_and(|c| c.trim() == "aic")
 }
 
 #[cfg(test)]

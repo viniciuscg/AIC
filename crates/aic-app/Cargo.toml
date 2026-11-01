@@ -16,7 +16,6 @@ path = "src/lib.rs"
 [dependencies]
 eframe.workspace = true
 egui.workspace = true
-egui_extras.workspace = true
 image.workspace = true
 egui_commonmark = "0.25"
 aic-term.workspace = true

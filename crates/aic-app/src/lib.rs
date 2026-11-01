@@ -1,11 +1,11 @@
-//! AIC — central de vibecode pessoal. Biblioteca do app (o binário é `main.rs`).
+//! AIC (marca: Anakin) — central de vibecode pessoal. Biblioteca do app (o binário é `main.rs`).
 
 pub mod actions;
+pub mod anakin;
 pub mod app;
 pub mod brand;
 pub mod cli;
 pub mod injection;
-pub mod layne;
 pub mod notify;
 pub mod session;
 pub mod sounds;
@@ -28,9 +28,14 @@ impl eframe::App for AicApp {
         let _ = self.0.cfg.save();
         let _ = self.0.keymap.save();
     }
+
+    /// Só o tamanho da janela é guardado: o `Memory` do egui era 67 KB reescritos a cada 30 s.
+    fn persist_egui_memory(&self) -> bool {
+        false
+    }
 }
 
-/// Ícone da janela: o pote de moscas (sem depender de arquivo).
+/// Ícone da janela (sem depender de arquivo).
 pub fn window_icon() -> egui::IconData {
     egui::IconData {
         rgba: icon_rgba(64),
@@ -39,54 +44,56 @@ pub fn window_icon() -> egui::IconData {
     }
 }
 
-/// O pote em RGBA `size`×`size` (desenhado em 64 px e escalado; usado pela janela e pelo `export-icon`):
-/// tampa de ferrugem, vidro âmbar e três moscas.
+/// O sabre na diagonal em RGBA `size`×`size` (usado pela janela e pelo `export-icon`).
 pub fn icon_rgba(size: u32) -> Vec<u8> {
     let mut rgba = vec![0u8; (size * size * 4) as usize];
     let k = 64.0 / size as f32;
-    // retângulo de cantos arredondados: distância com sinal (<= 0 = dentro)
-    let rrect = |x: f32, y: f32, x0: f32, y0: f32, x1: f32, y1: f32, r: f32| {
-        let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
-        let (hx, hy) = ((x1 - x0) / 2.0 - r, (y1 - y0) / 2.0 - r);
-        let (dx, dy) = (
-            ((x - cx).abs() - hx).max(0.0),
-            ((y - cy).abs() - hy).max(0.0),
-        );
-        (dx * dx + dy * dy).sqrt() - r
+    // distância até o segmento a→b e posição ao longo dele (0..1)
+    let seg = |x: f32, y: f32, a: (f32, f32), b: (f32, f32)| {
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let t = (((x - a.0) * dx + (y - a.1) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
+        ((x - a.0 - t * dx).hypot(y - a.1 - t * dy), t)
     };
-    let flies = [(24.0f32, 33.0f32), (38.0, 40.0), (30.0, 49.0)];
+    let mix = |a: [f32; 3], b: [f32; 3], t: f32| {
+        [
+            a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            a[2] + (b[2] - a[2]) * t,
+        ]
+    };
     for y in 0..size {
         for x in 0..size {
             let (fx, fy) = ((x as f32 + 0.5) * k, (y as f32 + 0.5) * k);
             let i = ((y * size + x) * 4) as usize;
-            let lid = rrect(fx, fy, 14.0, 6.0, 50.0, 15.0, 2.0) <= 0.0;
-            let neck = rrect(fx, fy, 18.0, 13.0, 46.0, 20.0, 2.0);
-            let body = rrect(fx, fy, 11.0, 18.0, 53.0, 60.0, 8.0);
-            let glass = neck.min(body);
-            let fly = flies
-                .iter()
-                .any(|(cx, cy)| ((fx - cx) / 3.2).powi(2) + ((fy - cy) / 2.2).powi(2) <= 1.0);
-            let shine = (15.0..18.0).contains(&fx) && (24.0..52.0).contains(&fy);
-            let px: [u8; 4] = if lid {
-                if (fx as i32) % 6 == 0 {
-                    [90, 42, 18, 255]
+            // fundo: quadrado de cantos arredondados, preto do espaço
+            let (qx, qy) = ((fx - 32.0).abs() - 26.0, (fy - 32.0).abs() - 26.0);
+            let corner = qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - 4.0;
+            if corner > 0.0 {
+                continue;
+            }
+            let mut c = [10.0, 14.0, 20.0];
+            let (d, _) = seg(fx, fy, (22.0, 42.0), (50.0, 14.0));
+            // brilho → lâmina → miolo quase branco
+            c = mix(
+                c,
+                [47.0, 143.0, 255.0],
+                (1.0 - d / 8.0).clamp(0.0, 1.0).powi(2) * 0.8,
+            );
+            if d < 2.6 {
+                c = [124.0, 196.0, 255.0];
+            }
+            if d < 1.3 {
+                c = [234.0, 246.0, 255.0];
+            }
+            let (h, t) = seg(fx, fy, (12.0, 52.0), (23.0, 41.0));
+            if h < 3.2 {
+                c = if (0.15..0.25).contains(&t) || t > 0.85 {
+                    [57.0, 66.0, 79.0]
                 } else {
-                    [181, 82, 43, 255]
-                }
-            } else if glass <= -1.6 {
-                if fly {
-                    [21, 16, 11, 255]
-                } else if shine {
-                    [246, 236, 214, 255]
-                } else {
-                    [201, 160, 96, 255]
-                }
-            } else if glass <= 0.0 {
-                [239, 226, 200, 255]
-            } else {
-                [0, 0, 0, 0]
-            };
-            rgba[i..i + 4].copy_from_slice(&px);
+                    [170.0, 182.0, 198.0]
+                };
+            }
+            rgba[i..i + 4].copy_from_slice(&[c[0] as u8, c[1] as u8, c[2] as u8, 255]);
         }
     }
     rgba

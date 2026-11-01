@@ -103,7 +103,11 @@ fn page(app: &mut App, ui: &mut Ui) {
                     if !matches!(rt.s.kind, SessionKind::Claude) {
                         continue;
                     }
-                    if ui.link(&rt.s.name).clicked() {
+                    if ui
+                        .link(&rt.s.name)
+                        .on_hover_text("Ir pra este terminal")
+                        .clicked()
+                    {
                         let id = *id;
                         app.focus(id);
                         return;

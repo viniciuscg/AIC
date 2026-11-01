@@ -1,10 +1,10 @@
-//! Voz do Layne: lista os microfones, grava um `.wav` e transcreve.
+//! Voz do Anakin: lista os microfones, grava um `.wav` e transcreve.
 //!
 //! Gravação: `parecord` (PulseAudio/PipeWire), senão `pw-record`, senão `arecord` (este ignora a
 //! escolha de microfone). 16 kHz mono, o que o Whisper espera. Parar = SIGINT, que fecha o
 //! cabeçalho do WAV direito.
 //!
-//! Transcrição (`[layne.voice]` no config): whisper.cpp local, API no formato da OpenAI
+//! Transcrição (`[anakin.voice]` no config): whisper.cpp local, API no formato da OpenAI
 //! (OpenAI, Groq…) ou um comando seu.
 
 use std::path::{Path, PathBuf};
@@ -260,7 +260,7 @@ fn transcribe_keep(cfg: &VoiceConfig, file: &Path) -> Result<String> {
             let model = cfg.model_path();
             if !model.exists() {
                 bail!(
-                    "modelo do whisper.cpp não encontrado em {} (Config → Layne)",
+                    "modelo do whisper.cpp não encontrado em {} (Config → Anakin)",
                     paths::pretty(&model)
                 );
             }
@@ -325,7 +325,7 @@ fn transcribe_keep(cfg: &VoiceConfig, file: &Path) -> Result<String> {
         }
         Transcriber::Command => {
             if cfg.command.trim().is_empty() {
-                bail!("defina o comando de transcrição (Config → Layne)");
+                bail!("defina o comando de transcrição (Config → Anakin)");
             }
             let cmd = fill_command(&cfg.command, file, lang);
             let out = Command::new("sh")

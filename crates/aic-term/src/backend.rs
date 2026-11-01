@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -18,6 +18,7 @@ use alacritty_terminal::term::{self, Term, TermMode, viewport_to_point};
 use alacritty_terminal::tty;
 
 use crate::theme::TerminalTheme;
+use crate::view::RenderCache;
 
 /// O que rodar no terminal.
 #[derive(Debug, Clone)]
@@ -43,18 +44,42 @@ impl Default for TermSettings {
 
 /// Estado compartilhado entre a thread do PTY e a UI. Tudo atômico para a UI
 /// nunca travar esperando o PTY.
-#[derive(Default)]
 pub struct Shared {
     /// Último output do processo (ms desde epoch). Base da heurística WORKING/IDLE.
     pub last_output_ms: AtomicU64,
     pub bells: AtomicU64,
     pub exited: AtomicBool,
     pub exit_code: AtomicI32,
+    /// O processo saiu sozinho com sucesso (não foi derrubado).
+    clean_exit: AtomicBool,
+    /// Terminal na tela. Invisível, a saída não pede redesenho nenhum.
+    pub visible: AtomicBool,
+    /// Muda a cada coisa que altera o que está desenhado (saída, seleção, rolagem, tamanho).
+    pub generation: AtomicU64,
     pub title: Mutex<Option<String>>,
     pub clipboard: Mutex<Option<String>>,
     theme: Mutex<TerminalTheme>,
     size: Mutex<Option<WindowSize>>,
     writer: Mutex<Option<EventLoopSender>>,
+}
+
+impl Default for Shared {
+    fn default() -> Self {
+        Self {
+            last_output_ms: AtomicU64::new(0),
+            bells: AtomicU64::new(0),
+            exited: AtomicBool::new(false),
+            exit_code: AtomicI32::new(0),
+            clean_exit: AtomicBool::new(false),
+            visible: AtomicBool::new(true),
+            generation: AtomicU64::new(0),
+            title: Mutex::new(None),
+            clipboard: Mutex::new(None),
+            theme: Mutex::new(TerminalTheme::default()),
+            size: Mutex::new(None),
+            writer: Mutex::new(None),
+        }
+    }
 }
 
 pub fn now_ms() -> u64 {
@@ -64,8 +89,20 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Intervalo mínimo entre redesenhos pedidos pelos terminais (~30 fps).
-const FRAME_MS: u64 = 33;
+/// Intervalo mínimo entre redesenhos pedidos pelos terminais: ~30 fps, ~10 com a janela sem foco.
+const FRAME_FOCUSED_MS: u64 = 33;
+const FRAME_UNFOCUSED_MS: u64 = 100;
+static FRAME_MS: AtomicU64 = AtomicU64::new(FRAME_FOCUSED_MS);
+
+/// Avisa se a janela tem foco. Sem foco, a saída dos terminais redesenha a ~10 fps.
+pub fn set_window_focused(focused: bool) {
+    let ms = if focused {
+        FRAME_FOCUSED_MS
+    } else {
+        FRAME_UNFOCUSED_MS
+    };
+    FRAME_MS.store(ms, Ordering::Relaxed);
+}
 
 /// Quadro (ms desde epoch) do último redesenho pedido por QUALQUER terminal: o imediato ou o
 /// agendado. Compartilhado: vários Claudes animando o spinner ao mesmo tempo somam um redesenho
@@ -76,8 +113,9 @@ static FRAME_AT_MS: AtomicU64 = AtomicU64::new(0);
 /// última saída sempre aparece, só que no máximo um quadro depois.
 fn request_repaint_coalesced(ctx: &egui::Context) {
     let now = now_ms();
+    let frame_ms = FRAME_MS.load(Ordering::Relaxed);
     let last = FRAME_AT_MS.load(Ordering::Relaxed);
-    if now >= last + FRAME_MS {
+    if now >= last + frame_ms {
         // livre: desenha já
         let _ = FRAME_AT_MS.compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed);
         ctx.request_repaint();
@@ -85,7 +123,7 @@ fn request_repaint_coalesced(ctx: &egui::Context) {
         // já tem quadro agendado: ele pega esta saída também
         ctx.request_repaint_after(Duration::from_millis(last - now));
     } else {
-        let at = last + FRAME_MS;
+        let at = last + frame_ms;
         let _ = FRAME_AT_MS.compare_exchange(last, at, Ordering::Relaxed, Ordering::Relaxed);
         ctx.request_repaint_after(Duration::from_millis(at - now));
     }
@@ -111,13 +149,18 @@ impl EventListener for EventProxy {
         match event {
             Event::Wakeup => {
                 s.last_output_ms.store(now_ms(), Ordering::Relaxed);
-                request_repaint_coalesced(&self.ctx);
+                s.generation.fetch_add(1, Ordering::Release);
+                if s.visible.load(Ordering::Relaxed) {
+                    request_repaint_coalesced(&self.ctx);
+                }
             }
             Event::Title(t) => *s.title.lock().unwrap() = Some(t),
             Event::ResetTitle => *s.title.lock().unwrap() = None,
             Event::Bell => {
                 s.bells.fetch_add(1, Ordering::Relaxed);
-                request_repaint_coalesced(&self.ctx);
+                if s.visible.load(Ordering::Relaxed) {
+                    request_repaint_coalesced(&self.ctx);
+                }
             }
             Event::ClipboardStore(_, text) => *s.clipboard.lock().unwrap() = Some(text),
             // Respostas que o programa espera (DA, cor de fundo, tamanho): sem elas
@@ -135,6 +178,7 @@ impl EventListener for EventProxy {
             Event::ChildExit(status) => {
                 s.exit_code
                     .store(status.code().unwrap_or(-1), Ordering::Relaxed);
+                s.clean_exit.store(status.success(), Ordering::Relaxed);
                 s.exited.store(true, Ordering::Relaxed);
                 self.ctx.request_repaint();
             }
@@ -187,6 +231,11 @@ pub struct TerminalBackend {
     pub(crate) size: GridSize,
     url_regex: RegexSearch,
     pub(crate) hovered_link: Option<Match>,
+    /// O que foi desenhado por último (ver `view`).
+    pub(crate) render: RenderCache,
+    /// Último modo e rolagem lidos, pra UI não esperar o PTY quando ele está com o lock.
+    last_mode: AtomicU32,
+    last_offset: AtomicUsize,
 }
 
 impl TerminalBackend {
@@ -250,6 +299,9 @@ impl TerminalBackend {
             )
             .expect("regex de URL"),
             hovered_link: None,
+            render: RenderCache::default(),
+            last_mode: AtomicU32::new(TermMode::default().bits()),
+            last_offset: AtomicUsize::new(0),
         })
     }
 
@@ -268,10 +320,51 @@ impl TerminalBackend {
             self.write(text.into_bytes());
         }
         self.term.lock().scroll_display(Scroll::Bottom);
+        self.touch();
     }
 
     pub fn set_theme(&self, theme: TerminalTheme) {
         *self.shared.theme.lock().unwrap() = theme;
+        self.touch();
+    }
+
+    /// Diz se o terminal está na tela. Invisível, a saída não redesenha o app.
+    pub fn set_visible(&self, visible: bool) {
+        self.shared.visible.store(visible, Ordering::Relaxed);
+    }
+
+    /// O processo saiu sozinho e com sucesso (ex: `exit` num shell).
+    pub fn clean_exit(&self) -> bool {
+        self.shared.clean_exit.load(Ordering::Relaxed)
+    }
+
+    /// Algo mudou o que está desenhado: o próximo frame relê a grade.
+    pub(crate) fn touch(&self) {
+        self.shared.generation.fetch_add(1, Ordering::Release);
+    }
+
+    /// Modo do terminal sem esperar o PTY: com o lock ocupado, o último lido.
+    pub(crate) fn mode_fast(&self) -> TermMode {
+        match self.term.try_lock_unfair() {
+            Some(term) => {
+                let mode = *term.mode();
+                self.last_mode.store(mode.bits(), Ordering::Relaxed);
+                mode
+            }
+            None => TermMode::from_bits_truncate(self.last_mode.load(Ordering::Relaxed)),
+        }
+    }
+
+    /// Rolagem sem esperar o PTY: com o lock ocupado, a última lida.
+    pub(crate) fn display_offset_fast(&self) -> usize {
+        match self.term.try_lock_unfair() {
+            Some(term) => {
+                let offset = term.grid().display_offset();
+                self.last_offset.store(offset, Ordering::Relaxed);
+                offset
+            }
+            None => self.last_offset.load(Ordering::Relaxed),
+        }
     }
 
     pub fn is_exited(&self) -> bool {
@@ -304,6 +397,7 @@ impl TerminalBackend {
         *self.shared.size.lock().unwrap() = Some(new.window_size());
         self.notifier.on_resize(new.window_size());
         self.term.lock().resize(new);
+        self.touch();
     }
 
     pub fn scroll(&self, delta: i32) {
@@ -321,11 +415,14 @@ impl TerminalBackend {
             self.write(seq);
         } else {
             term.scroll_display(Scroll::Delta(delta));
+            drop(term);
+            self.touch();
         }
     }
 
     pub fn scroll_to_bottom(&self) {
         self.term.lock().scroll_display(Scroll::Bottom);
+        self.touch();
     }
 
     /// Converte posição em pixels (relativa ao widget) em ponto da grade.
@@ -347,6 +444,8 @@ impl TerminalBackend {
         let mut term = self.term.lock();
         let p = self.point_at(x, y, term.grid().display_offset());
         term.selection = Some(Selection::new(ty, p, self.side_at(x)));
+        drop(term);
+        self.touch();
     }
 
     pub(crate) fn select_update(&self, x: f32, y: f32) {
@@ -356,10 +455,13 @@ impl TerminalBackend {
         if let Some(sel) = term.selection.as_mut() {
             sel.update(p, side);
         }
+        drop(term);
+        self.touch();
     }
 
     pub fn clear_selection(&self) {
         self.term.lock().selection = None;
+        self.touch();
     }
 
     pub fn selection_text(&self) -> Option<String> {
@@ -367,27 +469,6 @@ impl TerminalBackend {
             .lock()
             .selection_to_string()
             .filter(|s| !s.is_empty())
-    }
-
-    /// Últimas `n` linhas não vazias do que está na tela (prévia nos cards).
-    pub fn tail_lines(&self, n: usize) -> Vec<String> {
-        let term = self.term.lock();
-        let grid = term.grid();
-        let mut out = Vec::new();
-        let cols = grid.columns();
-        for line in (0..grid.screen_lines() as i32).rev() {
-            let row = &grid[Line(line)];
-            let s: String = (0..cols).map(|c| row[Column(c)].c).collect();
-            let s = s.trim_end().to_string();
-            if !s.trim().is_empty() {
-                out.push(s);
-                if out.len() == n {
-                    break;
-                }
-            }
-        }
-        out.reverse();
-        out
     }
 
     /// Todo o scrollback como texto (cache estilo tmux).
@@ -413,7 +494,10 @@ impl TerminalBackend {
         let found =
             visible_matches(&term, &mut self.url_regex.clone()).find(|m| m.contains(&point));
         drop(term);
-        self.hovered_link = found;
+        if self.hovered_link != found {
+            self.hovered_link = found;
+            self.touch();
+        }
     }
 
     pub(crate) fn open_hovered_link(&self) {

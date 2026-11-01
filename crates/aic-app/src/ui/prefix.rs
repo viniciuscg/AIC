@@ -119,6 +119,9 @@ fn key_char(key: Key, shift: bool) -> Option<char> {
 
 /// Trata o teclado do prefixo. Devolve `true` se o prefixo tomou o teclado neste frame.
 pub fn handle(app: &mut App, ctx: &Context) -> bool {
+    if app.keymap.prefix_name != app.cfg.prefix {
+        app.keymap.prefix_name = label(app);
+    }
     let Some(sc) = parse_shortcut(&app.cfg.prefix) else {
         app.prefix_pending = false;
         return false;
@@ -183,8 +186,8 @@ fn send_prefix_to_terminal(app: &mut App, key: Key, mods: Modifiers) {
         .filter(|c| c.is_ascii_alphabetic())
         .map(|c| (c.to_ascii_uppercase() as u8) - b'@');
     let Some(byte) = byte else { return };
-    let term = if app.layne.focus {
-        app.layne.rt.as_ref()
+    let term = if app.anakin.focus {
+        app.anakin.rt.as_ref()
     } else {
         app.focused().and_then(|id| app.sessions.get(&id))
     };

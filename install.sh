@@ -7,7 +7,7 @@
 #
 # O que faz: rustup (se faltar cargo), build release, link em ~/.local/bin/aic,
 # ícones + atalho no menu, link do plugin do Claude e a fonte
-# JetBrainsMono Nerd Font Mono (se faltar).
+# JetBrainsMono Nerd Font Mono (se faltar) e a voz do Anakin (whisper.cpp + modelo).
 
 set -euo pipefail
 
@@ -21,7 +21,12 @@ FONT_DIR="$DATA_DIR/fonts/JetBrainsMonoNerdFontMono"
 ICON_SIZES=(16 32 48 64 128 256 512)
 
 # Sons baixados por versões antigas (o uninstall ainda limpa).
-OLD_SOUNDS=(plankton-gemido.mp3)
+OLD_SOUNDS=(plankton-gemido.mp3 aic-acorde.wav aic-feedback.wav sino.wav pop.wav sabre.wav)
+WHISPER_SRC="$AIC_DATA/whisper.cpp"
+WHISPER_REPO="https://github.com/ggml-org/whisper.cpp"
+WHISPER_MODEL="$AIC_DATA/whisper/ggml-small.bin"
+WHISPER_MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+AIC_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/aic/config.toml"
 FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
@@ -157,7 +162,9 @@ build() {
   fi
   local log
   log=$(mktemp)
-  if (cd "$REPO_DIR" && "$cargo" build --release --locked) >"$log" 2>&1; then
+  echo "  (build otimizado ao máximo: a última etapa fica vários minutos parada em aic-app, é normal)"
+  # o progresso do cargo aparece na tela; o log fica pro caso de erro
+  if (cd "$REPO_DIR" && set -o pipefail && "$cargo" build --release --locked 2>&1 | tee "$log" | grep --line-buffered -E '^ *(Compiling aic|Finished|error)'); then
     done_
     rm -f "$log"
   else
@@ -209,9 +216,9 @@ desktop_entry() {
   cat <<EOF
 [Desktop Entry]
 Type=Application
-Name=AIC
+Name=Anakin
 GenericName=Central de sessões do Claude Code
-Comment=Sessões do Claude Code em blocos, com tmux por baixo
+Comment=Sessões do Claude Code no jeito do i3, com tmux por baixo
 Exec=$BIN_DIR/aic
 Icon=aic
 Terminal=false
@@ -273,6 +280,100 @@ install_font() {
   rm -rf "$tmp"
 }
 
+# cmake do sistema ou, sem ele, o do PyPI via uvx (sem sudo).
+cmake_cmd() {
+  if have cmake; then
+    echo cmake
+  elif have uvx; then
+    echo "uvx cmake"
+  fi
+}
+
+# Valor de uma chave do [anakin.voice] no config (vazio se não tiver).
+voice_cfg() {
+  [ -f "$AIC_CONFIG" ] || return 0
+  sed -n "/^\[\(anakin\|layne\)\.voice\]/,/^\[/s/^$1 *= *\"\(.*\)\"/\1/p" "$AIC_CONFIG" | head -n1
+}
+
+install_whisper_bin() {
+  if have whisper-cli; then
+    ok "$(command -v whisper-cli)"
+    return
+  fi
+  local cm
+  cm=$(cmake_cmd)
+  if [ -z "$cm" ] || ! have git || ! { have c++ || have g++ || have clang++; }; then
+    skip "precisa de git, cmake (ou uv) e um compilador C++"
+    warn "Debian/Ubuntu: sudo apt install git cmake build-essential   (depois rode o install de novo)"
+    return
+  fi
+  if [ "$DRY" = 1 ]; then
+    run git clone --depth 1 "$WHISPER_REPO" "$WHISPER_SRC"
+    run $cm --build "$WHISPER_SRC/build" --target whisper-cli
+    run ln -sfn "$WHISPER_SRC/build/bin/whisper-cli" "$BIN_DIR/whisper-cli"
+    would
+    return
+  fi
+  local log
+  log=$(mktemp)
+  if {
+    { [ -d "$WHISPER_SRC/.git" ] || git clone -q --depth 1 "$WHISPER_REPO" "$WHISPER_SRC"; } &&
+      $cm -S "$WHISPER_SRC" -B "$WHISPER_SRC/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF &&
+      $cm --build "$WHISPER_SRC/build" -j "$(nproc 2>/dev/null || echo 4)" --target whisper-cli
+  } >"$log" 2>&1; then
+    mkdir -p "$BIN_DIR"
+    ln -sfn "$WHISPER_SRC/build/bin/whisper-cli" "$BIN_DIR/whisper-cli"
+    done_ "compilado em $WHISPER_SRC"
+  else
+    fail "o build do whisper.cpp falhou; últimas linhas:"
+    tail -n 20 "$log" | sed 's/^/      /'
+  fi
+  rm -f "$log"
+}
+
+install_whisper_model() {
+  local model
+  model=$(voice_cfg whisper_model)
+  model=${model/#\~/$HOME}
+  model=${model:-$WHISPER_MODEL}
+  if [ -s "$model" ]; then
+    ok "$model"
+    return
+  fi
+  if [ "$model" != "$WHISPER_MODEL" ]; then
+    skip "o config aponta para $model, que não existe"
+    return
+  fi
+  if [ "$DRY" = 1 ]; then
+    run fetch "$WHISPER_MODEL_URL" "$WHISPER_MODEL"
+    would
+    return
+  fi
+  mkdir -p "$(dirname "$WHISPER_MODEL")"
+  if fetch "$WHISPER_MODEL_URL" "$WHISPER_MODEL.part"; then
+    mv "$WHISPER_MODEL.part" "$WHISPER_MODEL"
+    done_ "~470 MB em $WHISPER_MODEL"
+  else
+    rm -f "$WHISPER_MODEL.part"
+    skip "download falhou; baixe à mão: $WHISPER_MODEL_URL"
+  fi
+}
+
+install_voice() {
+  step "Voz do Anakin (whisper.cpp)"
+  local t
+  t=$(voice_cfg transcriber)
+  if [ -n "$t" ] && [ "$t" != whisper_cpp ]; then
+    skip "a transcrição está configurada como \"$t\""
+    return
+  fi
+  echo
+  printf '    whisper-cli: '
+  install_whisper_bin
+  printf '    modelo:      '
+  install_whisper_model
+}
+
 check_runtime() {
   step "tmux e Claude Code"
   local missing=()
@@ -304,7 +405,7 @@ remove_path() {
 }
 
 uninstall() {
-  TOTAL=6
+  TOTAL=7
   step "Binário ~/.local/bin/aic"
   if [ -L "$BIN_DIR/aic" ]; then remove_path "$BIN_DIR/aic"; else skip "não é link do AIC"; fi
   step "Atalho no menu"
@@ -325,6 +426,11 @@ uninstall() {
   if [ "$found" = 1 ]; then [ "$DRY" = 1 ] && would || done_; else skip "não existem"; fi
   step "Fonte instalada pelo AIC"
   remove_path "$FONT_DIR"
+  step "whisper.cpp compilado pelo AIC"
+  if [ -L "$BIN_DIR/whisper-cli" ] && [ "$(readlink "$BIN_DIR/whisper-cli")" = "$WHISPER_SRC/build/bin/whisper-cli" ]; then
+    run rm -f "$BIN_DIR/whisper-cli"
+  fi
+  remove_path "$WHISPER_SRC"
   echo
   echo "Ficaram (apague à mão se quiser): ~/.config/aic, $AIC_DATA, ~/.local/state/aic, ~/.cargo"
 }
@@ -343,7 +449,7 @@ if [ "$MODE" = uninstall ]; then
   exit 0
 fi
 
-TOTAL=9
+TOTAL=10
 install_rust
 check_build_deps
 build
@@ -352,6 +458,7 @@ install_icons
 install_desktop
 install_plugin
 install_font
+install_voice
 check_runtime
 
 echo

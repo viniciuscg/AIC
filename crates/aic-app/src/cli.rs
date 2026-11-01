@@ -1,13 +1,13 @@
 //! Subcomandos de linha de comando (rodam sem abrir janela):
 //!
 //! ```text
-//! aic add [--session] "corrigir juros #api !alta @hoje"   # nova tarefa
+//! aic add "pagar o boleto @sexta"               # nova tarefa
 //! aic tasks [--all] [--json]                    # lista tarefas
 //! aic done <id>                                 # conclui (prefixo do id serve)
 //! aic ws ls|new|go …                            # workspaces (new/go pedem ao app aberto)
 //! aic session [--repo r] [--ws w] [-- prompt]   # abre um Claude/shell no app aberto
 //! aic sessions | repos                          # o que está aberto / repos conhecidos
-//! aic layne [--send] "texto" | voz | show       # fala com o Layne (assistente)
+//! aic anakin [--send] "texto" | voz | show       # fala com o Anakin (assistente)
 //! aic hook                                      # (hooks do Claude) grava evento
 //! aic statusline                                # (statusLine do Claude) grava o snapshot, sem imprimir
 //! aic export-icon <dir>                         # PNGs do ícone (16..512) em <dir>
@@ -19,7 +19,7 @@ use aic_core::claude::StatusSnapshot;
 use aic_core::events::{self, HookEvent};
 use aic_core::inbox::{self, Command as Cmd};
 use aic_core::quickadd;
-use aic_core::{Config, Id, Store, TaskStatus, paths};
+use aic_core::{Config, Store, Task, paths};
 use anyhow::{Result, bail};
 use chrono::Local;
 
@@ -33,12 +33,8 @@ pub fn parse(args: Vec<String>) -> Cli {
     let first = it.next();
     match first.as_deref() {
         Some("add" | "a" | "t") => {
-            let mut rest: Vec<String> = it.collect();
-            let ws = take_opt(&mut rest, &["--ws", "--workspace", "-w"]);
-            let session = take_flag(&mut rest, &["--session"]);
-            Cli::Run(Box::new(move || {
-                add(&rest.join(" "), session, ws.as_deref())
-            }))
+            let rest: Vec<String> = it.collect();
+            Cli::Run(Box::new(move || add(&rest.join(" "))))
         }
         Some("tasks" | "ls") => {
             let rest: Vec<String> = it.collect();
@@ -66,9 +62,9 @@ pub fn parse(args: Vec<String>) -> Cli {
             Cli::Run(Box::new(move || sessions(json)))
         }
         Some("repos") => Cli::Run(Box::new(repos)),
-        Some("layne") => {
+        Some("anakin") => {
             let rest: Vec<String> = it.collect();
-            Cli::Run(Box::new(move || layne(rest)))
+            Cli::Run(Box::new(move || anakin(rest)))
         }
         Some("voz" | "voice") => Cli::Run(Box::new(|| ask(Cmd::Voice, 5).map(|_| ()))),
         Some("hook") => Cli::Run(Box::new(hook)),
@@ -99,22 +95,22 @@ pub fn parse(args: Vec<String>) -> Cli {
     }
 }
 
-const HELP: &str = "AIC — central de vibecode pessoal
+const HELP: &str = "aic (Anakin) — central de vibecode pessoal
 
 Uso:
   aic [--fresh]                                          abre o app
-  aic add [--ws W] \"texto #repo @hoje !alta +workspace ^DEV-1 ~tag\"   cria tarefa
+  aic add \"texto @amanhã\"                                cria tarefa (a data é opcional)
   aic tasks [--all] [--json]                             lista tarefas
   aic done <id>                                          conclui tarefa
   aic ws ls [--json]                                     lista workspaces
   aic ws new <nome> [--go]                               cria workspace (--go: vai pra ele)
   aic ws go <nome>                                       vai pro workspace
-  aic session [--ws W] [--repo R | --cwd P] [--branch B] [--name N] [--shell] [--task ID] [-- prompt]
-                                                         abre um Claude (ou shell) num bloco novo
+  aic session [--ws W] [--repo R | --cwd P] [--branch B] [--name N] [--shell] [-- prompt]
+                                                         abre um Claude (ou shell) numa sessão nova
   aic sessions [--json]                                  terminais abertos, por workspace
   aic repos                                              repos das pastas de projetos
-  aic layne [--send] \"texto\"                             escreve pro Layne (assistente)
-  aic layne show | aic voz                               mostra o Layne / liga-desliga a gravação
+  aic anakin [--send] \"texto\"                             escreve pro Anakin (assistente)
+  aic anakin show | aic voz                               mostra o Anakin / liga-desliga a gravação
   aic export-icon <dir>                                  gera <dir>/aic-<N>.png (16..512)
   aic hook | statusline                                  (usados pelo Claude Code)";
 
@@ -166,7 +162,6 @@ fn workspace(mut args: Vec<String>) -> Result<()> {
             let store = store()?;
             let wss = store.workspaces()?;
             let sessions = store.sessions()?;
-            let tasks = store.tasks()?;
             if args.iter().any(|a| a == "--json") {
                 let v: Vec<serde_json::Value> = wss
                     .iter()
@@ -175,7 +170,6 @@ fn workspace(mut args: Vec<String>) -> Result<()> {
                             "id": w.id,
                             "name": w.name,
                             "sessions": sessions.iter().filter(|s| s.workspace == w.id).count(),
-                            "open_tasks": tasks.iter().filter(|t| t.workspace == Some(w.id) && !matches!(t.status, TaskStatus::Done | TaskStatus::Archived)).count(),
                         })
                     })
                     .collect();
@@ -187,18 +181,7 @@ fn workspace(mut args: Vec<String>) -> Result<()> {
             }
             for (i, w) in wss.iter().enumerate() {
                 let s = sessions.iter().filter(|s| s.workspace == w.id).count();
-                let t = tasks
-                    .iter()
-                    .filter(|t| {
-                        t.workspace == Some(w.id)
-                            && !matches!(t.status, TaskStatus::Done | TaskStatus::Archived)
-                    })
-                    .count();
-                println!(
-                    "{}  {:<24} {s} terminais · {t} tarefas abertas",
-                    i + 1,
-                    w.name
-                );
+                println!("{}  {:<24} {s} terminais", i + 1, w.name);
             }
             Ok(())
         }
@@ -241,7 +224,6 @@ fn session(mut args: Vec<String>) -> Result<()> {
     });
     let branch = take_opt(&mut args, &["--branch", "-b"]);
     let name = take_opt(&mut args, &["--name", "--nome", "-n"]);
-    let task = take_opt(&mut args, &["--task", "--tarefa", "-t"]);
     let shell = take_flag(&mut args, &["--shell"]);
     if let Some(extra) = args.first() {
         bail!("argumento desconhecido: {extra} (veja `aic help`)");
@@ -255,7 +237,6 @@ fn session(mut args: Vec<String>) -> Result<()> {
             shell,
             branch,
             prompt: prompt.filter(|p| !p.trim().is_empty()),
-            task,
         },
         20,
     )
@@ -271,7 +252,7 @@ fn sessions(json: bool) -> Result<()> {
             .iter()
             .map(|s| {
                 serde_json::json!({
-                    "id": s.id, "name": s.name, "kind": s.kind, "cwd": s.cwd, "repo": s.repo, "task": s.task,
+                    "id": s.id, "name": s.name, "kind": s.kind, "cwd": s.cwd, "repo": s.repo,
                     "workspace": wss.iter().find(|w| w.id == s.workspace).map(|w| w.name.clone()),
                 })
             })
@@ -310,7 +291,7 @@ fn repos() -> Result<()> {
     Ok(())
 }
 
-fn layne(mut args: Vec<String>) -> Result<()> {
+fn anakin(mut args: Vec<String>) -> Result<()> {
     match args.first().map(String::as_str) {
         Some("show" | "mostrar") => ask(Cmd::Show, 5).map(|_| ()),
         Some("voz" | "voice") => ask(Cmd::Voice, 5).map(|_| ()),
@@ -330,57 +311,26 @@ fn store() -> Result<Store> {
     Store::open(&paths::db_path())
 }
 
-fn add(text: &str, link_session: bool, ws: Option<&str>) -> Result<()> {
+fn add(text: &str) -> Result<()> {
     if text.trim().is_empty() {
-        bail!("uso: aic add \"texto da tarefa\"");
+        bail!("uso: aic add \"texto da tarefa @data\"");
     }
-    let cfg = Config::load();
     let store = store()?;
-    let workspaces = store.workspaces()?;
-    let ws_names: Vec<String> = workspaces.iter().map(|w| w.name.clone()).collect();
-    let parsed = quickadd::parse(text, Local::now().date_naive(), &cfg.repos(), &ws_names);
+    let parsed = quickadd::parse(text, Local::now().date_naive());
     if parsed.title.trim().is_empty() {
-        bail!("a tarefa precisa de um título além dos marcadores");
+        bail!("a tarefa precisa de um título além da data");
     }
-    let chips: Vec<String> = parsed.chips.iter().map(|c| c.label.clone()).collect();
-    let ws_name = parsed.workspace.clone();
-    let mut task = parsed.into_task();
-
-    // Chamado de dentro de uma sessão do AIC (/tarefa): já vincula.
-    let env_id = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<Id>().ok());
-    let by_flag = match ws.map(str::trim).filter(|w| !w.is_empty()) {
-        Some(w) => Some(
-            workspaces
-                .iter()
-                .find(|x| x.name.eq_ignore_ascii_case(w))
-                .or_else(|| {
-                    workspaces
-                        .iter()
-                        .find(|x| x.name.to_lowercase().starts_with(&w.to_lowercase()))
-                })
-                .map(|x| x.id)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("workspace \"{w}\" não existe (crie com `aic ws new`)")
-                })?,
-        ),
-        None => None,
-    };
-    task.workspace = by_flag
-        .or_else(|| ws_name.and_then(|n| workspaces.iter().find(|w| w.name == n).map(|w| w.id)))
-        .or_else(|| env_id("AIC_WORKSPACE"));
-    if link_session {
-        task.session = env_id("AIC_SESSION");
-    }
+    let mut task = Task::new(parsed.title);
+    task.due = parsed.due;
     store.save_task(&task)?;
     let short = &task.id.to_string()[..8];
-    if chips.is_empty() {
-        println!("✓ tarefa criada [{short}]: {}", task.title);
-    } else {
-        println!(
+    match task.due {
+        Some(d) => println!(
             "✓ tarefa criada [{short}]: {}  ({})",
             task.title,
-            chips.join(" · ")
-        );
+            quickadd::due_label(d, Local::now().date_naive())
+        ),
+        None => println!("✓ tarefa criada [{short}]: {}", task.title),
     }
     Ok(())
 }
@@ -388,13 +338,9 @@ fn add(text: &str, link_session: bool, ws: Option<&str>) -> Result<()> {
 fn tasks(all: bool, json: bool) -> Result<()> {
     let store = store()?;
     let mut list = store.tasks()?;
-    list.retain(|t| all || !matches!(t.status, TaskStatus::Done | TaskStatus::Archived));
-    list.sort_by(|a, b| {
-        a.status
-            .cmp(&b.status)
-            .then(b.priority.cmp(&a.priority))
-            .then(a.rank.total_cmp(&b.rank))
-    });
+    list.retain(|t| all || !t.done);
+    // com data primeiro, a mais próxima em cima
+    list.sort_by_key(|t| (t.done, t.due.is_none(), t.due, t.created_at));
     if json {
         println!("{}", serde_json::to_string_pretty(&list)?);
         return Ok(());
@@ -404,23 +350,16 @@ fn tasks(all: bool, json: bool) -> Result<()> {
     }
     let today = Local::now().date_naive();
     for t in list {
-        let mut extra = Vec::new();
-        if let Some(r) = &t.repo {
-            extra.push(format!("#{r}"));
-        }
-        if let Some(d) = t.due {
-            extra.push(format!("@{}", quickadd::due_label(d, today)));
-        }
-        if let Some(k) = &t.card_key {
-            extra.push(format!("^{k}"));
-        }
+        let due = t
+            .due
+            .map(|d| quickadd::due_label(d, today))
+            .unwrap_or_default();
         println!(
-            "{}  {:<9} {:<7} {}  {}",
+            "{}  {} {:<12} {}",
             &t.id.to_string()[..8],
-            t.status.label(),
-            t.priority.label(),
+            if t.done { "✓" } else { " " },
+            due,
             t.title,
-            extra.join(" ")
         );
     }
     Ok(())
@@ -439,7 +378,7 @@ fn done(prefix: &str) -> Result<()> {
     match matches.as_slice() {
         [t] => {
             let mut t = t.clone();
-            t.status = TaskStatus::Done;
+            t.done = true;
             t.touch();
             store.save_task(&t)?;
             println!("✓ concluída: {}", t.title);

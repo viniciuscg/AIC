@@ -7,50 +7,11 @@ use serde::{Deserialize, Serialize};
 use crate::modules::{self, Flags, Module};
 use crate::paths;
 
-/// Como as sessões aparecem. Escolhida no primeiro uso; muda em Config ou pelo atalho.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum SessionView {
-    /// Lista de blocos: cada bloco (contexto) com seus terminais.
-    #[default]
-    Blocks,
-    /// Um bloco por aba, com os terminais divididos (o mais parecido com tmux).
-    Tabs,
-    /// Um terminal grande + lista lateral.
-    Focus,
-    /// Todos os terminais do workspace lado a lado.
-    Grid,
-}
-
-impl SessionView {
-    pub const ALL: [SessionView; 4] = [Self::Blocks, Self::Tabs, Self::Focus, Self::Grid];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Blocks => "Blocos",
-            Self::Tabs => "Abas",
-            Self::Focus => "Foco",
-            Self::Grid => "Grade",
-        }
-    }
-
-    pub fn desc(self) -> &'static str {
-        match self {
-            Self::Blocks => "Cada contexto é um bloco com seus terminais, um embaixo do outro.",
-            Self::Tabs => "Um bloco por aba, terminais divididos lado a lado. O jeito tmux.",
-            Self::Focus => "Um terminal grande e a lista de sessões ao lado, com prévia.",
-            Self::Grid => "Todos os terminais do workspace numa grade.",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Config {
     /// Primeiro uso concluído (assistente de visualização/módulos).
     pub setup_done: bool,
-    /// Visualização das sessões.
-    pub view: SessionView,
     /// Módulos ligados/desligados.
     pub modules: Flags,
     /// Tecla líder: aperte e veja o catálogo de atalhos (which-key).
@@ -64,18 +25,16 @@ pub struct Config {
     pub repos_dirs: Vec<PathBuf>,
     pub sound: SoundConfig,
     pub notify: NotifyConfig,
-    pub layne: LayneConfig,
+    #[serde(alias = "layne", alias = "ahsoka")]
+    pub anakin: AnakinConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct SoundConfig {
     pub enabled: bool,
-    /// Id do som de "terminou" no catálogo (ex: `aic-acorde`) ou caminho de arquivo.
-    /// `None` = o som padrão.
-    pub done: Option<String>,
-    /// Id/caminho do som de "precisa de você". `None` = sem som.
-    pub attention: Option<String>,
+    /// Um arquivo seu no lugar do sabre de luz. `None` = o sabre.
+    pub file: Option<PathBuf>,
     pub volume: f32,
 }
 
@@ -88,25 +47,28 @@ pub struct NotifyConfig {
     pub only_when_unfocused: bool,
 }
 
-/// Layne: o assistente pessoal (módulo `layne`). Um Claude com o agente `aic:layne`, sempre aberto.
+/// Anakin: o assistente pessoal (módulo `anakin`). Um Claude com o agente `aic:anakin`, sempre aberto.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct LayneConfig {
+pub struct AnakinConfig {
     /// Sobe a sessão junto com o app (senão, na primeira vez que o painel abre).
     pub auto_start: bool,
     /// Modelo do Claude (`--model`). Vazio = o padrão da conta.
     pub model: Option<String>,
-    /// Largura do painel lateral (px).
+    /// Largura da janela de conversa (px).
     pub width: f32,
+    /// Mostra o boneco no canto da tela.
+    pub avatar: bool,
     pub voice: VoiceConfig,
 }
 
-impl Default for LayneConfig {
+impl Default for AnakinConfig {
     fn default() -> Self {
         Self {
             auto_start: true,
             model: None,
-            width: 480.0,
+            width: 640.0,
+            avatar: true,
             voice: VoiceConfig::default(),
         }
     }
@@ -192,7 +154,6 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             setup_done: false,
-            view: SessionView::Blocks,
             modules: Flags::new(),
             leader: "Ctrl+Space".into(),
             prefix: "Ctrl+B".into(),
@@ -202,7 +163,7 @@ impl Default for Config {
             repos_dirs: vec![paths::home_dir()],
             sound: SoundConfig::default(),
             notify: NotifyConfig::default(),
-            layne: LayneConfig::default(),
+            anakin: AnakinConfig::default(),
         }
     }
 }
@@ -211,8 +172,7 @@ impl Default for SoundConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            done: None,
-            attention: None,
+            file: None,
             volume: 1.0,
         }
     }

@@ -13,7 +13,7 @@ pub mod store;
 pub mod usage;
 pub mod voice;
 
-pub use config::{Config, LayneConfig, SessionView, Transcriber, VoiceConfig};
+pub use config::{AnakinConfig, Config, Transcriber, VoiceConfig};
 pub use model::*;
 pub use modules::Module;
 pub use store::Store;

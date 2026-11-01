@@ -21,8 +21,6 @@ pub struct Workspace {
     pub name: String,
     #[serde(default)]
     pub icon: String,
-    #[serde(default)]
-    pub layout: Layout,
     /// Ordem das sessões na grade/lista.
     #[serde(default)]
     pub sessions: Vec<Id>,
@@ -41,22 +39,12 @@ impl Workspace {
             id: new_id(),
             name: name.into(),
             icon: String::new(),
-            layout: Layout::default(),
             sessions: vec![],
             focused: None,
             blocks: vec![],
             created_at: Utc::now(),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum Layout {
-    /// Uma sessão grande + lista lateral.
-    #[default]
-    Focus,
-    /// Todas lado a lado.
-    Grid,
 }
 
 // ───────────────────────────── Bloco ─────────────────────────────
@@ -93,7 +81,7 @@ impl Split {
     }
 }
 
-/// Um contexto de trabalho (normalmente um card): vários terminais e a tarefa vinculada.
+/// Uma sessão da barra: um contexto de trabalho (um repo, um card) com seus terminais.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Block {
     pub id: Id,
@@ -101,37 +89,14 @@ pub struct Block {
     pub name: String,
     #[serde(default)]
     pub color: u8,
-    /// Tarefa/card deste bloco.
-    #[serde(default)]
-    pub task: Option<Id>,
-    /// Notas de antes das notas por sessão: o app passa pra sessão em foco do bloco e limpa.
-    #[serde(default)]
-    pub notes: String,
     /// Terminais, em ordem.
     #[serde(default)]
     pub panes: Vec<Id>,
     #[serde(default)]
     pub split: Split,
-    /// Recolhido na visualização de blocos.
-    #[serde(default)]
-    pub collapsed: bool,
-    /// Painel lateral (tarefas) aberto.
-    #[serde(default = "yes")]
-    pub side: bool,
-    /// Altura na visualização de blocos (px).
-    #[serde(default = "default_height")]
-    pub height: f32,
     #[serde(default)]
     pub focused: Option<Id>,
     pub created_at: DateTime<Utc>,
-}
-
-fn yes() -> bool {
-    true
-}
-
-fn default_height() -> f32 {
-    380.0
 }
 
 impl Block {
@@ -141,13 +106,8 @@ impl Block {
             workspace,
             name: name.into(),
             color: 0,
-            task: None,
-            notes: String::new(),
             panes: vec![],
             split: Split::Row,
-            collapsed: false,
-            side: true,
-            height: default_height(),
             focused: None,
             created_at: Utc::now(),
         }
@@ -187,8 +147,6 @@ pub struct Session {
     /// Session id do Claude Code (`--session-id`). Igual ao `id` por padrão.
     pub claude_session: Id,
     #[serde(default)]
-    pub task: Option<Id>,
-    #[serde(default)]
     pub color: u8,
     /// Args extras pro claude (ex: `--model opus`, `--permission-mode plan`).
     #[serde(default)]
@@ -215,7 +173,6 @@ impl Session {
             repo: None,
             worktree: None,
             claude_session: id,
-            task: None,
             color: 0,
             claude_args: vec![],
             initial_prompt: None,
@@ -249,8 +206,8 @@ impl SessionState {
             Self::Working => "WORKING",
             Self::Idle => "IDLE",
             Self::Waiting => "WAITING",
-            Self::Done => "DONE!",
-            Self::GameOver => "GAME OVER",
+            Self::Done => "DONE",
+            Self::GameOver => "EXITED",
         }
     }
 
@@ -262,108 +219,21 @@ impl SessionState {
 
 // ───────────────────────────── Tarefa ─────────────────────────────
 
-#[derive(
-    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default, PartialOrd, Ord,
-)]
-pub enum TaskStatus {
-    #[default]
-    Todo,
-    Doing,
-    Review,
-    Done,
-    Archived,
-}
-
-impl TaskStatus {
-    /// Os status que dá pra escolher (arquivada fica de fora).
-    pub const ALL: [TaskStatus; 4] = [Self::Todo, Self::Doing, Self::Review, Self::Done];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Todo => "A fazer",
-            Self::Doing => "Fazendo",
-            Self::Review => "Revisão",
-            Self::Done => "Feito",
-            Self::Archived => "Arquivado",
-        }
-    }
-
-    pub fn next(self) -> Self {
-        match self {
-            Self::Todo => Self::Doing,
-            Self::Doing => Self::Review,
-            Self::Review => Self::Done,
-            s => s,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        match self {
-            Self::Doing => Self::Todo,
-            Self::Review => Self::Doing,
-            Self::Done => Self::Review,
-            s => s,
-        }
-    }
-}
-
-#[derive(
-    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default, PartialOrd, Ord,
-)]
-pub enum Priority {
-    Low,
-    #[default]
-    Normal,
-    High,
-    Urgent,
-}
-
-impl Priority {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Low => "baixa",
-            Self::Normal => "normal",
-            Self::High => "alta",
-            Self::Urgent => "urgente",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Subtask {
-    pub text: String,
-    #[serde(default)]
-    pub done: bool,
-}
-
+/// Uma linha da lista de tarefas: título e data. Não tem ligação com sessões.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Task {
     pub id: Id,
     pub title: String,
     #[serde(default)]
-    pub notes: String,
-    #[serde(default)]
-    pub status: TaskStatus,
-    #[serde(default)]
-    pub priority: Priority,
-    #[serde(default)]
     pub due: Option<NaiveDate>,
     #[serde(default)]
-    pub repo: Option<String>,
-    #[serde(default)]
-    pub workspace: Option<Id>,
-    #[serde(default)]
-    pub session: Option<Id>,
-    /// Chave do card (ex: `DEV-142`, marcador `^`): vira o começo do nome da branch.
-    #[serde(default)]
-    pub card_key: Option<String>,
-    #[serde(default)]
-    pub subtasks: Vec<Subtask>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    /// Ordem na lista (menor = mais em cima).
-    #[serde(default)]
-    pub rank: f64,
+    pub done: bool,
+    /// Notas de antes da v2 (aparecem ao passar o mouse; a lista não cria mais).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
+    /// Status de antes da v2: só é lido, pra virar `done` (ver `Store::tasks`).
+    #[serde(default, skip_serializing)]
+    pub status: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -374,17 +244,10 @@ impl Task {
         Self {
             id: new_id(),
             title: title.into(),
-            notes: String::new(),
-            status: TaskStatus::Todo,
-            priority: Priority::Normal,
             due: None,
-            repo: None,
-            workspace: None,
-            session: None,
-            card_key: None,
-            subtasks: vec![],
-            tags: vec![],
-            rank: now.timestamp_millis() as f64,
+            done: false,
+            notes: String::new(),
+            status: None,
             created_at: now,
             updated_at: now,
         }
@@ -394,17 +257,10 @@ impl Task {
         self.updated_at = Utc::now();
     }
 
-    pub fn subtasks_progress(&self) -> Option<(usize, usize)> {
-        (!self.subtasks.is_empty()).then(|| {
-            (
-                self.subtasks.iter().filter(|s| s.done).count(),
-                self.subtasks.len(),
-            )
-        })
-    }
-
-    pub fn is_overdue(&self, today: NaiveDate) -> bool {
-        self.due.is_some_and(|d| d < today)
-            && !matches!(self.status, TaskStatus::Done | TaskStatus::Archived)
+    /// Tarefa salva pela v1: `Done`/`Archived` viram concluída.
+    pub fn migrate(&mut self) {
+        if matches!(self.status.take().as_deref(), Some("Done" | "Archived")) {
+            self.done = true;
+        }
     }
 }

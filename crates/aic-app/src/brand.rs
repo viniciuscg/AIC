@@ -1,134 +1,101 @@
-//! Identidade visual do AIC: cores, letreiro e nomes dos estados. Inspirado no grunge de
-//! Seattle e em Alice in Chains; nada de logos ou capas oficiais.
+//! Identidade visual: Anakin Skywalker, o cavaleiro Jedi. Azul do sabre, areia de Tatooine e o
+//! preto do espaço. Sem logos nem imagens oficiais: o sabre da barra é desenhado aqui.
 
 use aic_core::SessionState;
-use egui::epaint::TextShape;
-use egui::{FontFamily, FontId, Pos2, Rect, Stroke, Ui, pos2, vec2};
+use egui::{CornerRadius, Pos2, Rect, Ui, pos2, vec2};
 
 use crate::theme::{Theme, c, term_from};
 
-pub const NAME: &str = "AIC";
-pub const TAGLINE: &str = "down in a hole, up in the stack";
+pub const NAME: &str = "Anakin";
+pub const TAGLINE: &str = "now this is podracing";
 
 /// Manual (aba Ajuda, F1).
 pub const HELP: &str = include_str!("../../../docs/MANUAL.md");
 
-/// Terra seca, ferrugem e mostarda queimada.
 pub fn theme() -> Theme {
     Theme {
         dark: true,
-        bg: c("#110e0b"),
-        bg2: c("#1a1510"),
-        bg3: c("#241d16"),
-        bg4: c("#30271d"),
-        border: c("#3a2e22"),
-        border_active: c("#c0602f"),
-        ink: c("#e8dac4"),
-        dim: c("#9a8a74"),
-        faint: c("#65574a"),
-        accent: c("#b5522b"),
-        accent_hi: c("#d06a3d"),
-        accent_lo: c("#4a2414"),
-        ok: c("#8a9a4e"),
-        warn: c("#c9a227"),
-        err: c("#b0362b"),
-        attention: c("#9b7bb0"),
+        bg: c("#0a0e14"),
+        bg2: c("#10151e"),
+        bg3: c("#18202c"),
+        bg4: c("#222c3b"),
+        border: c("#263142"),
+        border_active: c("#4da3ff"),
+        ink: c("#dbe6f2"),
+        dim: c("#8493a8"),
+        faint: c("#4f5c70"),
+        accent: c("#2f8fff"),
+        accent_hi: c("#7cc4ff"),
+        accent_lo: c("#12335c"),
+        ok: c("#6fc7a0"),
+        warn: c("#e3c27f"),
+        err: c("#e5533d"),
+        attention: c("#ff9d4d"),
         agents: [
-            "#b5522b", "#8a9a4e", "#c9a227", "#9b7bb0", "#5f8b99", "#b0362b", "#a08a70",
+            "#2f8fff", "#6fc7a0", "#e3c27f", "#ff9d4d", "#5fd0d6", "#b79cff", "#a8b6c8",
         ]
         .map(c)
         .to_vec(),
-        radius: 2,
-        hard_shadow: Some(2.0),
+        radius: 0,
+        hard_shadow: None,
         term: term_from(
-            "#110e0b",
-            "#e8dac4",
-            "#d06a3d",
-            "#4a2414",
+            "#0a0e14",
+            "#dbe6f2",
+            "#7cc4ff",
+            "#12335c",
             [
-                "#241d16", "#b0362b", "#8a9a4e", "#c9a227", "#5f8b99", "#9b7bb0", "#6f9a88",
-                "#d6c8b0", "#65574a", "#d04a3c", "#a6b862", "#e3bc3c", "#7eaabb", "#b899cc",
-                "#8bb8a4", "#f6ead6",
+                "#18202c", "#e5533d", "#6fc7a0", "#e3c27f", "#4da3ff", "#b79cff", "#5fd0d6",
+                "#c9d6e5", "#4f5c70", "#ff7a66", "#8fe0bb", "#f2d9a0", "#7cc4ff", "#cdb8ff",
+                "#8be4e9", "#f4f8fc",
             ],
         ),
     }
 }
 
-/// Nome do estado na linguagem do AIC.
+/// Nome do estado.
 pub fn state_label(s: SessionState) -> &'static str {
     match s {
-        SessionState::Boot => "ROOSTER",
-        SessionState::Working => "THEM BONES",
-        SessionState::Idle => "NUTSHELL",
-        SessionState::Waiting => "WOULD?",
-        SessionState::Done => "NO EXCUSES",
-        SessionState::GameOver => "DOWN IN A HOLE",
+        SessionState::Boot => "IGNITING",
+        SessionState::Working => "PODRACING",
+        SessionState::Idle => "MEDITATING",
+        SessionState::Waiting => "BAD FEELING",
+        SessionState::Done => "YIPPEE",
+        SessionState::GameOver => "HIGH GROUND",
     }
 }
 
-/// "AIC" com cara de cartaz xerocado: letras tortas, impressão desalinhada e riscos.
-pub fn wordmark(ui: &Ui, pos: Pos2, size: f32, theme: &Theme) -> Rect {
+/// O sabre de luz da barra: empunhadura e lâmina azul, com brilho.
+pub fn saber(ui: &Ui, pos: Pos2, height: f32, theme: &Theme) -> Rect {
     let p = ui.painter();
-    let font = FontId::new(size * 1.3, FontFamily::Monospace);
-    let letters = [
-        ('A', -0.09f32, 1.0f32),
-        ('I', 0.06, -1.5),
-        ('C', -0.04, 0.5),
-    ];
-    let mut x = pos.x;
-    let mut h: f32 = 0.0;
-    let ghost = theme.err.gamma_multiply(0.55);
-    for (ch, ang, dy) in letters {
-        let g = p.layout_no_wrap(ch.to_string(), font.clone(), theme.ink);
-        let w = g.size().x;
-        h = h.max(g.size().y);
-        let at = pos2(x, pos.y + dy);
-        // impressão fantasma desalinhada
-        p.add(
-            TextShape::new(at + vec2(1.5, 1.0), g.clone(), ghost)
-                .with_override_text_color(ghost)
-                .with_angle(ang * 1.4),
+    let cy = pos.y + height / 2.0;
+    let hilt_w = 10.0;
+    let blade_w = 26.0;
+    let x = pos.x;
+    let tip = x + hilt_w + blade_w;
+    let blade = |half: f32, color| {
+        p.rect_filled(
+            Rect::from_min_max(pos2(x + hilt_w, cy - half), pos2(tip, cy + half)),
+            CornerRadius::same(half.ceil() as u8),
+            color,
         );
-        // bold "na mão": a mesma letra 3x com meio pixel de diferença
-        for d in [vec2(0.0, 0.0), vec2(0.6, 0.0), vec2(0.0, 0.5)] {
-            p.add(
-                TextShape::new(at + d, g.clone(), theme.accent_hi)
-                    .with_override_text_color(theme.accent_hi)
-                    .with_angle(ang),
-            );
-        }
-        x += w * 1.02;
-    }
-    let r = Rect::from_min_size(pos, vec2(x - pos.x, h));
-    // riscos e falhas de tinta (na cor do fundo)
-    let scratch = Stroke::new(1.0, theme.bg);
-    p.line_segment(
-        [
-            pos2(r.left() - 1.0, r.top() + h * 0.42),
-            pos2(r.right() + 1.0, r.top() + h * 0.36),
-        ],
-        scratch,
+    };
+    blade(3.5, theme.accent.gamma_multiply(0.22));
+    blade(2.0, theme.accent);
+    blade(0.9, c("#eaf6ff"));
+    p.rect_filled(
+        Rect::from_min_size(pos2(x, cy - 2.0), vec2(hilt_w, 4.0)),
+        0.0,
+        c("#9aa7b8"),
     );
-    p.line_segment(
-        [
-            pos2(r.left() + r.width() * 0.3, r.top() + h * 0.75),
-            pos2(r.right() - 2.0, r.top() + h * 0.80),
-        ],
-        Stroke::new(0.8, theme.bg),
+    p.rect_filled(
+        Rect::from_min_size(pos2(x + 2.0, cy - 2.0), vec2(1.5, 4.0)),
+        0.0,
+        c("#39424f"),
     );
-    for i in 0..14 {
-        let fx = rnd(i as f32 * 3.3 + 0.7);
-        let fy = 0.2 + 0.65 * rnd(i as f32 * 5.1 + 0.2);
-        p.circle_filled(
-            pos2(r.left() + fx * r.width(), r.top() + fy * h),
-            0.5 + rnd(i as f32 * 1.7) * 0.6,
-            theme.bg,
-        );
-    }
-    r
-}
-
-/// Hash barato e determinístico em [0, 1).
-pub fn rnd(seed: f32) -> f32 {
-    ((seed * 12.9898).sin() * 43758.545).fract().abs()
+    p.rect_filled(
+        Rect::from_min_size(pos2(x + hilt_w - 2.0, cy - 2.6), vec2(2.0, 5.2)),
+        0.0,
+        c("#c9d3df"),
+    );
+    Rect::from_min_size(pos, vec2(tip - x, height))
 }

@@ -11,9 +11,15 @@ fn main() {
             }
         }
         Cli::Gui { fresh } => {
+            // Duas janelas disputando o mesmo banco e o mesmo tmux bagunçam (ou apagam) as sessões.
+            if aic_core::inbox::other_instance() {
+                let _ = aic_core::inbox::send(aic_core::inbox::Command::Focus);
+                eprintln!("aic: já está aberto; trazendo a janela pra frente");
+                return;
+            }
             let options = eframe::NativeOptions {
                 viewport: egui::ViewportBuilder::default()
-                    .with_title("AIC")
+                    .with_title(aic_app::brand::NAME)
                     .with_app_id("aic")
                     .with_inner_size([1480.0, 920.0])
                     .with_min_inner_size([900.0, 560.0])

@@ -150,7 +150,7 @@ fn global_config_path() -> PathBuf {
 }
 
 /// Marca a pasta como confiável no Claude Code, como se o usuário tivesse respondido "Yes, I
-/// trust this folder". Serve pras pastas que o próprio AIC cria (a do Layne): sem isso o Claude
+/// trust this folder". Serve pras pastas que o próprio AIC cria (a do Anakin): sem isso o Claude
 /// abre parado na pergunta. Só escreve se a pasta (ou uma acima dela) ainda não for confiável.
 pub fn ensure_trusted(dir: &Path) -> anyhow::Result<()> {
     let path = global_config_path();
@@ -200,11 +200,7 @@ pub struct Injection {
 }
 
 /// Monta `program` + `args` para abrir/retomar a sessão no Claude Code.
-pub fn command(
-    session: &Session,
-    inj: &Injection,
-    extra_prompt: Option<&str>,
-) -> (String, Vec<String>) {
+pub fn command(session: &Session, inj: &Injection) -> (String, Vec<String>) {
     let id = session.claude_session.to_string();
     let mut args = Vec::new();
     if find_transcript(&session.cwd, &id).is_some() {
@@ -222,10 +218,6 @@ pub fn command(
     if let Some(p) = &inj.plugin_dir {
         args.push("--plugin-dir".into());
         args.push(p.to_string_lossy().into());
-    }
-    if let Some(p) = extra_prompt.filter(|p| !p.is_empty()) {
-        args.push("--append-system-prompt".into());
-        args.push(p.to_string());
     }
     args.extend(session.claude_args.iter().cloned());
     if let Some(p) = session

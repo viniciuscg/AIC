@@ -1,6 +1,6 @@
 //! Desenho. `draw` é chamado uma vez por frame com o `Ui` raiz.
 
-pub mod blocks;
+pub mod avatar;
 pub mod changes;
 pub mod help;
 pub mod leader;
@@ -10,6 +10,7 @@ pub mod prefix;
 pub mod sessions;
 pub mod settings;
 pub mod setup;
+pub mod tasks;
 pub mod topbar;
 pub mod usage;
 pub mod widgets;
@@ -17,13 +18,15 @@ pub mod worktrees;
 
 use std::time::Duration;
 
-use egui::{Align2, Frame, Key, Margin, RichText, Ui, Vec2};
+use egui::{Align2, Frame, Margin, RichText, Ui, Vec2};
 
 use crate::app::{App, Phase, ToastKind, View};
 
 /// Redesenho de fundo, sem nada acontecendo: relógio, estados dos hooks, avisos. Saída de
 /// terminal e input redesenham na hora (a saída limitada a ~30 fps, ver `aic_term::backend`).
 pub const IDLE_REPAINT: Duration = Duration::from_millis(500);
+/// O mesmo com a janela sem foco.
+pub const IDLE_REPAINT_UNFOCUSED: Duration = Duration::from_millis(1000);
 
 pub fn draw(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
@@ -43,6 +46,7 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
 
     // aba de um módulo que foi desligado: volta pras sessões
     let view_module = match app.view {
+        View::Tasks => Some(aic_core::Module::Tasks),
         View::Worktrees => Some(aic_core::Module::Worktrees),
         View::Changes => Some(aic_core::Module::Changes),
         View::Usage => Some(aic_core::Module::Usage),
@@ -61,16 +65,14 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
         for a in app.keymap.pressed(&ctx) {
             app.run_action(&ctx, a);
         }
-        let typing = ctx.egui_wants_keyboard_input();
-        let free = !(app.view == View::Sessions && app.term_focus)
-            && !app.layne.focus
-            && !typing
-            && app.modal.is_none();
-        if free
-            && app.cfg.on(aic_core::Module::Tasks)
-            && ctx.input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::NONE, Key::T))
+        // Alt+Tab anda entre as abas, como o Ctrl+Tab
+        let shift_alt = egui::Modifiers::ALT | egui::Modifiers::SHIFT;
+        if ctx.input_mut(|i| crate::actions::consume_exact(i, shift_alt, egui::Key::Tab)) {
+            app.cycle_view(-1);
+        } else if ctx
+            .input_mut(|i| crate::actions::consume_exact(i, egui::Modifiers::ALT, egui::Key::Tab))
         {
-            app.open_quick_add(None);
+            app.cycle_view(1);
         }
     }
 
@@ -81,24 +83,9 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
         .frame(
             Frame::new()
                 .fill(app.theme.bg2)
-                .inner_margin(Margin::symmetric(6, 4))
-                .stroke(egui::Stroke::new(1.0, app.theme.border)),
+                .inner_margin(Margin::symmetric(2, 0)),
         )
         .show(ui, |ui| topbar::show(app, ui));
-
-    if app.layne.open && app.cfg.on(aic_core::Module::Layne) {
-        let resp = egui::Panel::right("layne")
-            .resizable(true)
-            .default_size(app.cfg.layne.width)
-            .size_range(320.0..=1100.0)
-            .frame(crate::layne::frame(app))
-            .show(ui, |ui| crate::layne::panel(app, ui));
-        let w = resp.response.rect.width();
-        if (w - app.cfg.layne.width).abs() > 4.0 && !ctx.input(|i| i.pointer.any_down()) {
-            app.cfg.layne.width = w;
-            let _ = app.cfg.save();
-        }
-    }
 
     if notes::visible(app) {
         egui::Panel::right("notes")
@@ -117,13 +104,14 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     egui::CentralPanel::default()
         .frame(
             Frame::new().inner_margin(Margin::same(if app.view == View::Sessions {
-                6
+                0
             } else {
                 16
             })),
         )
         .show(ui, |ui| match app.view {
             View::Sessions => sessions::show(app, ui),
+            View::Tasks => tasks::show(app, ui),
             View::Worktrees => worktrees::show(app, ui),
             View::Changes => changes::show(app, ui),
             View::Usage => {
@@ -134,11 +122,19 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
             View::Help => help::show(app, ui),
         });
 
+    if app.cfg.on(aic_core::Module::Anakin) {
+        crate::anakin::floating(app, &ctx);
+        avatar::show(app, &ctx);
+    }
     modals::show(app, &ctx);
     leader::show(app, &ctx);
     toasts(app, &ctx);
 
-    ctx.request_repaint_after(IDLE_REPAINT);
+    ctx.request_repaint_after(if app.window_focused {
+        IDLE_REPAINT
+    } else {
+        IDLE_REPAINT_UNFOCUSED
+    });
 }
 
 fn toasts(app: &mut App, ctx: &egui::Context) {

@@ -32,6 +32,8 @@ impl Store {
         }
         let conn = Connection::open(path).with_context(|| format!("abrindo {}", path.display()))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
+        // em WAL não precisa de fsync por commit: trocar de sessão não espera o disco
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.busy_timeout(std::time::Duration::from_secs(3))?;
         Self::init(conn)
     }
@@ -84,7 +86,9 @@ impl Store {
     // ── tarefas ──
 
     pub fn tasks(&self) -> Result<Vec<Task>> {
-        self.all("tasks")
+        let mut v: Vec<Task> = self.all("tasks")?;
+        v.iter_mut().for_each(Task::migrate);
+        Ok(v)
     }
 
     pub fn task(&self, id: Id) -> Result<Option<Task>> {
@@ -241,20 +245,46 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{SessionKind, TaskStatus};
+    use crate::model::SessionKind;
 
     #[test]
     fn tarefa_ida_e_volta() {
         let s = Store::open_in_memory().unwrap();
         let mut t = Task::new("corrigir juros");
         s.save_task(&t).unwrap();
-        t.status = TaskStatus::Doing;
+        t.done = true;
         s.save_task(&t).unwrap();
         let all = s.tasks().unwrap();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].status, TaskStatus::Doing);
+        assert!(all[0].done);
         s.delete_task(t.id).unwrap();
         assert!(s.tasks().unwrap().is_empty());
+    }
+
+    /// Tarefa gravada pela v1 (status, prioridade, sessão…) continua abrindo, sem perder nada que importa.
+    #[test]
+    fn tarefa_da_v1_carrega() {
+        let s = Store::open_in_memory().unwrap();
+        for (id, status) in [
+            ("11111111-1111-4111-8111-111111111111", "Doing"),
+            ("22222222-2222-4222-8222-222222222222", "Done"),
+        ] {
+            let json = format!(
+                r#"{{"id":"{id}","title":"velha","notes":"n","status":"{status}","priority":"High","due":"2026-10-14","repo":"r","session":"{id}","subtasks":[],"tags":[],"rank":1.0,"created_at":"2026-10-01T00:00:00Z","updated_at":"2026-10-01T00:00:00Z"}}"#
+            );
+            s.conn
+                .execute(
+                    "INSERT INTO tasks (id, json, updated_at) VALUES (?1, ?2, '')",
+                    params![id, json],
+                )
+                .unwrap();
+        }
+        let mut all = s.tasks().unwrap();
+        all.sort_by_key(|t| t.id);
+        assert!(!all[0].done);
+        assert!(all[1].done);
+        assert_eq!(all[0].notes, "n");
+        assert_eq!(all[0].due, chrono::NaiveDate::from_ymd_opt(2026, 10, 14));
     }
 
     #[test]

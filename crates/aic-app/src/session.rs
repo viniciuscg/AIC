@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use aic_core::claude::{self, Injection, StatusSnapshot};
 use aic_core::events::Live;
-use aic_core::git::{self, GitStatus};
-use aic_core::{Session, SessionKind, SessionState, Task};
+use aic_core::git::GitStatus;
+use aic_core::{Session, SessionKind, SessionState};
 use aic_term::{TermSettings, TerminalBackend, TerminalTheme, now_ms};
 
 pub struct Runtime {
@@ -62,26 +62,22 @@ impl Runtime {
         term_id: u64,
         inj: &Injection,
         theme: &TerminalTheme,
-        task: Option<&Task>,
         use_tmux: bool,
     ) {
         let mut env: HashMap<String, String> = HashMap::new();
         env.insert("AIC".into(), "1".into());
         env.insert("AIC_SESSION".into(), self.s.id.to_string());
-        // o Layne não tem workspace: sem a variável, `aic add` cai no workspace que ele escolher
+        // o Anakin não tem workspace: sem a variável, `aic add` cai no workspace que ele escolher
         if !self.s.workspace.is_nil() {
             env.insert("AIC_WORKSPACE".into(), self.s.workspace.to_string());
         }
         if let Ok(exe) = std::env::current_exe() {
             env.insert("AIC_BIN".into(), exe.to_string_lossy().into());
         }
-        if let Some(t) = task {
-            env.insert("AIC_TASK".into(), t.id.to_string());
-        }
 
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
         let (program, args) = match &self.s.kind {
-            SessionKind::Claude => claude::command(&self.s, inj, task.map(task_prompt).as_deref()),
+            SessionKind::Claude => claude::command(&self.s, inj),
             SessionKind::Shell => (shell.clone(), vec!["-l".into()]),
             SessionKind::Command(cmd) => (
                 shell.clone(),
@@ -95,7 +91,9 @@ impl Runtime {
             aic_core::paths::home_dir()
         };
         self.reattached = false;
-        let (program, args, env) = if use_tmux && crate::tmux::available() {
+        // Com tmux o histórico fica nele: aqui a tela nunca rola, guardar linhas seria memória à toa.
+        let in_tmux = use_tmux && crate::tmux::available();
+        let (program, args, env) = if in_tmux {
             self.reattached = crate::tmux::alive(self.s.id);
             let pairs: Vec<(String, String)> =
                 env.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -109,7 +107,7 @@ impl Runtime {
             args,
             cwd: Some(cwd),
             env,
-            scrollback: 20_000,
+            scrollback: if in_tmux { 100 } else { 20_000 },
         };
         match TerminalBackend::spawn(term_id, ctx.clone(), settings, theme.clone()) {
             Ok(t) => {
@@ -147,15 +145,17 @@ impl Runtime {
         }
     }
 
-    /// Atualiza git (a cada 5s, numa thread) e snapshot da statusline (a cada 2s).
-    pub fn refresh(&mut self) {
+    /// Atualiza git (a cada 5s, numa thread) e snapshot da statusline (a cada 2s). Só quem está
+    /// na tela: `git status` por sessão escondida, a cada 5s, era o maior gasto em segundo plano.
+    pub fn refresh(&mut self, git: bool, snap: bool) {
         if let Some(rx) = &self.git_rx
             && let Ok(st) = rx.try_recv()
         {
             self.git = st;
             self.git_rx = None;
         }
-        if self.git_rx.is_none()
+        if git
+            && self.git_rx.is_none()
             && self
                 .git_at
                 .is_none_or(|t| t.elapsed() > Duration::from_secs(5))
@@ -165,13 +165,14 @@ impl Runtime {
             let cwd = self.s.cwd.clone();
             if std::thread::Builder::new()
                 .name("aic-git".into())
-                .spawn(move || tx.send(git::status(&cwd)))
+                .spawn(move || tx.send(aic_core::git::status(&cwd)))
                 .is_ok()
             {
                 self.git_rx = Some(rx);
             }
         }
-        if matches!(self.s.kind, SessionKind::Claude)
+        if snap
+            && matches!(self.s.kind, SessionKind::Claude)
             && self
                 .snap_at
                 .is_none_or(|t| t.elapsed() > Duration::from_secs(2))
@@ -183,55 +184,7 @@ impl Runtime {
         }
     }
 
-    pub fn force_git_refresh(&mut self) {
-        self.git_at = None;
-    }
-
-    pub fn display_dir(&self) -> String {
-        self.s
-            .repo
-            .clone()
-            .or_else(|| {
-                self.s
-                    .cwd
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-            })
-            .unwrap_or_else(|| "~".into())
-    }
-
-    pub fn worktree_branch(&self) -> Option<String> {
-        self.git.as_ref().and_then(|g| g.branch.clone())
-    }
-
     pub fn cwd(&self) -> PathBuf {
         self.s.cwd.clone()
     }
-}
-
-/// Contexto da tarefa vinculada, entregue ao Claude via `--append-system-prompt`.
-pub fn task_prompt(t: &Task) -> String {
-    let mut p = format!(
-        "Você está numa sessão aberta pelo AIC (gerenciador de sessões do Claude).\nTarefa vinculada: \"{}\"",
-        t.title
-    );
-    if let Some(k) = &t.card_key {
-        p.push_str(&format!(" (card {k})"));
-    }
-    p.push('.');
-    if !t.notes.trim().is_empty() {
-        p.push_str(&format!("\nNotas da tarefa:\n{}", t.notes.trim()));
-    }
-    if !t.subtasks.is_empty() {
-        p.push_str("\nSubtarefas:");
-        for s in &t.subtasks {
-            p.push_str(&format!(
-                "\n- [{}] {}",
-                if s.done { "x" } else { " " },
-                s.text
-            ));
-        }
-    }
-    p.push_str("\nSe existir .aic/context.md no diretório, leia antes de começar.");
-    p
 }

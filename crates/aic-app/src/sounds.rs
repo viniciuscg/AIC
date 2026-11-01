@@ -1,254 +1,76 @@
-//! Catálogo de sons. Duas origens:
-//! - **sintetizados**: gerados pelo AIC na primeira vez (WAV em `~/.local/share/aic/sounds`), sem direito autoral;
-//! - **seus**: qualquer `.mp3/.ogg/.wav/.oga` que você colocar na pasta de sons.
+//! O som do app: um sabre de luz sintetizado aqui mesmo (não é gravação do filme, então não
+//! tem direito autoral nenhum). Um arquivo seu entra no lugar em `[sound] file`.
 
-use std::f32::consts::PI;
+use std::f32::consts::TAU;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use aic_core::config::SoundConfig;
 use aic_core::paths;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Origin {
-    Synth,
-    User,
-}
-
-#[derive(Debug, Clone)]
-pub struct Sound {
-    pub id: String,
-    pub name: String,
-    pub desc: String,
-    pub origin: Origin,
-}
-
-struct Builtin {
-    id: &'static str,
-    name: &'static str,
-    desc: &'static str,
-    origin: Origin,
-    /// Sintetizado: função que gera as amostras. Baixado: nome do arquivo na pasta de sons.
-    synth: Option<fn() -> Vec<f32>>,
-    file: &'static str,
-}
-
 const RATE: u32 = 44_100;
+/// Sobe o nome quando a síntese mudar: o arquivo antigo fica pra trás e o novo é gerado.
+const FILE: &str = "sabre.wav";
 
-const BUILTINS: &[Builtin] = &[
-    Builtin {
-        id: "aic-acorde",
-        name: "Acorde grunge",
-        desc: "Power chord distorcido em Mi, afinado meio tom abaixo (sintetizado)",
-        origin: Origin::Synth,
-        synth: Some(grunge_chord),
-        file: "aic-acorde.wav",
-    },
-    Builtin {
-        id: "aic-feedback",
-        name: "Microfonia",
-        desc: "Nota longa com microfonia subindo, estilo fim de música (sintetizado)",
-        origin: Origin::Synth,
-        synth: Some(feedback),
-        file: "aic-feedback.wav",
-    },
-    Builtin {
-        id: "sino",
-        name: "Sino",
-        desc: "Sino curto e limpo (sintetizado)",
-        origin: Origin::Synth,
-        synth: Some(bell),
-        file: "sino.wav",
-    },
-    Builtin {
-        id: "pop",
-        name: "Pop",
-        desc: "Estalo discreto (sintetizado)",
-        origin: Origin::Synth,
-        synth: Some(pop),
-        file: "pop.wav",
-    },
-];
-
-/// Som padrão de "terminou".
-pub const DEFAULT_DONE: &str = "aic-acorde";
-
-/// Todos os sons disponíveis agora.
-pub fn catalog() -> Vec<Sound> {
+/// O arquivo pra tocar: o seu, se existir; senão o sabre (gerado na primeira vez).
+pub fn path(cfg: &SoundConfig) -> Option<PathBuf> {
+    if let Some(f) = cfg.file.as_ref().filter(|f| f.exists()) {
+        return Some(f.clone());
+    }
     let dir = paths::sounds_dir();
-    let mut v: Vec<Sound> = BUILTINS
-        .iter()
-        .filter(|b| b.origin == Origin::Synth || dir.join(b.file).exists())
-        .map(|b| Sound {
-            id: b.id.into(),
-            name: b.name.into(),
-            desc: b.desc.into(),
-            origin: b.origin,
-        })
-        .collect();
-    let known: Vec<&str> = BUILTINS.iter().map(|b| b.file).collect();
-    let mut user: Vec<Sound> = std::fs::read_dir(&dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().to_string_lossy().to_string();
-            let ext = Path::new(&name)
-                .extension()?
-                .to_string_lossy()
-                .to_lowercase();
-            (["mp3", "ogg", "oga", "wav", "flac"].contains(&ext.as_str())
-                && !known.contains(&name.as_str()))
-            .then(|| Sound {
-                id: format!("arquivo:{name}"),
-                name: Path::new(&name)
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or(name.clone()),
-                desc: "seu arquivo".into(),
-                origin: Origin::User,
-            })
-        })
-        .collect();
-    user.sort_by(|a, b| a.name.cmp(&b.name));
-    v.extend(user);
-    v
-}
-
-/// Id do catálogo (ou caminho de arquivo) → arquivo pronto pra tocar. Gera o sintetizado se faltar.
-pub fn resolve(id: &str) -> Option<PathBuf> {
-    let dir = paths::sounds_dir();
-    if let Some(name) = id.strip_prefix("arquivo:") {
-        let p = dir.join(name);
-        return p.exists().then_some(p);
+    let p = dir.join(FILE);
+    if !p.exists() {
+        std::fs::create_dir_all(&dir).ok()?;
+        write_wav(&p, &saber()).ok()?;
     }
-    if let Some(b) = BUILTINS.iter().find(|b| b.id == id) {
-        let p = dir.join(b.file);
-        if p.exists() {
-            return Some(p);
-        }
-        let synth = b.synth?;
-        let _ = std::fs::create_dir_all(&dir);
-        write_wav(&p, &synth()).ok()?;
-        return Some(p);
-    }
-    let p = PathBuf::from(id);
-    p.exists().then_some(p)
+    Some(p)
 }
 
-pub fn name_of(id: &str) -> String {
-    catalog()
-        .into_iter()
-        .find(|s| s.id == id)
-        .map(|s| s.name)
-        .unwrap_or_else(|| id.to_string())
-}
-
-fn write_wav(path: &Path, samples: &[f32]) -> std::io::Result<()> {
-    let data_len = (samples.len() * 2) as u32;
-    let mut f = std::fs::File::create(path)?;
-    f.write_all(b"RIFF")?;
-    f.write_all(&(36 + data_len).to_le_bytes())?;
-    f.write_all(b"WAVEfmt ")?;
-    f.write_all(&16u32.to_le_bytes())?;
-    f.write_all(&1u16.to_le_bytes())?; // PCM
-    f.write_all(&1u16.to_le_bytes())?; // mono
-    f.write_all(&RATE.to_le_bytes())?;
-    f.write_all(&(RATE * 2).to_le_bytes())?;
-    f.write_all(&2u16.to_le_bytes())?;
-    f.write_all(&16u16.to_le_bytes())?;
-    f.write_all(b"data")?;
-    f.write_all(&data_len.to_le_bytes())?;
-    let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs())).max(1e-6);
-    let mut buf = Vec::with_capacity(samples.len() * 2);
-    for s in samples {
-        buf.extend_from_slice(&(((s / peak) * 0.85 * i16::MAX as f32) as i16).to_le_bytes());
-    }
-    f.write_all(&buf)
-}
-
-fn saw(phase: f32) -> f32 {
-    2.0 * (phase - phase.floor()) - 1.0
-}
-
-/// Power chord Eb (afinação meio tom abaixo, como o grunge de Seattle): fundamental, quinta e oitava,
-/// dois "violões" levemente desafinados, distorção por saturação e um palm-mute no ataque.
-fn grunge_chord() -> Vec<f32> {
-    let dur = 1.6;
+/// Ignição de sabre: estalo e chiado subindo nos primeiros 200 ms, depois o zumbido grave
+/// (duas notas quase iguais batendo, com um leve vibrato), que some no fim.
+fn saber() -> Vec<f32> {
+    let dur = 1.15;
     let n = (RATE as f32 * dur) as usize;
-    let root = 77.78; // Eb2
-    let notes = [root, root * 1.4983, root * 2.0];
+    let dt = 1.0 / RATE as f32;
     let mut out = Vec::with_capacity(n);
+    let (mut p1, mut p2, mut p3, mut sweep) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    let (mut seed, mut lp, mut hp_prev) = (0x2545_f491u32, 0.0f32, 0.0f32);
     for i in 0..n {
-        let t = i as f32 / RATE as f32;
-        let mut s = 0.0;
-        for (k, f) in notes.iter().enumerate() {
-            for detune in [-0.12, 0.12] {
-                let ff = f + detune + (t * 5.5).sin() * 0.15;
-                s += saw(ff * t + k as f32 * 0.13) * 0.5;
-            }
-        }
-        let attack = (t / 0.004).min(1.0);
-        let env = attack * (-t * 2.2).exp();
-        let driven = (s * 3.5 * env).tanh();
-        // passa-baixa de 1 polo pra tirar a aspereza
-        out.push(driven);
+        let t = i as f32 * dt;
+        // o tom sobe rápido até o zumbido e fica ali
+        let rise = 1.0 - (-t / 0.06).exp();
+        let vibrato = 1.0 + 0.006 * (TAU * 6.0 * t).sin();
+        let f = (48.0 + 62.0 * rise) * vibrato;
+        p1 += f * dt;
+        p2 += f * 1.012 * dt;
+        p3 += f * 1.5 * dt;
+        let saw = |p: f32| 2.0 * (p - p.floor()) - 1.0;
+        let hum = saw(p1) * 0.5 + saw(p2) * 0.5 + (TAU * p3).sin() * 0.25;
+
+        // chiado da ignição: ruído que abre e fecha
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        let noise = seed as f32 / u32::MAX as f32 * 2.0 - 1.0;
+        let hiss_env = (t / 0.012).min(1.0) * (-t / 0.09).exp();
+        let a = 0.35 * (1.0 - (-t / 0.05).exp()) + 0.05;
+        lp += a * (noise - lp);
+        let hiss = (lp - hp_prev) * hiss_env * 1.8;
+        hp_prev = lp;
+
+        // o "vuuum" subindo
+        sweep += (180.0 + 1500.0 * (t / 0.2).min(1.0)) * dt;
+        let whoosh = (TAU * sweep).sin() * (-t / 0.07).exp() * 0.35;
+
+        let body = (t / 0.02).min(1.0) * ((dur - t) / 0.35).clamp(0.0, 1.0).powi(2);
+        out.push(((hum * body * 1.4).tanh() * 0.7 + hiss + whoosh).clamp(-1.0, 1.0));
     }
-    lowpass(&mut out, 3200.0);
+    lowpass(&mut out, 5200.0);
     out
-}
-
-/// Nota sustentada que vai virando microfonia (harmônico agudo crescendo).
-fn feedback() -> Vec<f32> {
-    let dur = 2.2;
-    let n = (RATE as f32 * dur) as usize;
-    let f0 = 155.56; // Eb3
-    let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let t = i as f32 / RATE as f32;
-        let body = saw(f0 * t) * (-t * 1.3).exp();
-        let fb_amp = ((t - 0.5).max(0.0) / 1.4).min(1.0);
-        let fb = (2.0 * PI * f0 * 4.0 * t + (t * 6.0).sin() * 0.3).sin() * fb_amp * 0.8;
-        let fade = ((dur - t) / 0.25).min(1.0);
-        out.push(((body + fb) * 2.2).tanh() * fade * (t / 0.005).min(1.0));
-    }
-    lowpass(&mut out, 4500.0);
-    out
-}
-
-fn bell() -> Vec<f32> {
-    let n = (RATE as f32 * 1.2) as usize;
-    (0..n)
-        .map(|i| {
-            let t = i as f32 / RATE as f32;
-            let partials = [
-                (880.0, 1.0, 3.0),
-                (880.0 * 2.76, 0.5, 5.0),
-                (880.0 * 5.4, 0.25, 8.0),
-            ];
-            partials
-                .iter()
-                .map(|(f, a, d)| (2.0 * PI * f * t).sin() * a * (-t * d).exp())
-                .sum::<f32>()
-                * (t / 0.002).min(1.0)
-        })
-        .collect()
-}
-
-fn pop() -> Vec<f32> {
-    let n = (RATE as f32 * 0.12) as usize;
-    let mut phase = 0.0f32;
-    (0..n)
-        .map(|i| {
-            let t = i as f32 / RATE as f32;
-            let f = 650.0 - 450.0 * (t / 0.12);
-            phase += f / RATE as f32;
-            (2.0 * PI * phase).sin() * (-t * 35.0).exp()
-        })
-        .collect()
 }
 
 fn lowpass(x: &mut [f32], cutoff: f32) {
-    let rc = 1.0 / (2.0 * PI * cutoff);
+    let rc = 1.0 / (TAU * cutoff);
     let dt = 1.0 / RATE as f32;
     let a = dt / (rc + dt);
     let mut y = 0.0;
@@ -258,24 +80,65 @@ fn lowpass(x: &mut [f32], cutoff: f32) {
     }
 }
 
+fn write_wav(path: &Path, samples: &[f32]) -> std::io::Result<()> {
+    let data_len = (samples.len() * 2) as u32;
+    let mut buf = Vec::with_capacity(44 + samples.len() * 2);
+    buf.extend_from_slice(b"RIFF");
+    buf.extend_from_slice(&(36 + data_len).to_le_bytes());
+    buf.extend_from_slice(b"WAVEfmt ");
+    buf.extend_from_slice(&16u32.to_le_bytes());
+    buf.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    buf.extend_from_slice(&1u16.to_le_bytes()); // mono
+    buf.extend_from_slice(&RATE.to_le_bytes());
+    buf.extend_from_slice(&(RATE * 2).to_le_bytes());
+    buf.extend_from_slice(&2u16.to_le_bytes());
+    buf.extend_from_slice(&16u16.to_le_bytes());
+    buf.extend_from_slice(b"data");
+    buf.extend_from_slice(&data_len.to_le_bytes());
+    let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs())).max(1e-6);
+    for s in samples {
+        buf.extend_from_slice(&(((s / peak) * 0.85 * i16::MAX as f32) as i16).to_le_bytes());
+    }
+    std::fs::File::create(path)?.write_all(&buf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn sintetizados_geram_audio_valido() {
-        for f in [grunge_chord, feedback, bell, pop] {
-            let s = f();
-            assert!(s.len() > 1000);
-            assert!(s.iter().all(|x| x.is_finite()));
-            assert!(s.iter().any(|x| x.abs() > 0.05));
+    /// Energia numa frequência (Goertzel) num trecho.
+    fn power(x: &[f32], f: f32) -> f32 {
+        let w = TAU * f / RATE as f32;
+        let (mut s1, mut s2) = (0.0f32, 0.0f32);
+        for v in x {
+            let s = v + 2.0 * w.cos() * s1 - s2;
+            s2 = s1;
+            s1 = s;
         }
+        (s1 * s1 + s2 * s2 - 2.0 * w.cos() * s1 * s2) / x.len() as f32
+    }
+
+    #[test]
+    fn sabre_tem_zumbido_grave_e_chiado_no_comeco() {
+        let s = saber();
+        assert!(s.iter().all(|x| x.is_finite()));
+        let at = |sec: f32| (sec * RATE as f32) as usize;
+        let hum = &s[at(0.4)..at(0.7)];
+        assert!(
+            power(hum, 110.0) > 20.0 * power(hum, 3000.0),
+            "zumbido grave"
+        );
+        let start = &s[..at(0.1)];
+        let rms = |x: &[f32]| (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();
+        assert!(rms(start) > 0.05, "ignição audível");
+        // termina em silêncio, sem estalo
+        assert!(s[s.len() - 200..].iter().all(|v| v.abs() < 0.02));
     }
 
     #[test]
     fn wav_tem_cabecalho_certo() {
         let p = std::env::temp_dir().join(format!("aic-som-{}.wav", std::process::id()));
-        write_wav(&p, &pop()).unwrap();
+        write_wav(&p, &[0.0, 0.5, -0.5]).unwrap();
         let b = std::fs::read(&p).unwrap();
         assert_eq!(&b[0..4], b"RIFF");
         assert_eq!(&b[8..12], b"WAVE");

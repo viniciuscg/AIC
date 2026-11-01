@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Module {
-    /// Tarefas locais: captura rápida e o painel Tarefas do bloco.
+    /// Lista de tarefas: data e título, numa aba só dela.
     Tasks,
     /// Notas por sessão.
     Notes,
@@ -29,8 +29,8 @@ pub enum Module {
     Notifications,
     /// Catálogo de atalhos (tecla líder).
     Hints,
-    /// Layne: assistente pessoal (um Claude sempre aberto, por texto ou voz) que mexe no AIC por você.
-    Layne,
+    /// Anakin: assistente pessoal (um Claude sempre aberto, por texto ou voz) que mexe no AIC por você.
+    Anakin,
 }
 
 pub struct ModuleInfo {
@@ -60,16 +60,16 @@ pub const ALL: &[ModuleInfo] = &[
         module: Workspaces,
         id: "workspaces",
         name: "Workspaces",
-        desc: "Vários contextos de trabalho, cada um com seus blocos e layout.",
+        desc: "Conjuntos de sessões separados, como os workspaces do i3.",
         group: "Sessões",
         default: true,
         requires: &[],
     },
     ModuleInfo {
-        module: Layne,
-        id: "layne",
-        name: "Layne (assistente)",
-        desc: "Um Claude sempre aberto no painel lateral: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.",
+        module: Anakin,
+        id: "anakin",
+        name: "Anakin (assistente)",
+        desc: "Um Claude sempre aberto, no boneco do canto da tela: fala por texto ou voz e ele cria workspaces, tarefas e sessões por você.",
         group: "Sessões",
         default: true,
         requires: &[],
@@ -78,7 +78,7 @@ pub const ALL: &[ModuleInfo] = &[
         module: Tasks,
         id: "tasks",
         name: "Tarefas",
-        desc: "Tarefas locais: captura rápida com marcadores (#repo @hoje !alta) e o painel Tarefas do bloco.",
+        desc: "Aba com a lista de tarefas: data e título, agrupados por dia, sem ligação com as sessões.",
         group: "Organização",
         default: true,
         requires: &[],
@@ -132,7 +132,7 @@ pub const ALL: &[ModuleInfo] = &[
         module: Sound,
         id: "sound",
         name: "Som",
-        desc: "Toca um som quando uma sessão termina ou pede permissão.",
+        desc: "Sabre de luz quando uma sessão termina ou pede permissão.",
         group: "Avisos",
         default: true,
         requires: &[],

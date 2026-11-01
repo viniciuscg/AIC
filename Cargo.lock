@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "aic-app"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "aic-core",
  "aic-term",
@@ -63,7 +63,6 @@ dependencies = [
  "eframe",
  "egui",
  "egui_commonmark",
- "egui_extras",
  "egui_kittest",
  "image",
  "notify-rust",
@@ -76,7 +75,7 @@ dependencies = [
 
 [[package]]
 name = "aic-core"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -91,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "aic-term"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "alacritty_terminal",
  "anyhow",
@@ -604,12 +603,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "color_quant"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
-
-[[package]]
 name = "colored"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -924,8 +917,6 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.36.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98466000559d66ba4db786a30448b01483946add4188e7f10f522a27b4fb89cc"
 dependencies = [
  "arboard",
  "bytemuck",
@@ -1402,16 +1393,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gif"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8cfcc411d9adbbaba82fb72661cc1bcca13e8bba98b364e62b2dba8f960159"
-dependencies = [
- "color_quant",
- "weezl",
-]
-
-[[package]]
 name = "gl_generator"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1847,8 +1828,6 @@ checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
- "color_quant",
- "gif",
  "moxcms",
  "num-traits",
  "png",

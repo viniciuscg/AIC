@@ -1,4 +1,4 @@
-//! Aba Ajuda: o manual, os estados das sessões e os atalhos principais ao vivo.
+//! Tela de Ajuda: o manual, os estados das sessões e os atalhos principais ao vivo.
 
 use aic_core::SessionState;
 use egui::{FontId, RichText, ScrollArea, Ui};
@@ -15,6 +15,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         .resizable(false)
         .exact_size(300.0)
         .show(ui, |ui| {
+            // quebra as descrições em vez de esticar: texto que passa da largura empurra a borda
+            // do painel e a área do manual (com a barra de rolagem) fica por baixo dele
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
             ui.label(
                 RichText::new(format!("{}  ·  {}", brand::NAME, brand::TAGLINE))
                     .font(FontId::monospace(12.0))

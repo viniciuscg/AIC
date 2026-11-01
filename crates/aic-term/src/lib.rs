@@ -8,7 +8,7 @@ mod theme;
 mod view;
 
 pub use alacritty_terminal::term::TermMode as TerminalMode;
-pub use backend::{GridSize, Shared, TermSettings, TerminalBackend, now_ms};
+pub use backend::{GridSize, Shared, TermSettings, TerminalBackend, now_ms, set_window_focused};
 pub use bindings::{Binding, BindingAction, BindingsLayout, InputKind, KeyboardBinding};
 pub use theme::{TerminalTheme, hex};
 pub use view::{TerminalFont, TerminalView};

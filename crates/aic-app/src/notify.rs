@@ -1,4 +1,4 @@
-//! Som (o gemido do AIC) e notificação do sistema. Tudo fora da thread da UI.
+//! Som e notificação do sistema. Tudo fora da thread da UI.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -55,7 +55,12 @@ fn path_str(p: &Path) -> String {
 
 /// Notificação do desktop (notify-send via D-Bus).
 pub fn desktop(title: &str, body: &str, icon: Option<PathBuf>) {
-    let (title, body) = (title.to_string(), body.to_string());
+    // o servidor de notificação interpreta marcação no corpo
+    let body = body
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let title = title.to_string();
     std::thread::spawn(move || {
         let mut n = notify_rust::Notification::new();
         n.appname("AIC").summary(&title).body(&body).timeout(6000);

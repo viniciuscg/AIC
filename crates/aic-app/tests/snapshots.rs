@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use aic_app::app::{App, View};
 use aic_core::events::{self, HookEvent};
-use aic_core::{Priority, SessionKind, Subtask, Task, TaskStatus};
+use aic_core::{SessionKind, Task};
 use egui_kittest::Harness;
 
 /// Os testes mexem em variáveis de ambiente: um de cada vez.
@@ -32,7 +32,7 @@ fn sandbox(name: &str) -> PathBuf {
     std::fs::create_dir_all(dir.join("claude/projects")).unwrap();
     std::fs::write(
         dir.join("config/config.toml"),
-        "setup_done = true\n\n[modules]\ntmux = false\nlayne = false\n",
+        "setup_done = true\n\n[modules]\ntmux = false\nanakin = false\n",
     )
     .unwrap();
     dir
@@ -45,40 +45,25 @@ fn out(name: &str) -> PathBuf {
 }
 
 fn tasks(app: &mut App) {
-    let mut a = Task::new("Corrigir cálculo de juros no checkout");
-    a.repo = Some("api-pagamentos".into());
-    a.card_key = Some("DEV-142".into());
-    a.priority = Priority::High;
-    a.status = TaskStatus::Doing;
-    a.due = Some(chrono::Local::now().date_naive());
-    a.subtasks = vec![
-        Subtask {
-            text: "reproduzir com pedido 9912".into(),
-            done: true,
-        },
-        Subtask {
-            text: "ajustar arredondamento".into(),
-            done: false,
-        },
-        Subtask {
-            text: "teste de regressão".into(),
-            done: false,
-        },
-    ];
-    a.notes = "Diferença de centavos no juros diário quando o pedido cruza o mês.".into();
-    let mut b = Task::new("Tela de pedidos: filtro por data");
-    b.repo = Some("web-app".into());
-    b.card_key = Some("DEV-150".into());
-    b.tags = vec!["front".into()];
-    let mut c = Task::new("Revisar PR do notificador (retry de webhooks)");
-    c.repo = Some("notificador".into());
-    c.status = TaskStatus::Review;
-    c.priority = Priority::Urgent;
-    let mut d = Task::new("Atualizar docker-compose do infra");
-    d.status = TaskStatus::Done;
-    let mut e = Task::new("Ler a thread sobre o rate limit da API");
-    e.priority = Priority::Low;
-    for t in [a, b, c, d, e] {
+    let today = chrono::Local::now().date_naive();
+    let d = |n: i64| Some(today + chrono::Duration::days(n));
+    for (title, due, done) in [
+        ("Corrigir cálculo de juros no checkout", d(0), false),
+        (
+            "Revisar PR do notificador https://github.com/x/y/pull/1",
+            d(0),
+            false,
+        ),
+        ("Tela de pedidos: filtro por data", d(1), false),
+        ("Atualizar docker-compose do infra", d(3), false),
+        ("Mandar o relatório do trimestre", d(-2), false),
+        ("Renovar o certificado", d(21), false),
+        ("Ler a thread sobre o rate limit da API", None, false),
+        ("Pagar o boleto do aluguel", d(0), true),
+    ] {
+        let mut t = Task::new(title);
+        t.due = due;
+        t.done = done;
         app.save_task(t);
     }
 }
@@ -201,14 +186,9 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     let script = r#"printf '\e[38;2;215;119;87m✻\e[0m Welcome to \e[1mClaude Code\e[0m!\n\n> corrige o cálculo do juros quando cruza o mês\n\n\e[38;2;215;119;87m⏺\e[0m Vou olhar o serviço de juros primeiro.\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mRead\e[0m(src/checkout/interest.ts)\n  ⎿  Read 214 lines\n\n\e[38;2;215;119;87m⏺\e[0m \e[1mUpdate\e[0m(src/checkout/interest.ts)\n  ⎿  Updated with \e[32m6 additions\e[0m and \e[31m2 removals\e[0m\n\n╭──────────────────────────────────────────────╮\n│ > \e[2mTry \"write a test for interest.ts\"\e[0m          │\n╰──────────────────────────────────────────────╯\n  \e[2m⏵⏵ accept edits on (shift+tab to cycle)\e[0m\n'; sleep 60"#;
     // 3 blocos: um card com 2 terminais, uma revisão, infra
     let plan = [
-        (
-            "api juros",
-            "api-pagamentos",
-            "DEV-142 · juros no checkout",
-            true,
-        ),
+        ("api juros", "api-pagamentos", "hermes", true),
         ("web filtros", "web-app", "", false),
-        ("review", "notificador", "Revisão do notificador", true),
+        ("review", "notificador", "wallet", true),
         ("infra", "infra", "infra", true),
     ];
     let mut ids = vec![];
@@ -216,7 +196,7 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     for (name, repo, block_name, new_block) in plan {
         let cwd = app.cfg.repo_path(repo).unwrap_or_else(std::env::temp_dir);
         if new_block {
-            block = app.new_block(block_name, None);
+            block = app.new_block(block_name);
         }
         let id = app.create_session_in(
             &ctx,
@@ -225,22 +205,12 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
             SessionKind::Command(script.into()),
             cwd,
             None,
-            None,
             vec![],
             None,
         );
         ids.push(id);
     }
-    let b0 = app.block_of(ids[0]).unwrap();
     app.set_notes(ids[0], "## Plano\n- reproduzir com a pedido 9912\n- arredondar no fim, não por parcela\n- teste de regressão no checkout".into());
-    let t0 = app
-        .tasks
-        .iter()
-        .find(|t| t.card_key.as_deref() == Some("DEV-142"))
-        .map(|t| t.id)
-        .unwrap();
-    app.update_task(t0, |t| t.session = Some(ids[0]));
-    app.update_block(b0, |b| b.task = Some(t0));
     // estados via hooks
     hook(ids[0], "SessionStart", &[]);
     hook(
@@ -311,18 +281,24 @@ fn telas() {
     let _dir = sandbox("telas");
     let mut h = harness([1480.0, 900.0]);
     demo_sessions(&mut h);
-    settle(&mut h, 2500);
-    shot(&mut h, "blocos");
-    for (v, name) in [
-        (aic_core::SessionView::Tabs, "abas"),
-        (aic_core::SessionView::Focus, "foco"),
-        (aic_core::SessionView::Grid, "grade"),
-    ] {
-        h.state_mut().as_mut().unwrap().cfg.view = v;
-        settle(&mut h, 300);
-        shot(&mut h, name);
+    {
+        let app = h.state_mut().as_mut().unwrap();
+        app.cfg.anakin.auto_start = false;
+        app.cfg.modules.remove("anakin");
     }
-    h.state_mut().as_mut().unwrap().cfg.view = aic_core::SessionView::Blocks;
+    settle(&mut h, 2500);
+    h.state_mut()
+        .as_mut()
+        .unwrap()
+        .anakin
+        .avatar
+        .speak("wallet acabou. Yippee!", 30);
+    settle(&mut h, 100);
+    shot(&mut h, "sessao");
+    h.state_mut().as_mut().unwrap().anakin.open = true;
+    settle(&mut h, 200);
+    shot(&mut h, "anakin-conversa");
+    h.state_mut().as_mut().unwrap().anakin.open = false;
     // prefixo armado: indicador na barra
     h.state_mut().as_mut().unwrap().prefix_pending = true;
     settle(&mut h, 200);
@@ -384,6 +360,8 @@ fn telas() {
             "user.name=t",
             "-c",
             "user.email=t@t",
+            "-c",
+            "commit.gpgsign=false",
             "commit",
             "-qm",
             "init",
@@ -394,8 +372,8 @@ fn telas() {
         std::fs::write(repo.join("src/novo.rs"), "// arquivo novo\n").unwrap();
         let app = h.state_mut().as_mut().unwrap();
         app.changes.pinned = Some(repo);
-        app.cfg.layne.auto_start = false;
-        app.cfg.modules.insert("layne".into(), true);
+        app.cfg.anakin.auto_start = false;
+        app.cfg.modules.insert("anakin".into(), true);
         app.set_view(View::Changes);
         settle(&mut h, 300);
         let app = h.state_mut().as_mut().unwrap();
@@ -407,7 +385,7 @@ fn telas() {
             .unwrap()
             .cfg
             .modules
-            .insert("layne".into(), false);
+            .insert("anakin".into(), false);
     }
     let app = h.state_mut().as_mut().unwrap();
     app.set_view(View::Settings);
@@ -417,12 +395,12 @@ fn telas() {
     let app = h.state_mut().as_mut().unwrap();
     app.settings.search.clear();
     app.set_view(View::Sessions);
-    app.open_quick_add(None);
-    if let Some(aic_app::ui::modals::Modal::QuickAdd { text, .. }) = &mut app.modal {
-        *text = "corrigir cálculo de juros #api !alta @sexta ^dev-142".into();
-    }
-    settle(&mut h, 200);
-    shot(&mut h, "captura-rapida");
+    aic_app::ui::tasks::open(app);
+    app.tasks_ui.input = "ligar pro banco".into();
+    settle(&mut h, 300);
+    shot(&mut h, "tarefas");
+    let app = h.state_mut().as_mut().unwrap();
+    app.set_view(View::Sessions);
     let app = h.state_mut().as_mut().unwrap();
     app.modal = Some(aic_app::ui::modals::Modal::ConfirmQuit);
     settle(&mut h, 200);
