@@ -16,7 +16,7 @@ Feito em Rust com [egui](https://github.com/emilk/egui). Roda no Linux (X11 e Wa
 - **tmux por baixo**: os terminais rodam num servidor tmux próprio. Fechou a janela, o app caiu? Os Claudes continuam rodando e ele reconecta ao abrir.
 - **Estado de cada sessão** pelos hooks do Claude Code. Quando acaba, toca um sabre de luz e a notificação cita a sessão: "hermes acabou".
 - **Prefixo estilo tmux** (`Ctrl+B`), funcionando com o terminal focado, e um **catálogo de atalhos** (`Ctrl+Space`).
-- **Anakin**: um boneco em pixel art no canto da tela, que anda, fala em balões e, no clique, abre um Claude sempre aberto pra criar workspaces, anotar tarefas e abrir sessões, por texto ou voz.
+- **Anakin**: um boneco em pixel art no canto da tela, que anda, fala em balões, apronta cenas (duelo com o Obi-Wan, mortais, Força num stormtrooper, uns passos de Vader, lutas contra quatro rivais; o botão direito escolhe qual rodar) e, no clique, abre um Claude sempre aberto pra criar workspaces, anotar tarefas e abrir sessões, por texto ou voz.
 - **Worktrees**, **Changes** (diff e commit) e **Tokens** (limites e custo).
 - **Otimizado**: terminal escondido não gasta redesenho, linha que não mudou não é refeita, `git status` só de quem está na tela. `tests/perf.rs` mede.
 - **Módulos**: tudo além dos terminais liga e desliga.

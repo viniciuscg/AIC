@@ -134,6 +134,7 @@ fn tree() -> Vec<Item> {
         Run('m', "Falar com o Anakin", AnakinVoice),
         Run('y', "Reiniciar o Anakin", RestartAnakin),
         Run('e', "Mostrar/esconder o boneco", ToggleAvatar),
+        Run('f', "Animações do boneco", AvatarScenes),
         Run('n', "Notas da sessão", ToggleNotes),
         Run('k', "Tokens e custo", ViewUsage),
         Run('p', "Paleta de comandos", Palette),

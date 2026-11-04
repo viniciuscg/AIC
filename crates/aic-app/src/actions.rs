@@ -28,6 +28,8 @@ pub enum Action {
     RestartAnakin,
     /// Mostra/esconde o boneco do canto da tela.
     ToggleAvatar,
+    /// Menu do boneco: escolher uma animação pra rodar agora.
+    AvatarScenes,
     NewShell,
     CloseSession,
     RenameSession,
@@ -133,6 +135,7 @@ impl Action {
             AnakinVoice,
             RestartAnakin,
             ToggleAvatar,
+            AvatarScenes,
             NewShell,
             CloseSession,
             RenameSession,
@@ -198,7 +201,9 @@ impl Action {
             Workspaces | NewWorkspace | NextWorkspace | PrevWorkspace | GotoWorkspace(_)
             | LastWorkspace | RenameWorkspace => Some(Module::Workspaces),
             ToggleNotes => Some(Module::Notes),
-            ToggleAnakin | AnakinVoice | RestartAnakin | ToggleAvatar => Some(Module::Anakin),
+            ToggleAnakin | AnakinVoice | RestartAnakin | ToggleAvatar | AvatarScenes => {
+                Some(Module::Anakin)
+            }
             Catalog => Some(Module::Hints),
             _ => None,
         }
@@ -245,6 +250,12 @@ impl Action {
             ToggleAvatar => (
                 "toggle_avatar",
                 "Anakin: mostrar/esconder o boneco do canto",
+                "Anakin",
+                None,
+            ),
+            AvatarScenes => (
+                "avatar_scenes",
+                "Anakin: menu do boneco (escolher uma animação pra rodar agora)",
                 "Anakin",
                 None,
             ),
@@ -585,6 +596,7 @@ impl Action {
             AnakinVoice => &["m"],
             RestartAnakin => &["Y"],
             ToggleAvatar => &["A"],
+            AvatarScenes => &["F"],
             NextBlock => &[">"],
             PrevBlock => &["<"],
             NewShell => &["%", "\""],

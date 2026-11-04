@@ -1,6 +1,8 @@
 //! Desenho. `draw` é chamado uma vez por frame com o `Ui` raiz.
 
 pub mod avatar;
+pub mod avatar_eggs;
+pub mod avatar_rivals;
 pub mod changes;
 pub mod help;
 pub mod leader;
@@ -61,7 +63,10 @@ pub fn draw(app: &mut App, ui: &mut Ui) {
     if app.modal.is_some() || capturing {
         app.leader = None;
         app.prefix_pending = false;
-    } else if !prefix::handle(app, &ctx) && !leader::handle(app, &ctx) {
+    } else if !avatar::picker_keys(app, &ctx)
+        && !prefix::handle(app, &ctx)
+        && !leader::handle(app, &ctx)
+    {
         for a in app.keymap.pressed(&ctx) {
             app.run_action(&ctx, a);
         }

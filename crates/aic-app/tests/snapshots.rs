@@ -275,6 +275,83 @@ fn demo_sessions(h: &mut Harness<'static, Option<App>>) {
     .unwrap();
 }
 
+/// Quadros das cenas do boneco, pra revisão visual (`avatar-<cena>-<ms>.png`).
+#[test]
+fn cenas_do_anakin() {
+    use aic_app::ui::avatar::Scene;
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _dir = sandbox("cenas");
+    let mut h = harness([520.0, 200.0]);
+    h.step();
+    {
+        let app = h.state_mut().as_mut().unwrap();
+        app.cfg.anakin.auto_start = false;
+        app.cfg.modules.remove("anakin");
+        app.cfg.anakin.avatar = true;
+    }
+    // deixa o boneco aparecer e cala a saudação, que cobriria as falas das cenas
+    h.run_steps(2);
+    h.state_mut().as_mut().unwrap().anakin.avatar.speak("", 0);
+    h.run_steps(2);
+    for (scene, name, frames) in [
+        (
+            Scene::Duel,
+            "duelo",
+            &[300, 1400, 1800, 3100, 3700, 5300][..],
+        ),
+        (Scene::Flip, "mortal", &[100, 400, 650, 900, 1200][..]),
+        (
+            Scene::Force,
+            "forca",
+            &[500, 1100, 2000, 3400, 3700, 4400][..],
+        ),
+        (
+            Scene::Vader,
+            "vader",
+            &[300, 900, 1500, 2000, 4000, 6100][..],
+        ),
+    ] {
+        for ms in frames {
+            let app = h.state_mut().as_mut().unwrap();
+            app.anakin
+                .avatar
+                .play_from(scene, Duration::from_millis(*ms));
+            h.step();
+            shot(&mut h, &format!("avatar-{name}-{ms:04}"));
+        }
+    }
+    h.set_size(egui::vec2(800.0, 340.0));
+    h.run_steps(2);
+    for egg in aic_app::ui::avatar_eggs::ALL {
+        for tenth in [1, 3, 5, 7, 9] {
+            let ms = (egg.duration() * 100.0) as u64 * tenth;
+            let app = h.state_mut().as_mut().unwrap();
+            app.anakin
+                .avatar
+                .play_from(Scene::Egg(egg), Duration::from_millis(ms));
+            h.step();
+            shot(&mut h, &format!("egg-{egg:?}-{tenth}"));
+        }
+    }
+    for rival in aic_app::ui::avatar_rivals::ALL {
+        let dur = Scene::Fight(rival).duration();
+        for tenth in 1..=9u64 {
+            let ms = (dur * 100.0) as u64 * tenth;
+            let app = h.state_mut().as_mut().unwrap();
+            app.anakin
+                .avatar
+                .play_from(Scene::Fight(rival), Duration::from_millis(ms));
+            h.step();
+            shot(&mut h, &format!("luta-{rival:?}-{tenth}"));
+        }
+    }
+    // o menu do botão direito, com as animações
+    h.set_size(egui::vec2(900.0, 480.0));
+    h.state_mut().as_mut().unwrap().anakin.avatar.picker = true;
+    h.run_steps(3);
+    shot(&mut h, "avatar-menu");
+}
+
 #[test]
 fn telas() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());

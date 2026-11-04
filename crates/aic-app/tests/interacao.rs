@@ -429,6 +429,32 @@ fn anakin_no_canto() {
         Some("hermes acabou. Yippee!")
     );
 
+    // botão direito abre o menu; uma tecla escolhe a animação e fecha
+    h.get_by_label("Anakin").click_secondary();
+    frames(&mut h, 2);
+    assert!(
+        app(&mut h).anakin.avatar.picker,
+        "botão direito abre o menu"
+    );
+    assert!(exists(&h, "1   Luta: o do cavanhaque"));
+    h.event(egui::Event::Text("1".into()));
+    frames(&mut h, 2);
+    assert!(!app(&mut h).anakin.avatar.picker);
+    assert_eq!(
+        app(&mut h).anakin.avatar.scene(),
+        Some(aic_app::ui::avatar::Scene::Fight(
+            aic_app::ui::avatar_rivals::Rival::Curly
+        ))
+    );
+    // pelo atalho também abre, e Esc fecha sem rodar nada
+    let ctx = h.ctx.clone();
+    app(&mut h).run_action(&ctx, aic_app::actions::Action::AvatarScenes);
+    frames(&mut h, 1);
+    assert!(app(&mut h).anakin.avatar.picker);
+    h.key_press(egui::Key::Escape);
+    frames(&mut h, 1);
+    assert!(!app(&mut h).anakin.avatar.picker);
+
     // o boneco some e volta pela tecla
     let ctx = h.ctx.clone();
     app(&mut h).run_action(&ctx, aic_app::actions::Action::ToggleAvatar);

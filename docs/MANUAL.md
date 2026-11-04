@@ -67,6 +67,7 @@ Aperte **Ctrl+B**, solte e aperte a tecla. A barra acende **Ctrl+B** enquanto es
 | `w` `W` `$` | lista, novo e renomear workspace |
 | `L` / `m` | conversa com o Anakin / falar com ele por voz |
 | `Y` / `A` | reiniciar o Anakin / mostrar ou esconder o boneco |
+| `F` | menu do boneco: escolher uma animação pra rodar agora |
 | `:` | paleta de comandos |
 | `?` | catálogo de atalhos |
 | `[` | solta o teclado do terminal |
@@ -112,9 +113,9 @@ Cada terminal tem a sua nota em Markdown. **Ctrl+B e** abre o painel à direita 
 
 ## Anakin (assistente)
 
-O próprio Anakin mora no canto da tela: um boneco em pixel art, desenhado pelo app, que anda de vez em quando, acende o sabre enquanto alguém trabalha, pula quando uma sessão acaba e solta falas num balão ("hermes acabou. Yippee!"). Quando a conversa está fechada, é no balão que ele conta o que respondeu.
+O próprio Anakin mora no canto da tela: um boneco em pixel art, desenhado pelo app, que anda de vez em quando, acende o sabre vermelho enquanto alguém trabalha, pula quando uma sessão acaba e solta falas num balão ("hermes acabou. Yippee!"). De tempos em tempos ele apronta uma cena curta: duela com o Obi-Wan, dá mortais, levanta um stormtrooper com a Força ou vira Vader e sai dando uns passos pesados. E não é só isso: o resto fica pra você descobrir. As cenas só rodam com a janela em foco e a conversa fechada, e o clique passa direto pelos outros bonecos. Quando a conversa está fechada, é no balão que ele conta o que respondeu.
 
-Clique nele (ou **Ctrl+B L**) e abre a conversa, numa janela flutuante: um Claude sempre aberto. Você pede em português, digitando ou falando, e ele mexe no app por você: cria workspaces, anota tarefas, abre sessões num repo ou worktree com a primeira mensagem já escrita. **Ctrl+B A** esconde o boneco.
+Clique nele (ou **Ctrl+B L**) e abre a conversa, numa janela flutuante: um Claude sempre aberto. Você pede em português, digitando ou falando, e ele mexe no app por você: cria workspaces, anota tarefas, abre sessões num repo ou worktree com a primeira mensagem já escrita. **Ctrl+B A** esconde o boneco. Botão direito nele (ou **Ctrl+B F**) abre um menu com todas as animações, inclusive as lutas contra quatro rivais; clique numa ou aperte a tecla dela e ela roda na hora, mesmo com a conversa aberta.
 
 > "anota pra eu lembrar: renovar a CNH sexta, comprar ração"
 > "abre uma sessão com o card DEV-142 no projeto api"

@@ -1278,6 +1278,7 @@ impl App {
                 self.cfg.anakin.avatar = !self.cfg.anakin.avatar;
                 let _ = self.cfg.save();
             }
+            AvatarScenes => ui::avatar::toggle_picker(self),
             NextBlock => self.cycle_block(1),
             PrevBlock => self.cycle_block(-1),
             AnakinVoice => crate::anakin::toggle_voice(self, ctx),
