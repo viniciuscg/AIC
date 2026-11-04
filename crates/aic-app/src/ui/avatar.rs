@@ -1133,7 +1133,9 @@ fn picker(app: &mut App, ctx: &Context, sprite: Pos2, avatar: Rect) {
                             item(ui, m, &mut play);
                         }
                     });
-                    ui.separator();
+                    // espaço, não separador: o separador vertical pega a altura toda da tela,
+                    // e o menu ia crescendo quadro a quadro
+                    ui.add_space(18.0);
                     ui.vertical(|ui| {
                         ui.label(egui::RichText::new("Surpresas").strong());
                         for &m in &menu[classics..eggs_half] {

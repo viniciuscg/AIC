@@ -346,9 +346,16 @@ fn cenas_do_anakin() {
         }
     }
     // o menu do botão direito, com as animações
-    h.set_size(egui::vec2(900.0, 480.0));
+    h.set_size(egui::vec2(1060.0, 1070.0));
     h.state_mut().as_mut().unwrap().anakin.avatar.picker = true;
-    h.run_steps(3);
+    // vários quadros: o menu não pode ir crescendo de um quadro pro outro
+    h.run_steps(40);
+    use egui_kittest::kittest::Queryable;
+    let item = h.get_by_label("1   Luta: o do cavanhaque").rect();
+    assert!(
+        item.top() > 600.0 && item.bottom() < 1070.0,
+        "o menu fica junto do boneco: {item:?}"
+    );
     shot(&mut h, "avatar-menu");
 }
 
