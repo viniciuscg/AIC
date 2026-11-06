@@ -219,7 +219,14 @@ impl SessionState {
 
 // ───────────────────────────── Tarefa ─────────────────────────────
 
-/// Uma linha da lista de tarefas: título e data. Não tem ligação com sessões.
+fn is_zero(n: &f64) -> bool {
+    *n == 0.0
+}
+
+/// Tag especial: a tarefa fica vermelha e o motivo vai em `notes`.
+pub const TAG_BLOCKED: &str = "bloqueado";
+
+/// Uma linha da lista de tarefas: título, data, tags e descrição. Não tem ligação com sessões.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Task {
     pub id: Id,
@@ -228,9 +235,18 @@ pub struct Task {
     pub due: Option<NaiveDate>,
     #[serde(default)]
     pub done: bool,
-    /// Notas de antes da v2 (aparecem ao passar o mouse; a lista não cria mais).
+    /// Quando foi concluída (o `touch` cuida). Concluídas antigas não têm: vale o `updated_at`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_at: Option<DateTime<Utc>>,
+    /// Tags, sem o `#`, em minúsculas (`bloqueado`, `infra`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Descrição ou motivo do bloqueio (`m` na aba Tarefas).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub notes: String,
+    /// Posição dentro do dia (`J`/`K` na aba Tarefas). Menor vem antes.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub rank: f64,
     /// Status de antes da v2: só é lido, pra virar `done` (ver `Store::tasks`).
     #[serde(default, skip_serializing)]
     pub status: Option<String>,
@@ -246,15 +262,46 @@ impl Task {
             title: title.into(),
             due: None,
             done: false,
+            done_at: None,
+            tags: vec![],
             notes: String::new(),
+            rank: 0.0,
             status: None,
             created_at: now,
             updated_at: now,
         }
     }
 
+    /// Marca a mudança; ao concluir guarda a hora, ao reabrir esquece.
     pub fn touch(&mut self) {
-        self.updated_at = Utc::now();
+        let now = Utc::now();
+        self.updated_at = now;
+        if !self.done {
+            self.done_at = None;
+        } else if self.done_at.is_none() {
+            self.done_at = Some(now);
+        }
+    }
+
+    /// Hora da conclusão (as antigas usam a última mudança).
+    pub fn finished_at(&self) -> Option<DateTime<Utc>> {
+        self.done.then(|| self.done_at.unwrap_or(self.updated_at))
+    }
+
+    pub fn blocked(&self) -> bool {
+        self.tags.iter().any(|t| t == TAG_BLOCKED)
+    }
+
+    /// Põe a tag se não tiver, tira se tiver. Devolve se ficou com ela.
+    pub fn toggle_tag(&mut self, tag: &str) -> bool {
+        let tag = normalize_tag(tag);
+        if let Some(i) = self.tags.iter().position(|t| *t == tag) {
+            self.tags.remove(i);
+            false
+        } else {
+            self.tags.push(tag);
+            true
+        }
     }
 
     /// Tarefa salva pela v1: `Done`/`Archived` viram concluída.
@@ -263,4 +310,21 @@ impl Task {
             self.done = true;
         }
     }
+}
+
+/// `#Infra` → `infra`. Vazio quando não sobra nada.
+pub fn normalize_tag(s: &str) -> String {
+    s.trim().trim_start_matches('#').trim().to_lowercase()
+}
+
+/// `#a #b`, `a, b` ou `a b` → tags sem repetir, na ordem.
+pub fn parse_tags(s: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for w in s.split(|c: char| c == ',' || c.is_whitespace()) {
+        let t = normalize_tag(w);
+        if !t.is_empty() && !out.contains(&t) {
+            out.push(t);
+        }
+    }
+    out
 }

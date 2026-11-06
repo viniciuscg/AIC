@@ -322,6 +322,7 @@ fn add(text: &str) -> Result<()> {
     }
     let mut task = Task::new(parsed.title);
     task.due = parsed.due;
+    task.tags = parsed.tags;
     store.save_task(&task)?;
     let short = &task.id.to_string()[..8];
     match task.due {
@@ -354,8 +355,14 @@ fn tasks(all: bool, json: bool) -> Result<()> {
             .due
             .map(|d| quickadd::due_label(d, today))
             .unwrap_or_default();
+        let tags: String = t.tags.iter().map(|g| format!("  #{g}")).collect();
+        let notes = if t.notes.trim().is_empty() {
+            String::new()
+        } else {
+            format!("  — {}", t.notes.trim().replace('\n', " "))
+        };
         println!(
-            "{}  {} {:<12} {}",
+            "{}  {} {:<12} {}{tags}{notes}",
             &t.id.to_string()[..8],
             if t.done { "✓" } else { " " },
             due,

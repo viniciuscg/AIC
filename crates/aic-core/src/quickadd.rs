@@ -1,5 +1,6 @@
 //! Uma linha de texto vira tarefa: `pagar boleto @sexta`. O `@data` é opcional e pode estar em
-//! qualquer posição; o resto é o título. `@fulano` que não é data fica no título.
+//! qualquer posição; o resto é o título. `@fulano` que não é data fica no título. `#tag` vira tag
+//! (`#bloqueado` deixa a tarefa vermelha).
 
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
 
@@ -7,12 +8,21 @@ use chrono::{Datelike, Duration, NaiveDate, Weekday};
 pub struct Parsed {
     pub title: String,
     pub due: Option<NaiveDate>,
+    pub tags: Vec<String>,
 }
 
 pub fn parse(input: &str, today: NaiveDate) -> Parsed {
     let mut p = Parsed::default();
     let mut words: Vec<&str> = Vec::new();
     for word in input.split_whitespace() {
+        if let Some(tag) = word.strip_prefix('#').map(crate::model::normalize_tag)
+            && !tag.is_empty()
+        {
+            if !p.tags.contains(&tag) {
+                p.tags.push(tag);
+            }
+            continue;
+        }
         match word.strip_prefix('@').and_then(|d| parse_date(d, today)) {
             Some(d) => p.due = Some(d),
             None => words.push(word),
@@ -139,6 +149,16 @@ mod tests {
         assert_eq!(p.title, "pagar o boleto");
         assert_eq!(p.due, NaiveDate::from_ymd_opt(2026, 10, 9));
         assert_eq!(parse("só texto", today()).due, None);
+    }
+
+    #[test]
+    fn hashtag_vira_tag() {
+        let p = parse("subir o deploy #Infra #bloqueado @sexta #infra", today());
+        assert_eq!(p.title, "subir o deploy");
+        assert_eq!(p.tags, vec!["infra", "bloqueado"]);
+        assert!(p.due.is_some());
+        // `#` sozinho fica no título
+        assert_eq!(parse("item # 3", today()).title, "item # 3");
     }
 
     #[test]

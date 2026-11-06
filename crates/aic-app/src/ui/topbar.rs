@@ -79,7 +79,7 @@ fn centered(ui: &mut Ui, row: Rect, items: Vec<Item>) -> (Vec<Response>, f32) {
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let theme = app.theme.clone();
-    let second = app.view != View::Tasks && app.view != View::Usage;
+    let second = app.view != View::Usage;
     let width = ui.available_width();
     let height = ROW1 + if second { ROW2 } else { 0.0 };
     let (rect, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
@@ -90,6 +90,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         let row2 = Rect::from_min_size(rect.min + vec2(0.0, ROW1), vec2(width, ROW2));
         if app.view == View::Sessions {
             sessions_row(app, ui, row2, &theme);
+        } else if app.view == View::Tasks {
+            tasks_row(app, ui, row2, &theme);
         } else {
             other_view_row(app, ui, row2, &theme);
         }
@@ -266,6 +268,66 @@ fn sessions_row(app: &mut App, ui: &mut Ui, row: Rect, theme: &Theme) {
         app.run_action(ui.ctx(), Action::NewBlock);
     }
     focus_status(app, ui, row, end + 16.0, theme);
+}
+
+/// Na aba Tarefas: Em andamento · Concluídas, igual à linha das sessões.
+fn tasks_row(app: &mut App, ui: &mut Ui, row: Rect, theme: &Theme) {
+    use super::tasks::{Tab, set_tab};
+    let today = chrono::Local::now().date_naive();
+    let open = app.tasks.iter().filter(|t| !t.done).count();
+    let blocked = app.tasks.iter().filter(|t| !t.done && t.blocked()).count();
+    let done_today = super::tasks::done_since(&app.tasks, today);
+    let tabs = [Tab::Open, Tab::Done];
+    let items: Vec<Item> = tabs
+        .iter()
+        .map(|tab| {
+            let on = app.tasks_ui.tab == *tab;
+            let mut job = LayoutJob::default();
+            push(
+                &mut job,
+                tab.label(),
+                if on { theme.ink } else { theme.dim },
+                FONT,
+            );
+            match tab {
+                Tab::Open => {
+                    push(&mut job, &format!(" {open}"), theme.faint, FONT - 1.0);
+                    if blocked > 0 {
+                        push(
+                            &mut job,
+                            &format!(" · {blocked} bloq."),
+                            theme.err,
+                            FONT - 1.0,
+                        );
+                    }
+                }
+                Tab::Done if done_today > 0 => {
+                    push(
+                        &mut job,
+                        &format!(" +{done_today} hoje"),
+                        theme.ok,
+                        FONT - 1.0,
+                    );
+                }
+                Tab::Done => {}
+            }
+            Item {
+                label: format!("Tarefas {}", tab.label()),
+                job,
+                underline: on.then_some(theme.accent),
+                dot: None,
+            }
+        })
+        .collect();
+    let (resps, _) = centered(ui, row, items);
+    for (resp, tab) in resps.into_iter().zip(tabs) {
+        if resp
+            .on_hover_text(format!("{} · c alterna", tab.label()))
+            .clicked()
+        {
+            set_tab(&mut app.tasks_ui, tab);
+        }
+    }
 }
 
 /// Numa tela fora da barra (Config, Worktrees…): o nome dela e como voltar.

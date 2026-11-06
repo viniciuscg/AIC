@@ -90,19 +90,28 @@ Uma lista à parte, no jeito do "Próximos" do Todoist: **data e tarefa**, agrup
 
 A lista mostra as atrasadas (com um botão pra mandar tudo pra hoje), os próximos 7 dias, mais tarde e sem data.
 
+Na barra, embaixo das abas, tem **Em andamento · Concluídas** (`c` alterna). Concluídas fica agrupada pelo dia em que você concluiu, com a hora, e em cima mostra quantas foram hoje, na semana, no mês e no total.
+
+**Tags**: `#infra` no texto da tarefa nova vira tag, ou `t` numa tarefa pra editar. A tag `#bloqueado` (ou a tecla `b`) deixa a tarefa vermelha e já abre o campo do motivo. `m` escreve um motivo ou descrição, que aparece embaixo do título.
+
 | Tecla (fora do campo) | Ação |
 | --- | --- |
 | `n` | escrever uma nova |
 | `h` / `l` | dia anterior / seguinte da tarefa nova |
 | `j` / `k` | andar na lista |
-| `x` ou `Espaço` | concluir |
+| `Shift+K` / `Shift+J` | subir / descer a tarefa dentro do dia (a ordem fica salva) |
+| `Home` / `End` | mandar a tarefa pro topo / fim do dia (também no menu do botão direito) |
+| `x` ou `Espaço` | concluir (em Concluídas, reabre) |
 | `e` ou `Enter` | editar o título |
 | `<` / `>` | um dia antes / depois |
 | `1` `2` `3` `0` | hoje, amanhã, daqui a uma semana, sem data |
 | `H` | mandar as atrasadas pra hoje |
 | `d`, depois `u` | apagar, desfazer |
 | `o` | abrir o link que estiver no título |
-| `c` | mostrar concluídas |
+| `c` | alternar Em andamento / Concluídas |
+| `t` | editar as tags (`#a #b`) |
+| `b` | bloquear / desbloquear |
+| `m` | motivo ou descrição |
 | `Esc` | voltar pros terminais |
 
 Pelo terminal: `aic add "pagar o boleto @sexta"`, `aic tasks`, `aic done <id>`.
