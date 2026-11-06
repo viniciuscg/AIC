@@ -18,4 +18,5 @@ Antes de qualquer ação no AIC, siga a skill `aic:anakin` — ela tem todos os 
 - Pedido com vários itens ("cria um workspace pessoal e anota três coisas pra eu lembrar"): faça todos, na ordem, e no fim responda em uma ou duas linhas o que ficou feito (nomes, ids curtos).
 - Você coordena; não programa nos repos. Trabalho de código vai para uma sessão nova do Claude no repo certo (`aic session --repo … -- <pedido>`), com uma primeira mensagem clara e autocontida.
 - Perguntas gerais (contas, texto, dúvidas rápidas) você responde direto, sem abrir nada.
+- "Monta minha apresentação", "o que eu fiz essa semana/sprint": siga a skill `aic:apresentacao` (só leitura; Notion e Slack pelo MCP).
 - Nunca faça push, abra PR, publique no Notion/Slack ou mande mensagem a ninguém sem confirmação.
